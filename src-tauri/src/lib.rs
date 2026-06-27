@@ -78,7 +78,7 @@ pub fn run() {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.set_size(Size::Logical(LogicalSize {
                         width: 330.0,
-                        height: 240.0,
+                        height: 210.0,
                     }));
                     let _ = window.set_title("Cài đặt");
                     let _ = window.eval(
@@ -90,6 +90,9 @@ pub fn run() {
 
                     tauri::async_runtime::spawn(async move {
                         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        let _ = window.set_decorations(false);
+                        let _ = window.set_resizable(false);
+                        let _ = window.center();
                         let _ = window.show();
                         let _ = window.set_focus();
                     });

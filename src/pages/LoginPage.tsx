@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from "react";
+import { useCallback, useLayoutEffect, useState } from "react";
 import { RotateCw, Eye, EyeOff } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -8,18 +8,41 @@ import { useAppStore } from "../stores/app.store";
 import { trayApi } from "../api/axios/axiosClient";
 
 export default function LoginPage() {
+    const token = useAppStore(store => store.tokenTCT);
     const location = useLocation();
-    const data = location.state;
+    const params = location.state;
 
-    const [username] = useState(data?.username ?? "");
-    const [password, setPassword] = useState(data?.password ?? "");
+    const [username] = useState(params.username);
+    const [password, setPassword] = useState(params.password);
     const [cvalue, setCvalue] = useState("");
     const [ckey, setCkey] = useState("");
     const [captchaImage, setCaptchaImage] = useState("");
     const [loadingCaptcha, setLoadingCaptcha] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const setTokenTCT = useAppStore(appStore => appStore.setTokenTCT);
-    const loadCaptcha = async () => {
+    const getInvoiceTCT = useCallback(async () => {
+        await getCurrentWindow().hide();
+        const payload = {
+            route: "/get-invoice-tct",
+            data: {
+                taxCode: username,
+                type: params.type,
+                fromDate: params.fromDate,
+                toDate: params.toDate,
+                screen: {
+                    title: "Lấy hóa đơn",
+                    width: 400,
+                    height: 510
+                }
+            }
+        }
+        await trayApi.post("/open_tray_page", payload);
+    }, [username, params])
+    const loadCaptcha = useCallback(async () => {
+        if (token !== null) {
+            await getInvoiceTCT();
+            return;
+        }
         setLoadingCaptcha(true);
         const res = await tctService.getCaptcha();
         if (res) {
@@ -32,7 +55,7 @@ export default function LoginPage() {
             });
         }
         setLoadingCaptcha(false);
-    };
+    }, [token]);
 
     useLayoutEffect(() => {
         loadCaptcha();
@@ -44,18 +67,7 @@ export default function LoginPage() {
         });
         if (res) {
             setTokenTCT(res.token);
-            await getCurrentWindow().hide();
-            const payload = {
-                route: "/get-invoice-tct",
-                data: {
-                    screen: {
-                        title: "Lấy hóa đơn",
-                        width: 400,
-                        height: 400
-                    }
-                }
-            }
-            await trayApi.post("/open_tray_page", payload);
+            await getInvoiceTCT();
         }
     };
 

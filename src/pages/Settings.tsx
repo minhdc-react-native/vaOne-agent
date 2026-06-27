@@ -7,6 +7,7 @@ import {
     isEnabled,
 } from "@tauri-apps/plugin-autostart";
 import { useAppStore } from "../stores/app.store";
+import { Line } from "../components/Line";
 // import { sendNotification } from "@tauri-apps/plugin-notification";
 
 interface AgentInfo {
@@ -73,7 +74,7 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="settings" title="Cài đặt">
+        <div className="settings">
             <div className="content">
                 <div className="row">
                     <span>Version</span>
@@ -112,7 +113,6 @@ export default function SettingsPage() {
                     />
                 </div>
             </div>
-
             <div className="footer">
                 <button
                     className="app-button"

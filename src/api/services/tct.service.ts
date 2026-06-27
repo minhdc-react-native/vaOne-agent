@@ -1,6 +1,7 @@
 import axios from "axios";
 import { getDelayRequest, getTokenTct } from "../../stores/app.store";
 import { invoke } from "@tauri-apps/api/core";
+import { message } from "@tauri-apps/plugin-dialog";
 export function formatDate(dateStr?: string): string {
     if (!dateStr) return "";
     const [year, month, day] = dateStr.split("T")[0].split("-");
@@ -36,6 +37,10 @@ export const tctService = {
                 key: res.data.key ?? ""
             }
         } catch (e) {
+            await message("Không thể lấy mã Captcha!", {
+                title: "vaOne Agent",
+                kind: "error", // "info" | "warning" | "error"
+            });
             return null;
         }
     },
@@ -47,6 +52,16 @@ export const tctService = {
             );
             return res.data as ILoginRequest;
         } catch (e) {
+            let errorMessage = "Đã xảy ra lỗi.";
+            if (axios.isAxiosError(e)) {
+                errorMessage =
+                    e.response?.data?.message ??
+                    e.message;
+            }
+            await message(errorMessage, {
+                title: "Lỗi truy cập",
+                kind: "error", // "info" | "warning" | "error"
+            });
             return null;
         }
     },

@@ -538,6 +538,13 @@
   dependencies:
     "@tauri-apps/api" "^2.8.0"
 
+"@tauri-apps/plugin-dialog@^2.7.1":
+  version "2.7.1"
+  resolved "https://registry.yarnpkg.com/@tauri-apps/plugin-dialog/-/plugin-dialog-2.7.1.tgz#fc83387de807c8d064d2b64b1b813b84e8286a12"
+  integrity sha512-OK1UBXYt+ojcmxMktzzuyonYIFta8CmAASpX+CA+DTGK24KlHjhYI6x2iOJ/TjZF4N7/ACK1oFmEOjIY9IhzOQ==
+  dependencies:
+    "@tauri-apps/api" "^2.11.0"
+
 "@tauri-apps/plugin-notification@~2":
   version "2.3.3"
   resolved "https://registry.yarnpkg.com/@tauri-apps/plugin-notification/-/plugin-notification-2.3.3.tgz#01581e3abd3bd18200121b213d3e6ebff2967fe2"

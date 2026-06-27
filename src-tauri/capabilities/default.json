@@ -13,6 +13,9 @@
     "core:window:allow-close",
     "opener:default",
     "notification:default",
-    "autostart:default"
+    "autostart:default",
+    "dialog:allow-message",
+    "dialog:allow-confirm",
+    "dialog:allow-ask"
   ]
 }

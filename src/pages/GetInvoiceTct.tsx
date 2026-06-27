@@ -2,13 +2,25 @@ import { useCallback, useEffect, useState } from "react";
 import Progress from "../components/Progress";
 import { formatDate, tctService } from "../api/services/tct.service";
 import { sendNotification } from "@tauri-apps/plugin-notification";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { message } from "@tauri-apps/plugin-dialog";
+import { useLocation } from "react-router-dom";
+import { Line } from "../components/Line";
+const TYPE_LOADING = {
+    1: "Hóa đơn mua vào",
+    2: "Hóa đơn bán ra",
+    3: "Hóa đơn mua vào MTT",
+    4: "Hóa đơn bán ra MTT"
+}
 export const GetInvoiceTct = () => {
+    const location = useLocation();
+    const { taxCode, type, fromDate, toDate } = location.state;
     const [info, setInfo] = useState({ current: 0, total: 0 });
     const [invoices, setInvoices] = useState<any[]>([]);
     // const [invoicesWidthDetail, setInvoicesWidthDetail] = useState<any[]>([]);
     const [currentInvoice, setCurrentInvoice] = useState<any>({});
     const getInvoice = useCallback(async () => {
-        const dataAll = await tctService.getInvoice(2, { fromDate: '2026-05-28', toDate: '2026-06-27' });
+        const dataAll = await tctService.getInvoice(type, { fromDate, toDate });
         setInfo(prev => ({ ...prev, total: dataAll.length }));
         setInvoices(dataAll);
     }, []);
@@ -24,9 +36,10 @@ export const GetInvoiceTct = () => {
         );
         console.log('dataAllWidthDetail>>', dataAllWidthDetail);
         // setInvoicesWidthDetail(dataAllWidthDetail);
-        sendNotification({
-            title: "Nhận dữ liệu",
-            body: "Quá trình nhận dữ liệu đã hoàn tất!",
+        // await getCurrentWindow().hide();
+        await message(`Đã lấy được ${dataAllWidthDetail.length}/${datas.length} hóa đơn !`, {
+            title: "Thông báo",
+            kind: "info", // "info" | "warning" | "error"
         });
     }, []);
 
@@ -41,28 +54,28 @@ export const GetInvoiceTct = () => {
 
     return (
         <div style={{
-            padding: 20
+            padding: 10
         }}>
             <div className="invoice-loading">
-                <div className="row">
-                    <span className="label">Ngày</span>
-                    <span className="value">{formatDate(tdlap) || "--"}</span>
-                </div>
-                <div className="row">
-                    <span className="label">Ký hiệu</span>
-                    <span className="value">{khhdon || "--"}</span>
-                </div>
-                <div className="row">
-                    <span className="label">Số hóa đơn</span>
-                    <span className="value">{shdon || "--"}</span>
-                </div>
+                <span className="value">
+                    Mã số thuế: <strong>{taxCode}</strong>
+                </span>
+                <span className="value">{`Loại: ${TYPE_LOADING[type as 1 | 2 | 3 | 4]}`}</span>
+                <span className="value">{`Từ ngày: ${formatDate(fromDate)} đến ngày: ${formatDate(toDate)}`}</span>
+                <Line />
+                <span className="value">
+                    Đang tải hóa đơn: Ký hiệu: {khhdon}, Ngày:{" "}
+                    <strong>{formatDate(tdlap)}</strong>, Số hóa đơn:{" "}
+                    <strong style={{ color: "red" }}>{shdon}</strong>
+                </span>
+                {invoices.length === 0 && <span className="value"><strong style={{ color: "red" }}>Không có số hóa đơn nào!</strong></span>}
             </div>
             <Progress
                 value={info.current}
                 total={info.total}
             />
             <div style={{
-                height: 200,
+                height: invoices.length === 0 ? 250 : 280,
                 border: "1px solid darkred",
                 borderRadius: 8,
                 marginTop: 10,
