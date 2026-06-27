@@ -1,0 +1,23 @@
+# Rust
+/target
+/src-tauri/target
+
+# Node
+node_modules
+dist
+dist-ssr
+
+# Tauri / build output
+/src-tauri/target
+/src-tauri/gen
+/src-tauri/icons/*.icns
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Env
+.env
+.env.*
