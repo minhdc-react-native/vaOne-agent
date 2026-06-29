@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "vaone-agent",
+  "productName": "vaone-plugin",
   "version": "0.1.0",
-  "identifier": "com.congtyvacom.vaone-agent",
+  "identifier": "com.congtyvacom.vaone-plugin",
   "build": {
     "beforeDevCommand": "yarn dev",
     "devUrl": "http://localhost:1420",
@@ -13,10 +13,11 @@
     "windows": [
       {
         "label": "main",
-        "title": "vaone-agent",
-        "width": 400,
-        "height": 300,
-        "resizable": false
+        "title": "vaOne plugin",
+        "width": 135,
+        "height": 44,
+        "resizable": false,
+        "decorations": false
       }
     ],
     "security": {

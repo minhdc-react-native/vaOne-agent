@@ -7,7 +7,7 @@ use tokio::time::{sleep, Duration};
 #[tauri::command]
 pub fn get_agent_info() -> AgentInfo {
     AgentInfo {
-        name: "vaOne Agent".into(),
+        name: "vaOne plugin".into(),
         version: "1.0.0".into(),
         os: std::env::consts::OS.into(),
     }

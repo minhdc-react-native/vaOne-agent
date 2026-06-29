@@ -6,9 +6,15 @@ import {
     disable,
     isEnabled,
 } from "@tauri-apps/plugin-autostart";
+
+import AppWindow from "../components/AppWindow";
+import Button from "../components/Button";
+import Input from "../components/Input";
+import Switch from "../components/Switch";
+
 import { useAppStore } from "../stores/app.store";
-import { Line } from "../components/Line";
-// import { sendNotification } from "@tauri-apps/plugin-notification";
+import { Divider } from "../components/Divider";
+import { dialog } from "../service/dialog.service";
 
 interface AgentInfo {
     name: string;
@@ -17,36 +23,54 @@ interface AgentInfo {
 }
 
 export default function SettingsPage() {
+    const delayRequest = useAppStore((s) => s.delayRequest);
+    const setDelayRequest = useAppStore((s) => s.setDelayRequest);
+
     const [info, setInfo] = useState<AgentInfo>();
-    const delayRequest = useAppStore(store => store.delayRequest);
-    const setDelayRequest = useAppStore(store => store.setDelayRequest)
+
     const [delay, setDelay] = useState(0);
+
     const [autoStart, setAutoStart] = useState(false);
-    const [savedAutoStart, setSavedAutoStart] = useState(false);
+    const [savedAutoStart, setSavedAutoStart] =
+        useState(false);
 
     const loadData = async () => {
         try {
             const enabled = await isEnabled();
+
             setAutoStart(enabled);
             setSavedAutoStart(enabled);
+
             setDelay(delayRequest);
-            const agent = await invoke<AgentInfo>("get_agent_info");
+
+            const agent =
+                await invoke<AgentInfo>("get_agent_info");
+
             setInfo(agent);
-        } catch (e) {
-            console.error(e);
+        } catch (err) {
+            console.error(err);
         }
     };
 
     useEffect(() => {
         loadData();
+
         const reload = () => loadData();
-        window.addEventListener("settings-open", reload);
+
+        window.addEventListener(
+            "settings-open",
+            reload
+        );
+
         return () => {
-            window.removeEventListener("settings-open", reload);
+            window.removeEventListener(
+                "settings-open",
+                reload
+            );
         };
     }, [delayRequest]);
 
-    const save = async () => {
+    const handleSave = async () => {
         try {
             if (autoStart !== savedAutoStart) {
                 if (autoStart) {
@@ -57,77 +81,104 @@ export default function SettingsPage() {
 
                 setSavedAutoStart(autoStart);
             }
-            if (delay !== delayRequest) setDelayRequest(delay);
+
+            if (delay !== delayRequest) {
+                setDelayRequest(delay);
+            }
+
             await getCurrentWindow().hide();
-        } catch (e) {
-            console.error(e);
+        } catch (err) {
+            console.error(err);
         }
     };
 
-    const close = async () => {
+    const handleClose = async () => {
+
         setAutoStart(savedAutoStart);
+        setDelay(delayRequest);
+
         await getCurrentWindow().hide();
     };
 
     if (!info) {
-        return <div className="settings">Loading...</div>;
+        return (
+            <AppWindow title="Settings">
+                <div className="flex h-full items-center justify-center">
+                    Loading...
+                </div>
+            </AppWindow>
+        );
     }
 
     return (
-        <div className="settings">
-            <div className="content">
-                <div className="row">
-                    <span>Version</span>
-                    <strong>{info.version}</strong>
-                </div>
+        <AppWindow title="Settings">
+            <div className="flex h-full flex-col justify-between p-4">
 
-                <div className="row">
-                    <span>OS</span>
-                    <strong>{info.os}</strong>
-                </div>
+                {/* Content */}
 
-                <div className="row">
-                    <span>Auto Start</span>
+                <div className="space-y-5">
 
-                    <label className="switch">
-                        <input
-                            type="checkbox"
-                            checked={autoStart}
-                            onChange={(e) =>
-                                setAutoStart(e.target.checked)
-                            }
-                        />
-                        <span className="slider" />
-                    </label>
-                </div>
-                <div className="row">
-                    <span>Delay request (ms)</span>
-                    <input
-                        className="app-input"
-                        style={{ width: 100 }}
-                        value={delay}
+                    <div className="flex items-center justify-between">
+
+                        <span className="text-sm text-gray-500">
+                            Version
+                        </span>
+
+                        <span className="font-medium">
+                            {info.version}
+                        </span>
+
+                    </div>
+
+                    <div className="flex items-center justify-between">
+
+                        <span className="text-sm text-gray-500">
+                            Operating System
+                        </span>
+
+                        <span className="font-medium">
+                            {info.os}
+                        </span>
+
+                    </div>
+
+                    <Switch
+                        label="Auto Start"
+                        description="Khởi động cùng hệ điều hành."
+                        checked={autoStart}
+                        onChange={setAutoStart}
+                    />
+
+                    <Input
+                        label="Delay Request (ms)"
+                        labelPosition="left"
                         type="number"
+                        value={delay}
                         onChange={(e) =>
                             setDelay(Number(e.target.value))
                         }
                     />
-                </div>
-            </div>
-            <div className="footer">
-                <button
-                    className="app-button"
-                    onClick={save}
-                >
-                    Save
-                </button>
 
-                <button
-                    className="app-button app-button-outline"
-                    onClick={close}
-                >
-                    Close
-                </button>
+                </div>
+
+                {/* Footer */}
+                <Divider />
+                <div className="flex justify-end gap-2">
+
+                    <Button
+                        variant="secondary"
+                        onClick={handleClose}
+                    >
+                        Đóng
+                    </Button>
+
+                    <Button onClick={handleSave}>
+                        Lưu
+                    </Button>
+
+                </div>
+
             </div>
-        </div>
+        </AppWindow>
     );
 }

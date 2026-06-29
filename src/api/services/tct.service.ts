@@ -1,7 +1,7 @@
 import axios from "axios";
 import { getDelayRequest, getTokenTct } from "../../stores/app.store";
 import { invoke } from "@tauri-apps/api/core";
-import { message } from "@tauri-apps/plugin-dialog";
+import { dialog } from "../../service/dialog.service";
 export function formatDate(dateStr?: string): string {
     if (!dateStr) return "";
     const [year, month, day] = dateStr.split("T")[0].split("-");
@@ -37,10 +37,11 @@ export const tctService = {
                 key: res.data.key ?? ""
             }
         } catch (e) {
-            await message("Không thể lấy mã Captcha!", {
-                title: "vaOne Agent",
-                kind: "error", // "info" | "warning" | "error"
-            });
+            await dialog.error("Không thể lấy mã Captcha!");
+            // await message("Không thể lấy mã Captcha!", {
+            //     title: "vaOne plugin",
+            //     kind: "error", // "info" | "warning" | "error"
+            // });
             return null;
         }
     },
@@ -58,10 +59,7 @@ export const tctService = {
                     e.response?.data?.message ??
                     e.message;
             }
-            await message(errorMessage, {
-                title: "Lỗi truy cập",
-                kind: "error", // "info" | "warning" | "error"
-            });
+            await dialog.error(errorMessage);
             return null;
         }
     },
@@ -86,7 +84,7 @@ export const tctService = {
         }
         return await fetchAll(url);
     },
-    async getInvoiceDetail(datas: any[], callBack: (numInvoice: number, currentInvoice: any) => void) {
+    async getInvoiceDetail(datas: any[], callBack: (numInvoice: number, currentInvoice: any, isError?: boolean) => void) {
         const token = getTokenTct();
         const delay = getDelayRequest();
         const result: any[] = [];
@@ -112,6 +110,7 @@ export const tctService = {
 
             } catch (err) {
                 console.error("FAILED INDEX:", i, err);
+                callBack(i + 1, datas[i], true);
                 continue; // 👈 quan trọng: không dừng loop
             }
         }

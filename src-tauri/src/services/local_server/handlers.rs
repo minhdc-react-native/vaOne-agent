@@ -34,20 +34,19 @@ pub async fn open_tray_page(Json(req): Json<OpenTrayRequest>) -> Json<serde_json
         let height = req.data["screen"]["height"].as_f64().unwrap_or(520.0);
         let title = req.data["screen"]["title"]
             .as_str()
-            .unwrap_or("VAOne Agent");
-        let decorations = req.data["screen"]["decorations"].as_bool().unwrap_or(true);
+            .unwrap_or("VAOne plugin");
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.set_title(title);
             let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
             let _ = window.emit("tray-navigate", payload);
-            tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                let _ = window.center();
-                let _ = window.set_decorations(decorations);
-                let _ = window.set_resizable(false);
-                let _ = window.show();
-                let _ = window.set_focus();
-            });
+            if req.route != "/blank" {
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                    let _ = window.center();
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                });
+            }
         }
     }
 

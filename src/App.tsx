@@ -1,10 +1,10 @@
-import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import SettingsPage from "./pages/Settings";
-import LoginPage from "./pages/LoginPage";
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { GetInvoiceTct } from "./pages/GetInvoiceTct";
 import { SplashScreen } from "./pages/Splash";
+import LoginPage from "./pages/LoginPage";
 
 function App() {
   const navigate = useNavigate();
@@ -27,6 +27,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<SplashScreen />} />
+      <Route path="/blank" element={null} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/get-invoice-tct" element={<GetInvoiceTct />} />

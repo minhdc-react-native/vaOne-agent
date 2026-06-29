@@ -1,88 +1,171 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
+
 import Progress from "../components/Progress";
 import { formatDate, tctService } from "../api/services/tct.service";
-import { sendNotification } from "@tauri-apps/plugin-notification";
+import { Divider } from "../components/Divider";
+import { dialog } from "../service/dialog.service";
+import AppWindow from "../components/AppWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { message } from "@tauri-apps/plugin-dialog";
-import { useLocation } from "react-router-dom";
-import { Line } from "../components/Line";
-const TYPE_LOADING = {
+import { trayApi } from "../api/axios/axiosClient";
+import Button from "../components/Button";
+import { useAppStore } from "../stores/app.store";
+import { useLoading } from "../service/loading.service";
+import { Loading } from "../components/Loading";
+
+const TYPE_LOADING: Record<number, string> = {
     1: "Hóa đơn mua vào",
     2: "Hóa đơn bán ra",
     3: "Hóa đơn mua vào MTT",
-    4: "Hóa đơn bán ra MTT"
-}
+    4: "Hóa đơn bán ra MTT",
+};
+
+type LocationState = {
+    source: number;
+    taxCode: string;
+    type: 1 | 2 | 3 | 4;
+    fromDate: string;
+    toDate: string;
+};
+
+type Invoice = any;
+
 export const GetInvoiceTct = () => {
     const location = useLocation();
-    const { taxCode, type, fromDate, toDate } = location.state;
-    const [info, setInfo] = useState({ current: 0, total: 0 });
-    const [invoices, setInvoices] = useState<any[]>([]);
-    // const [invoicesWidthDetail, setInvoicesWidthDetail] = useState<any[]>([]);
-    const [currentInvoice, setCurrentInvoice] = useState<any>({});
-    const getInvoice = useCallback(async () => {
-        const dataAll = await tctService.getInvoice(type, { fromDate, toDate });
-        setInfo(prev => ({ ...prev, total: dataAll.length }));
-        setInvoices(dataAll);
-    }, []);
+    const params = location.state as LocationState;
+    const { taxCode, type, fromDate, toDate } = params;
+    const setLoginTct = useAppStore((s) => s.setLoginTct);
+    const [disableClose, setDisableClose] = useState(false);
+    const [progress, setProgress] = useState({ current: 0, total: 0 });
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [currentInvoice, setCurrentInvoice] = useState<Invoice | null>(null);
+    const titleType = useMemo(
+        () => TYPE_LOADING[type],
+        [type]
+    );
+    const loading = useLoading.getState();
+    const loadInvoices = useCallback(async () => {
+        setInvoices([]);
+        loading.show("...");
+        try {
+            const data = await tctService.getInvoice(type, {
+                fromDate,
+                toDate,
+            });
 
-    const { tdlap, khhdon, shdon } = currentInvoice;
+            setInvoices(data);
+            setProgress((p) => ({ ...p, total: data.length }));
+        } catch (err) {
+            console.error("getInvoice error:", err);
+            await dialog.error("Không thể tải danh sách hóa đơn");
+        } finally {
+            loading.hide();
+        }
+    }, [type, fromDate, toDate]);
 
-    const getInvoiceDetail = useCallback(async (datas: any[]) => {
-        const dataAllWidthDetail = await tctService.getInvoiceDetail(datas,
-            (numInvoice, currentInvoice) => {
-                setInfo(prev => ({ ...prev, current: numInvoice }));
-                setCurrentInvoice(currentInvoice);
+    const loadInvoiceDetails = useCallback(
+        async (data: Invoice[]) => {
+            setDisableClose(true);
+            try {
+                const result = await tctService.getInvoiceDetail(
+                    data,
+                    (index, current, isError) => {
+                        if (!isError) {
+                            setProgress((p) => ({ ...p, current: index }));
+                            setCurrentInvoice(current);
+                        }
+                    }
+                );
+                // await getCurrentWindow().hide();
+                setDisableClose(false);
+                await dialog.success(`Đã lấy được ${result.length}/${data.length} hóa đơn!`);
+            } catch (err) {
+                console.error("getInvoiceDetail error:", err);
+                setDisableClose(false);
+                await dialog.error("Lỗi khi tải chi tiết hóa đơn");
+            } finally {
+
             }
-        );
-        console.log('dataAllWidthDetail>>', dataAllWidthDetail);
-        // setInvoicesWidthDetail(dataAllWidthDetail);
-        // await getCurrentWindow().hide();
-        await message(`Đã lấy được ${dataAllWidthDetail.length}/${datas.length} hóa đơn !`, {
-            title: "Thông báo",
-            kind: "info", // "info" | "warning" | "error"
+        },
+        []
+    );
+
+    useEffect(() => {
+        loadInvoices();
+    }, [loadInvoices]);
+
+    useEffect(() => {
+        if (invoices.length > 0) {
+            loadInvoiceDetails(invoices);
+        }
+    }, [invoices, loadInvoiceDetails]);
+
+    const { khhdon, shdon, tdlap } = currentInvoice || {};
+
+    const reLogin = useCallback(async () => {
+        setLoginTct(null);
+        await getCurrentWindow().hide();
+        await trayApi.post("/open_tray_page", {
+            route: "/login",
+            data: {
+                ...params,
+                username: params.taxCode,
+                screen: {
+                    width: 380,
+                    height: 520,
+                }
+            }
         });
-    }, []);
-
-    useEffect(() => {
-        getInvoice();
-    }, []);
-
-    useEffect(() => {
-        if (invoices.length === 0) return;
-        getInvoiceDetail(invoices);
-    }, [invoices]);
+    }, [params]);
 
     return (
-        <div style={{
-            padding: 10
-        }}>
-            <div className="invoice-loading">
-                <span className="value">
-                    Mã số thuế: <strong>{taxCode}</strong>
-                </span>
-                <span className="value">{`Loại: ${TYPE_LOADING[type as 1 | 2 | 3 | 4]}`}</span>
-                <span className="value">{`Từ ngày: ${formatDate(fromDate)} đến ngày: ${formatDate(toDate)}`}</span>
-                <Line />
-                <span className="value">
-                    Đang tải hóa đơn: Ký hiệu: {khhdon}, Ngày:{" "}
-                    <strong>{formatDate(tdlap)}</strong>, Số hóa đơn:{" "}
-                    <strong style={{ color: "red" }}>{shdon}</strong>
-                </span>
-                {invoices.length === 0 && <span className="value"><strong style={{ color: "red" }}>Không có số hóa đơn nào!</strong></span>}
-            </div>
-            <Progress
-                value={info.current}
-                total={info.total}
-            />
-            <div style={{
-                height: invoices.length === 0 ? 250 : 280,
-                border: "1px solid darkred",
-                borderRadius: 8,
-                marginTop: 10,
-                backgroundColor: "#ffffff",
-            }}>
+        <AppWindow title="Tải hóa đơn..." disableClose={disableClose}>
+            <div className="space-y-2 p-4">
+                {/* Info panel */}
+                <div className="space-y-1 text-sm">
+                    <div className="flex gap-1 items-center">
+                        <p className="flex-1">
+                            Mã số thuế: <strong>{taxCode}</strong>
+                        </p>
+                        {disableClose && <Loading />}
+                    </div>
+                    <p>Loại: {titleType}</p>
+                    <p>
+                        Từ ngày: {formatDate(fromDate)} → {formatDate(toDate)}
+                    </p>
+                    <Divider />
+                    <p>
+                        Đang tải: Ký hiệu: {khhdon ?? "--"}, Ngày:{" "}
+                        <strong>{tdlap ? formatDate(tdlap) : "--"}</strong>, Số hóa đơn:{" "}
+                        <strong className="text-red-500">{shdon ?? "--"}</strong>
+                    </p>
 
+                    {invoices.length === 0 && (
+                        <p className="text-red-500 font-semibold">
+                            Không có số hóa đơn nào!
+                        </p>
+                    )}
+                </div>
+
+                {/* Progress */}
+                <Progress value={progress.current} total={progress.total} />
+
+                {/* Content box */}
+                <div
+                    className="border border-red-800 rounded-md bg-white"
+                    style={{
+                        height: invoices.length === 0 ? 250 : 280,
+                    }}
+                />
+                {/* <div className="flex justify-end">
+                    <Button
+                        className="mt-2 w-40"
+                        onClick={reLogin} disabled={disableClose}
+                    >
+                        Đăng nhập lại
+                    </Button>
+                </div> */}
             </div>
-        </div>
+        </AppWindow>
     );
-}
+};
