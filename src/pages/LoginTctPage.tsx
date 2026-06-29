@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { RotateCw } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -12,6 +12,7 @@ import { useAppStore } from "../stores/app.store";
 import Switch from "../components/Switch";
 import { useLoading } from "../service/loading.service";
 import { dialog } from "../service/dialog.service";
+import { invoke } from "@tauri-apps/api/core";
 interface IProgs {
     params: Record<string, any>
 }
@@ -33,28 +34,20 @@ export default function LoginTctPage({ params }: IProgs) {
 
     const getInvoiceTCT = useCallback(async () => {
         await getCurrentWindow().hide();
-
         await trayApi.post("/open_tray_page", {
             route: "/get-invoice-tct",
             data: {
                 taxCode: params.username,
                 type: params.type,
                 fromDate: params.fromDate,
-                toDate: params.toDate,
-                screen: {
-                    title: "Lấy hóa đơn",
-                    width: 400,
-                    height: 520,
-                },
+                toDate: params.toDate
             },
         });
     }, [params]);
 
     const loadCaptcha = useCallback(async () => {
         setLoadingCaptcha(true);
-
         const res = await tctService.getCaptcha();
-
         if (res) {
             setCaptchaImage(res.captcha);
             setCkey(res.key);
@@ -62,8 +55,7 @@ export default function LoginTctPage({ params }: IProgs) {
 
         setLoadingCaptcha(false);
     }, []);
-
-    useLayoutEffect(() => {
+    useEffect(() => {
         if (
             tokenTct &&
             tokenTct.username === params.username
@@ -71,7 +63,7 @@ export default function LoginTctPage({ params }: IProgs) {
             getInvoiceTCT();
             return;
         }
-
+        invoke("page_ready", { name: 'loginTct' });
         loadCaptcha();
     }, [tokenTct, params.username, loadCaptcha, getInvoiceTCT]);
 

@@ -6,10 +6,11 @@ mod utils;
 mod window_config;
 use commands::system::get_agent_info;
 use commands::system::get_invoice_detail;
+use commands::system::page_ready;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    Emitter, LogicalSize, Manager, Size, WebviewWindow, WindowEvent,
+    Manager,
 };
 use tauri_plugin_dialog::DialogExt;
 
@@ -27,14 +28,6 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
             let window_clone = window.clone();
             let _ = window_clone.hide();
-            window.on_window_event(move |event| {
-                if let WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = window_clone.emit("app-hide", ());
-                    let _ = window_clone.hide();
-                }
-            });
-
             // let info = MenuItem::with_id(app, "agent_info", "Giới thiệu", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
@@ -63,51 +56,23 @@ pub fn run() {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "agent_info" => {
                 if let Some(window) = app.get_webview_window("main") {
-                    let (width, height) = window_config::get_window_size("splash").unwrap();
-                    let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
+                    let _ = window.hide();
                     let _ = window.eval(
                         r#"
                             window.location.hash = "/";
                         "#,
                     );
-
-                    tauri::async_runtime::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                        let _ = window.center();
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    });
                 }
-                // let info = get_agent_info();
-
-                // let msg = format!("{}\nVersion: {}\nOS: {}", info.name, info.version, info.os);
-
-                // let _ = app
-                //     .notification()
-                //     .builder()
-                //     .title("vaOne Info")
-                //     .body(msg)
-                //     .show();
             }
 
             "settings" => {
                 if let Some(window) = app.get_webview_window("main") {
-                    let (width, height) = window_config::get_window_size("settings").unwrap();
-                    let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
-                    let _ = window.set_title("Cài đặt");
+                    let _ = window.hide();
                     let _ = window.eval(
                         r#"
                             window.location.hash = "/settings";
-                            window.dispatchEvent(new Event("settings-open"));
                         "#,
                     );
-
-                    tauri::async_runtime::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                        let _ = window.center();
-                        let _ = window.show();
-                        let _ = window.set_focus();
-                    });
                 }
             }
             "quit" => {
@@ -135,7 +100,11 @@ pub fn run() {
             _ => {}
         })
         // REGISTER COMMAND
-        .invoke_handler(tauri::generate_handler![get_agent_info, get_invoice_detail])
+        .invoke_handler(tauri::generate_handler![
+            get_agent_info,
+            get_invoice_detail,
+            page_ready
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

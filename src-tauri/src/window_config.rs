@@ -2,6 +2,10 @@ pub fn get_window_size(id: &str) -> Option<(f64, f64)> {
     match id {
         "splash" => Some((500.0, 200.0)),
         "settings" => Some((330.0, 350.0)),
+        "loginTct" => Some((380.0, 520.0)),
+        "getInvoiceTct" => Some((400.0, 520.0)),
+        "loginMInvoice" => Some((380.0, 400.0)),
+        "blank" => Some((10.0, 10.0)),
         _ => None,
     }
 }

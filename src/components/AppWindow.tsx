@@ -1,8 +1,6 @@
-import { useEffect, type ReactNode } from "react";
-import { getCurrentWindow, PhysicalSize } from "@tauri-apps/api/window";
+import { type ReactNode } from "react";
 import { X } from "lucide-react";
 import Button from "./Button";
-import Tooltip from "./Tooltip";
 import { trayApi } from "../api/axios/axiosClient";
 
 interface AppWindowProps {
@@ -20,12 +18,7 @@ export default function AppWindow({
     const hideWindow = async () => {
         await trayApi.post("/open_tray_page", {
             route: "/blank",
-            data: {
-                screen: {
-                    width: 10,
-                    height: 10,
-                }
-            },
+            data: {},
         });
     };
 

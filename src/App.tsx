@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import { GetInvoiceTct } from "./pages/GetInvoiceTct";
 import { SplashScreen } from "./pages/Splash";
 import LoginPage from "./pages/LoginPage";
+import { BlankPage } from "./pages/BlankPage";
 
 function App() {
   const navigate = useNavigate();
@@ -27,7 +28,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<SplashScreen />} />
-      <Route path="/blank" element={null} />
+      <Route path="/blank" element={<BlankPage />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/get-invoice-tct" element={<GetInvoiceTct />} />

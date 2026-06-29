@@ -63,7 +63,7 @@ export const tctService = {
             return null;
         }
     },
-    async getInvoice(type: 1 | 2 | 3 | 4, filter: IFilterInvoice) {
+    async getInvoice(type: 1 | 2 | 3 | 4, filter: IFilterInvoice, isCancelled?: () => boolean) {
         /*
             1: Mua vào
             2: Bán ra
@@ -82,13 +82,21 @@ export const tctService = {
                 url = `https://hoadondientu.gdt.gov.vn/api/query/invoices/sold?sort=tdlap:desc&size=${sizePage}&search=tdlap=ge=${formatDate(filter.fromDate)}T00:00:00;tdlap=le=${formatDate(filter.toDate)}T23:59:59`;
                 break;
         }
-        return await fetchAll(url);
+        return await fetchAll(url, isCancelled);
     },
-    async getInvoiceDetail(datas: any[], callBack: (numInvoice: number, currentInvoice: any, isError?: boolean) => void) {
+    async getInvoiceDetail(
+        datas: any[],
+        callBack: (numInvoice: number, currentInvoice: any, isError?: boolean) => void,
+        isCancelled?: () => boolean
+    ) {
         const token = getTokenTct();
         const delay = getDelayRequest();
         const result: any[] = [];
         for (let i = 0; i < datas.length; i++) {
+            if (isCancelled?.()) {
+                console.log("Cancelled");
+                break;
+            }
             try {
                 callBack(i + 1, datas[i]);
 
@@ -122,13 +130,16 @@ export const sleep = (ms?: number) => new Promise(resolve => {
     setTimeout(resolve, fixMs)
 });
 
-async function fetchAll(url: string) {
+async function fetchAll(url: string, isCancelled?: () => boolean) {
     const token = getTokenTct();
     const result: any[] = [];
     let hasMore = true;
     let fixUrl = url;
     while (hasMore) {
-        console.log('fixUrl>>', fixUrl);
+        if (isCancelled?.()) {
+            console.log("Cancelled");
+            break;
+        }
         const res: IDataPage = (await axios.get(fixUrl, {
             headers: {
                 Authorization: `Bearer ${token}`,

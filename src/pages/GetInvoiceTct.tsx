@@ -12,6 +12,8 @@ import Button from "../components/Button";
 import { useAppStore } from "../stores/app.store";
 import { useLoading } from "../service/loading.service";
 import { Loading } from "../components/Loading";
+import { useCancellation } from "../api/useCancellation";
+import { invoke } from "@tauri-apps/api/core";
 
 const TYPE_LOADING: Record<number, string> = {
     1: "Hóa đơn mua vào",
@@ -32,6 +34,7 @@ type Invoice = any;
 
 export const GetInvoiceTct = () => {
     const location = useLocation();
+    const { isCancelled } = useCancellation();
     const params = location.state as LocationState;
     const { taxCode, type, fromDate, toDate } = params;
     const setLoginTct = useAppStore((s) => s.setLoginTct);
@@ -51,17 +54,22 @@ export const GetInvoiceTct = () => {
             const data = await tctService.getInvoice(type, {
                 fromDate,
                 toDate,
-            });
-
+            }, isCancelled);
+            if (isCancelled()) return;
             setInvoices(data);
             setProgress((p) => ({ ...p, total: data.length }));
         } catch (err) {
+            if (isCancelled()) return;
             console.error("getInvoice error:", err);
             await dialog.error("Không thể tải danh sách hóa đơn");
         } finally {
             loading.hide();
         }
     }, [type, fromDate, toDate]);
+
+    useEffect(() => {
+        invoke("page_ready", { name: 'getInvoiceTct' });
+    }, []);
 
     const loadInvoiceDetails = useCallback(
         async (data: Invoice[]) => {
@@ -70,17 +78,21 @@ export const GetInvoiceTct = () => {
                 const result = await tctService.getInvoiceDetail(
                     data,
                     (index, current, isError) => {
+                        if (isCancelled()) return;
                         if (!isError) {
                             setProgress((p) => ({ ...p, current: index }));
                             setCurrentInvoice(current);
                         }
-                    }
+                    },
+                    isCancelled
                 );
                 // await getCurrentWindow().hide();
+                if (isCancelled()) return;
                 setDisableClose(false);
                 await dialog.success(`Đã lấy được ${result.length}/${data.length} hóa đơn!`);
             } catch (err) {
                 console.error("getInvoiceDetail error:", err);
+                if (isCancelled()) return;
                 setDisableClose(false);
                 await dialog.error("Lỗi khi tải chi tiết hóa đơn");
             } finally {
@@ -109,11 +121,7 @@ export const GetInvoiceTct = () => {
             route: "/login",
             data: {
                 ...params,
-                username: params.taxCode,
-                screen: {
-                    width: 380,
-                    height: 520,
-                }
+                username: params.taxCode
             }
         });
     }, [params]);

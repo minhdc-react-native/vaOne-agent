@@ -1,9 +1,14 @@
+import { invoke } from "@tauri-apps/api/core";
 import AppWindow from "../components/AppWindow";
 import Button from "../components/Button";
+import { useEffect } from "react";
 interface IProgs {
     params: Record<string, any>
 }
 export default function LoginMInvoicePage({ params }: IProgs) {
+    useEffect(() => {
+        invoke("page_ready", { name: 'loginMInvoice' });
+    }, []);
     return (
         <AppWindow title="Đăng nhập">
             <div className="flex h-full flex-col gap-4 p-4">

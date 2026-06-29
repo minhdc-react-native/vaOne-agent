@@ -14,7 +14,6 @@ import Switch from "../components/Switch";
 
 import { useAppStore } from "../stores/app.store";
 import { Divider } from "../components/Divider";
-import { dialog } from "../service/dialog.service";
 
 interface AgentInfo {
     name: string;
@@ -99,6 +98,10 @@ export default function SettingsPage() {
 
         await getCurrentWindow().hide();
     };
+
+    useEffect(() => {
+        invoke("page_ready", { name: "settings" });
+    }, []);
 
     if (!info) {
         return (

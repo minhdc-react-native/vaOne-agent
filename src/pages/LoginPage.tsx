@@ -5,11 +5,11 @@ import LoginMInvoicePage from "./LoginMInvoicePage";
 export default function LoginPage() {
     const location = useLocation();
     const params = location.state;
-    const source = params.source as number;
+    const source = params.source;
     switch (source) {
-        case 1: //TCT
+        case "TCT": //TCT
             return <LoginTctPage params={params} />
-        case 2: //M-Invoice
+        case "M-INVOICE": //M-Invoice
             return <LoginMInvoicePage params={params} />
         default:
             return <LoginTctPage params={params} />
