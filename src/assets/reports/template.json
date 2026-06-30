@@ -1,0 +1,22 @@
+{
+    "page": {
+        "width": 210,
+        "height": 297
+    },
+    "elements": [
+        {
+            "type": "text",
+            "x": 20,
+            "y": 30,
+            "fontSize": 18,
+            "value": "Invoice"
+        },
+        {
+            "type": "text",
+            "x": 20,
+            "y": 45,
+            "fontSize": 12,
+            "value": "Customer: John"
+        }
+    ]
+}

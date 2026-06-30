@@ -49,7 +49,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                     "inline-flex items-center justify-center",
                     "gap-2",
                     iconOnly ? "rounded-full" : "rounded-lg",
-                    !iconOnly && "h-9",
+                    !iconOnly && "h-8",
                     "text-sm",
                     "font-medium",
                     "transition-all",

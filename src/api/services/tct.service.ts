@@ -26,32 +26,47 @@ interface IDataPage {
     time: number;
     total: number;
 }
+// const data = await invoke("http_get", {
+//     url: "https://abc.com/api",
+//     token: null,
+//     delay: null,
+//     headers: null,
+// });
+
+// const data = await invoke("http_post", {
+//     url: "https://abc.com/login",
+//     body: {
+//         username: "admin",
+//         password: "123456",
+//     },
+//     token: null,
+//     delay: 0,
+//     headers: null,
+// });
+
 export const tctService = {
     async getCaptcha() {
         try {
-            const res = await axios.get(
-                "https://hoadondientu.gdt.gov.vn/api/captcha"
-            );
+
+            const res: any = await invoke("http_get", {
+                url: "https://hoadondientu.gdt.gov.vn/api/captcha"
+            });
             return {
-                captcha: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(res.data.content)}`,
-                key: res.data.key ?? ""
+                captcha: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(res.content)}`,
+                key: res.key ?? ""
             }
         } catch (e) {
             await dialog.error("Không thể lấy mã Captcha!");
-            // await message("Không thể lấy mã Captcha!", {
-            //     title: "vaOne plugin",
-            //     kind: "error", // "info" | "warning" | "error"
-            // });
             return null;
         }
     },
     async login(data: IInfoLogin) {
         try {
-            const res = await axios.post(
-                "https://hoadondientu.gdt.gov.vn/api/security-taxpayer/authenticate",
-                data
-            );
-            return res.data as ILoginRequest;
+            const res: any = await invoke("http_post", {
+                url: "https://hoadondientu.gdt.gov.vn/api/security-taxpayer/authenticate",
+                body: data
+            });
+            return res as ILoginRequest;
         } catch (e) {
             let errorMessage = "Đã xảy ra lỗi.";
             if (axios.isAxiosError(e)) {
@@ -106,7 +121,7 @@ export const tctService = {
 
                 console.log("call:", i, url);
 
-                const res = await invoke("get_invoice_detail", {
+                const res = await invoke("http_get", {
                     url,
                     token,
                     delay
@@ -132,6 +147,7 @@ export const sleep = (ms?: number) => new Promise(resolve => {
 
 async function fetchAll(url: string, isCancelled?: () => boolean) {
     const token = getTokenTct();
+    const delay = getDelayRequest();
     const result: any[] = [];
     let hasMore = true;
     let fixUrl = url;
@@ -140,11 +156,13 @@ async function fetchAll(url: string, isCancelled?: () => boolean) {
             console.log("Cancelled");
             break;
         }
-        const res: IDataPage = (await axios.get(fixUrl, {
-            headers: {
-                Authorization: `Bearer ${token}`,
-            },
-        })).data;
+
+        const res: any = await invoke("http_get", {
+            url: fixUrl,
+            token,
+            delay
+        });
+
         result.push(...res.datas);
         hasMore = res.state !== null;
         fixUrl = `${url}&state=${res.state}`;

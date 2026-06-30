@@ -18,7 +18,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-opener = "2"
 tokio = { version = "1", features = ["full"] }
 axum = "0.8"
@@ -29,3 +29,9 @@ tauri-plugin-dialog = "2"
 tower-http = { version = "0.6", features = ["cors"] }
 tauri-plugin-autostart = "2"
 reqwest = { version = "0.13.4", features = ["json"] }
+
+printpdf = "0.8"
+thiserror = "2.0.18"
+anyhow = "1.0.103"
+dirs = "6.0.0"
+printers = "2"

@@ -8,12 +8,12 @@ import { dialog } from "../service/dialog.service";
 import AppWindow from "../components/AppWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { trayApi } from "../api/axios/axiosClient";
-import Button from "../components/Button";
 import { useAppStore } from "../stores/app.store";
 import { useLoading } from "../service/loading.service";
 import { Loading } from "../components/Loading";
 import { useCancellation } from "../api/useCancellation";
 import { invoke } from "@tauri-apps/api/core";
+import Button from "../components/Button";
 
 const TYPE_LOADING: Record<number, string> = {
     1: "Hóa đơn mua vào",

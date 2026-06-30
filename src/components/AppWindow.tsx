@@ -2,16 +2,19 @@ import { type ReactNode } from "react";
 import { X } from "lucide-react";
 import Button from "./Button";
 import { trayApi } from "../api/axios/axiosClient";
+import { useEscape } from "../hook/useEscape";
 
 interface AppWindowProps {
     title: string;
     children: ReactNode;
+    content?: ReactNode;
     disableClose?: boolean
 }
 
 export default function AppWindow({
     title,
     children,
+    content,
     disableClose = false
 }: AppWindowProps) {
 
@@ -21,6 +24,8 @@ export default function AppWindow({
             data: {},
         });
     };
+
+    useEscape(hideWindow, !disableClose);
 
     return (
         <div className="flex h-screen flex-col bg-white">
@@ -41,10 +46,11 @@ export default function AppWindow({
             >
                 <span
                     data-tauri-drag-region
-                    className="text-sm font-semibold text-gray-800"
+                    className="flex-1 text-sm font-semibold text-gray-800"
                 >
                     {title}
                 </span>
+                {content}
                 <Button
                     disabled={disableClose}
                     onClick={hideWindow} variant="ghost"

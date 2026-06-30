@@ -4,8 +4,15 @@ use crate::window_config;
 use reqwest::Client;
 use serde_json::Value;
 use std::collections::HashMap;
-use tauri::{LogicalSize, Manager, Size};
-use tokio::time::{sleep, Duration};
+use std::{thread, time::Duration};
+use tauri::{LogicalPosition, LogicalSize, Manager, Position, Size};
+use tokio::time::sleep;
+
+#[tauri::command]
+pub fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
 #[tauri::command]
 pub fn get_agent_info() -> AgentInfo {
     AgentInfo {
@@ -23,42 +30,22 @@ pub fn page_ready(name: String, show: Option<bool>) {
             let (width, height) = window_config::get_window_size(&name).unwrap();
             if show {
                 let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
-                let _ = window.center();
+                // let _ = window.center();
+                if let Some(monitor) = window.current_monitor().unwrap() {
+                    let scale = monitor.scale_factor();
+                    let monitor_size = monitor.size();
+                    let monitor_width = monitor_size.width as f64 / scale;
+                    let monitor_height = monitor_size.height as f64 / scale;
+                    let x = (monitor_width - width) / 2.0;
+                    let y = (monitor_height - height) / 2.0;
+                    let _ = window.set_position(Position::Logical(LogicalPosition { x, y }));
+                }
                 let _ = window.show();
                 let _ = window.set_focus();
             } else {
                 let _ = window.hide();
+                let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
             }
         }
     }
-}
-
-#[tauri::command]
-pub async fn get_invoice_detail(
-    url: String,
-    token: String,
-    delay: u64,
-) -> Result<HashMap<String, Value>, String> {
-    let client = Client::new();
-
-    let res = client
-        .get(&url)
-        .header("Authorization", format!("Bearer {}", token))
-        .header("User-Agent", "Mozilla/5.0")
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // ⏱ delay 1500ms (sau khi request xong)
-    sleep(Duration::from_millis(delay)).await;
-
-    let text = res.text().await.map_err(|e| e.to_string())?;
-
-    // 🔥 debug cực quan trọng (bật khi cần)
-    // println!("RAW RESPONSE: {}", text);
-
-    let json: HashMap<String, Value> = serde_json::from_str(&text)
-        .map_err(|e| format!("JSON parse error: {} | body: {}", e, text))?;
-
-    Ok(json)
 }

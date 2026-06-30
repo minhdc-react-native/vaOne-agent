@@ -20,6 +20,22 @@ services/
       └── mod.rs
 
 
+src-tauri/src/report/
+├── mod.rs
+├── report.rs
+├── element.rs
+├── page.rs
+├── error.rs
+├── template.rs
+│
+├── backend/
+│   ├── mod.rs
+│   ├── pdf_backend.rs
+│
+└── engine/
+    ├── mod.rs
+    ├── renderer.rs
+
 #tạo icons:
 yarn tauri icon src-tauri/icons/1024x1024.png      
 

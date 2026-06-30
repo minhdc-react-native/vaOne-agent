@@ -6,6 +6,8 @@ import { GetInvoiceTct } from "./pages/GetInvoiceTct";
 import { SplashScreen } from "./pages/Splash";
 import LoginPage from "./pages/LoginPage";
 import { BlankPage } from "./pages/BlankPage";
+import { PreviewReport } from "./pages/PreviewReport";
+import QuitPage from "./pages/QuitPage";
 
 function App() {
   const navigate = useNavigate();
@@ -29,9 +31,11 @@ function App() {
     <Routes>
       <Route path="/" element={<SplashScreen />} />
       <Route path="/blank" element={<BlankPage />} />
+      <Route path="/report" element={<PreviewReport />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/get-invoice-tct" element={<GetInvoiceTct />} />
+      <Route path="/quit" element={<QuitPage />} />
     </Routes>
   );
 }

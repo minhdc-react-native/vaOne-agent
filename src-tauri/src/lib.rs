@@ -1,12 +1,12 @@
+mod api;
 mod commands;
 mod models;
+mod pdf;
 mod services;
 mod state;
 mod utils;
 mod window_config;
-use commands::system::get_agent_info;
-use commands::system::get_invoice_detail;
-use commands::system::page_ready;
+use crate::state::{AppState, APP_STATE};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
@@ -28,12 +28,12 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
             let window_clone = window.clone();
             let _ = window_clone.hide();
-            // let info = MenuItem::with_id(app, "agent_info", "Giới thiệu", true, None::<&str>)?;
+            let report = MenuItem::with_id(app, "report", "Test print pdf", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Thoát ứng dụng", true, None::<&str>)?;
 
-            let menu = Menu::with_items(app, &[&settings, &separator, &quit])?;
+            let menu = Menu::with_items(app, &[&report, &settings, &separator, &quit])?;
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -46,6 +46,10 @@ pub fn run() {
                 .set(app.handle().clone())
                 .expect("APP_HANDLE already initialized");
 
+            APP_STATE
+                .set(std::sync::Mutex::new(AppState::default()))
+                .unwrap();
+
             tauri::async_runtime::spawn(async {
                 services::local_server::start().await;
             });
@@ -54,12 +58,12 @@ pub fn run() {
         })
         // HANDLE MENU CLICK
         .on_menu_event(|app, event| match event.id.as_ref() {
-            "agent_info" => {
+            "report" => {
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.hide();
                     let _ = window.eval(
                         r#"
-                            window.location.hash = "/";
+                            window.location.hash = "/report";
                         "#,
                     );
                 }
@@ -76,6 +80,14 @@ pub fn run() {
                 }
             }
             "quit" => {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                    let _ = window.eval(
+                        r#"
+                            window.location.hash = "/quit";
+                        "#,
+                    );
+                }
                 // let _ = app.emit(
                 //     "dialog:open",
                 //     serde_json::json!({
@@ -86,24 +98,30 @@ pub fn run() {
                 //     }),
                 // );
 
-                app.dialog()
-                    .message("Bạn có muốn thoát ứng dụng vaOne-agent không?")
-                    .title("Thoát ứng dụng")
-                    .buttons(tauri_plugin_dialog::MessageDialogButtons::YesNo)
-                    .show(|answer| {
-                        if answer {
-                            std::process::exit(0);
-                        }
-                    });
+                // app.dialog()
+                //     .message("Bạn có muốn thoát ứng dụng vaOne-agent không?")
+                //     .title("Thoát ứng dụng")
+                //     .buttons(tauri_plugin_dialog::MessageDialogButtons::YesNo)
+                //     .show(|answer| {
+                //         if answer {
+                //             std::process::exit(0);
+                //         }
+                //     });
             }
 
             _ => {}
         })
         // REGISTER COMMAND
         .invoke_handler(tauri::generate_handler![
-            get_agent_info,
-            get_invoice_detail,
-            page_ready
+            commands::system::quit_app,
+            commands::system::get_agent_info,
+            commands::api_command::http_get,
+            commands::api_command::http_post,
+            commands::system::page_ready,
+            commands::pdf::render_pdf,
+            commands::printer::get_printer_list,
+            commands::printer::print_pdf,
+            commands::invoice::get_sync_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
