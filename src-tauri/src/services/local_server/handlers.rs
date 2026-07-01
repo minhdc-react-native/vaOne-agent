@@ -4,7 +4,7 @@ use super::types::PingResponse;
 use crate::state::APP_HANDLE;
 use crate::utils::notification;
 use axum::Json;
-
+use serde_json::Value;
 use tauri::{Emitter, LogicalSize, Manager, Size};
 
 pub async fn ping() -> Json<PingResponse> {
@@ -19,6 +19,13 @@ pub async fn message(Json(req): Json<MessageRequest>) -> Json<PingResponse> {
         eprintln!("Show notification failed: {}", err);
     }
     Json(PingResponse { success: true })
+}
+
+pub async fn sync_token(Json(token): Json<Value>) -> Json<serde_json::Value> {
+    // Implementation for syncing token
+    Json(serde_json::json!({
+        "success": true
+    }))
 }
 
 pub async fn open_tray_page(Json(req): Json<OpenTrayRequest>) -> Json<serde_json::Value> {

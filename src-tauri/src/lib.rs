@@ -7,6 +7,7 @@ mod state;
 mod utils;
 mod window_config;
 use crate::state::{AppState, APP_STATE};
+
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
@@ -50,6 +51,8 @@ pub fn run() {
                 .set(std::sync::Mutex::new(AppState::default()))
                 .unwrap();
 
+            crate::state::init_ws_state();
+
             tauri::async_runtime::spawn(async {
                 services::local_server::start().await;
             });
@@ -59,6 +62,18 @@ pub fn run() {
         // HANDLE MENU CLICK
         .on_menu_event(|app, event| match event.id.as_ref() {
             "report" => {
+                // state::update_sync_emit(|s| {
+                //     s.source = "TCT".to_string();
+                //     s.running = true;
+                //     s.total = 100;
+                //     s.completed = 0;
+                //     s.current_invoice = Some(json!({
+                //         "invoiceNumber": "112345",
+                //         "b": 123,
+                //         "c": true
+                //     }));
+                // });
+
                 if let Some(window) = app.get_webview_window("main") {
                     let _ = window.hide();
                     let _ = window.eval(
@@ -122,6 +137,7 @@ pub fn run() {
             commands::printer::get_printer_list,
             commands::printer::print_pdf,
             commands::invoice::get_sync_state,
+            commands::invoice::start_invoice_tct_sync
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
