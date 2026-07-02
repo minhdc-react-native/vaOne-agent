@@ -1,8 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 
-export async function generatePdf(document: any) {
+export async function generatePdf(report: any, data: any) {
     return await invoke("render_pdf", {
-        document
+        report, data
     });
 }
 

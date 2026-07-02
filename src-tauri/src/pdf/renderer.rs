@@ -1,20 +1,31 @@
 use crate::pdf::models::*;
 use crate::pdf::text;
-use crate::state::FONT;
-use printpdf::{Mm, Op, ParsedFont, PdfDocument, PdfPage, PdfSaveOptions};
+use crate::pdf::utils::load_fonts;
+use printpdf::{Mm, Op, PdfDocument, PdfPage, PdfSaveOptions};
 
 pub fn render(doc: PdfTemplate, output: &str) -> anyhow::Result<()> {
     let mut pdf = PdfDocument::new("Invoice");
     let mut ops = Vec::<Op>::new();
-    let mut warnings = Vec::new();
-    let parsed_font = ParsedFont::from_bytes(FONT, 0, &mut warnings)
-        .ok_or_else(|| anyhow::anyhow!("Cannot parse font"))?;
 
-    let font_id = pdf.add_font(&parsed_font);
+    let fonts = load_fonts(&mut pdf)?;
+
     for e in doc.elements {
         match e {
             Element::Text(t) => {
-                text::draw_text(&mut ops, font_id.clone(), doc.page.height, &t);
+                text::draw_text(&mut ops, &fonts, doc.page.height, &t);
+            }
+            Element::Table(_t) => {
+                let fake = TextElement {
+                    x: 50.0,
+                    y: 50.0,
+                    width: 200.0,
+                    height: 20.0,
+                    content: "TABLE (TODO)".to_string(),
+                    field_name: Some("storeInfo.address".to_string()),
+                    style: None,
+                };
+
+                text::draw_text(&mut ops, &fonts, doc.page.height, &fake);
             }
         }
     }

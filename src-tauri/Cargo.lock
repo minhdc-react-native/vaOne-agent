@@ -6162,6 +6162,7 @@ dependencies = [
  "futures-util",
  "printers",
  "printpdf",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
@@ -6175,6 +6176,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite 0.24.0",
  "tower-http",
+ "ttf-parser 0.25.1",
 ]
 
 [[package]]

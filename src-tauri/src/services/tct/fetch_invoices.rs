@@ -196,6 +196,7 @@ pub async fn run_sync_flow(
             crate::state::update_sync_emit(|s| {
                 s.running = false;
                 s.current_invoice = None;
+                s.is_error_api = true;
             });
             return;
         }

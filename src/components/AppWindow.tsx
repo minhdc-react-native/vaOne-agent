@@ -10,6 +10,12 @@ interface AppWindowProps {
     content?: ReactNode;
     disableClose?: boolean
 }
+export const hideWindow = async () => {
+    await trayApi.post("/open_tray_page", {
+        route: "/blank",
+        data: {},
+    });
+};
 
 export default function AppWindow({
     title,
@@ -17,13 +23,6 @@ export default function AppWindow({
     content,
     disableClose = false
 }: AppWindowProps) {
-
-    const hideWindow = async () => {
-        await trayApi.post("/open_tray_page", {
-            route: "/blank",
-            data: {},
-        });
-    };
 
     useEscape(hideWindow, !disableClose);
 

@@ -41,3 +41,6 @@ printers = "2"
 tokio-tungstenite = "0.24"
 futures-util = "0.3"
 chrono = "0.4.45"
+
+ttf-parser = "0.25"
+regex = "1.12.4"

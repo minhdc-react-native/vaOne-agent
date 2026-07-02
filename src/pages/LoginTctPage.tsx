@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RotateCw } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import AppWindow from "../components/AppWindow";
+import AppWindow, { hideWindow } from "../components/AppWindow";
 import Button from "../components/Button";
 import Input from "../components/Input";
 
@@ -33,7 +33,7 @@ export default function LoginTctPage({ params }: IProgs) {
     const [cvalue, setCvalue] = useState("");
 
     const getInvoiceTCT = useCallback(async (token: string) => {
-        await getCurrentWindow().hide();
+        await hideWindow();
         const delay = getDelayRequest();
         await invoke("start_invoice_tct_sync", {
             invoiceType: params.type,

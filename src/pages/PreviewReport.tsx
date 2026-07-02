@@ -4,6 +4,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import AppWindow from "../components/AppWindow";
 import Button from "../components/Button";
 import { Printer } from "lucide-react";
+import { useLocation } from "react-router-dom";
 const template = {
     page: {
         width: 210,
@@ -11,27 +12,41 @@ const template = {
     },
     elements: [
         {
-            type: "text",
-            x: 20,
-            y: 30,
-            fontSize: 18,
-            value: "ĐINH CÔNG MINH",
-        },
-        {
-            type: "text",
-            x: 20,
-            y: 45,
-            fontSize: 18,
-            value: "Invoice",
-        },
+            "id": "stglgae01",
+            "name": "text_stgl",
+            "type": "text",
+            "x": 57.4818141050897,
+            "y": 40.71982281284607,
+            "width": 504.2753783684016,
+            "height": 20,
+            "content": "<b>Địa chỉ:</b> {value}",
+            "fieldName": "storeInfo.address",
+            "childElements": [],
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left",
+                "borderRadius": 4,
+                "padding": 8
+            }
+        }
     ],
+};
+const data = {
+    "storeInfo": {
+        "address": "123 Nguyễn Trãi, Thanh Xuân, Hà Nội"
+    }
 };
 
 export const PreviewReport = () => {
+    const location = useLocation();
+    const { report, data: data_report } = location.state || {};
     const [url, setUrl] = useState({ url: "", path: "" });
     const handleGenerate = async () => {
         await invoke("page_ready", { name: 'report' });
-        const path = await generatePdf(template) as string;
+        const path = await generatePdf(report || template, data_report || data) as string;
         const url = convertFileSrc(path);
         setUrl({ url, path });
     };

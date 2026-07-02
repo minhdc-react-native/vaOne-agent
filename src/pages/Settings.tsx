@@ -7,7 +7,7 @@ import {
     isEnabled,
 } from "@tauri-apps/plugin-autostart";
 
-import AppWindow from "../components/AppWindow";
+import AppWindow, { hideWindow } from "../components/AppWindow";
 import Button from "../components/Button";
 import Input from "../components/Input";
 import Switch from "../components/Switch";
@@ -69,13 +69,6 @@ export default function SettingsPage() {
             );
         };
     }, [delayRequest]);
-
-    const hideWindow = async () => {
-        await trayApi.post("/open_tray_page", {
-            route: "/blank",
-            data: {},
-        });
-    };
 
     const handleSave = async () => {
         try {

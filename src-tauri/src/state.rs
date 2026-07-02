@@ -11,7 +11,11 @@ pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 // ==========================
 // FONT STATIC RESOURCE
 // ==========================
-pub static FONT: &[u8] = include_bytes!("../fonts/NotoSans-Regular.ttf");
+pub static FONT_REGULAR: &[u8] = include_bytes!("../fonts/NotoSans-Regular.ttf");
+
+pub static FONT_BOLD: &[u8] = include_bytes!("../fonts/NotoSans-Bold.ttf");
+
+pub static FONT_ITALIC: &[u8] = include_bytes!("../fonts/NotoSans-Italic.ttf");
 
 // ==========================
 // APP STATE (BUSINESS STATE)
@@ -36,6 +40,7 @@ pub struct SyncState {
     pub failed: usize,
     pub current_invoice: Option<serde_json::Value>,
     pub message: String,
+    pub is_error_api: bool,
 }
 
 impl Default for SyncState {
@@ -49,6 +54,7 @@ impl Default for SyncState {
             failed: 0,
             current_invoice: None,
             message: String::new(),
+            is_error_api: false,
         }
     }
 }
