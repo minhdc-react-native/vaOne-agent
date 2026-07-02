@@ -42,7 +42,7 @@ export const PreviewReport = () => {
         await printPdf(url.path);
     }
     return (
-        <AppWindow title={url.path}
+        <AppWindow title={"Preview Report"}
             content={
                 (
                     <div className="flex gap-1 py-2 pr-2 mr-2 border-r border-gray-300">

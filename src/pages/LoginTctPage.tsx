@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { RotateCw } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -6,35 +6,12 @@ import AppWindow from "../components/AppWindow";
 import Button from "../components/Button";
 import Input from "../components/Input";
 
-import { formatDate, tctService } from "../api/services/tct.service";
-import { trayApi } from "../api/axios/axiosClient";
+import { tctService } from "../api/services/tct.service";
 import { getDelayRequest, useAppStore } from "../stores/app.store";
 import Switch from "../components/Switch";
 import { useLoading } from "../service/loading.service";
 import { dialog } from "../service/dialog.service";
 import { invoke } from "@tauri-apps/api/core";
-const getUrl = (type: 1 | 2 | 3 | 4, fromDate: string, toDate: string) => {
-    /*
-        1: Mua vào
-        2: Bán ra
-        3: Mua vào MTT
-        4: Bán ra MTT
-    */
-    const sizePage = 50;
-    let url = `https://hoadondientu.gdt.gov.vn/api/query/invoices/sold?sort=tdlap:desc&size=${sizePage}&search=tdlap=ge=${formatDate(fromDate)}T00:00:00;tdlap=le=${formatDate(toDate)}T23:59:59`;
-    switch (type) {
-        case 1:
-        case 3:
-            url = `https://hoadondientu.gdt.gov.vn/api/query/invoices/purchase?sort=tdlap:desc&size=${sizePage}&search=tdlap=ge=${formatDate(fromDate)}T00:00:00;tdlap=le=${formatDate(toDate)}T23:59:59;ttxly==5`;
-            break;
-        case 2:
-        case 4:
-            url = `https://hoadondientu.gdt.gov.vn/api/query/invoices/sold?sort=tdlap:desc&size=${sizePage}&search=tdlap=ge=${formatDate(fromDate)}T00:00:00;tdlap=le=${formatDate(toDate)}T23:59:59`;
-            break;
-    }
-    return url;
-};
-
 
 interface IProgs {
     params: Record<string, any>
@@ -59,18 +36,12 @@ export default function LoginTctPage({ params }: IProgs) {
         await getCurrentWindow().hide();
         const delay = getDelayRequest();
         await invoke("start_invoice_tct_sync", {
-            url: getUrl(params.type, params.fromDate, params.toDate),
-            token, delay
+            invoiceType: params.type,
+            fromDate: params.fromDate,
+            toDate: params.toDate,
+            token: token,
+            delay: delay
         });
-        // await trayApi.post("/open_tray_page", {
-        //     route: "/get-invoice-tct",
-        //     data: {
-        //         taxCode: params.username,
-        //         type: params.type,
-        //         fromDate: params.fromDate,
-        //         toDate: params.toDate
-        //     },
-        // });
     }, [params]);
 
     const loadCaptcha = useCallback(async () => {
@@ -115,8 +86,7 @@ export default function LoginTctPage({ params }: IProgs) {
             password,
             token: res.token,
         });
-
-        await getInvoiceTCT(res.token);
+        // await getInvoiceTCT(res.token);
     };
 
     if (

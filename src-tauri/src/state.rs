@@ -30,7 +30,7 @@ pub struct AppState {
 pub struct SyncState {
     pub source: String,
     pub running: bool,
-    pub total: usize,
+    pub total: Option<usize>,
     pub completed: usize,
     pub success: usize,
     pub failed: usize,
@@ -43,7 +43,7 @@ impl Default for SyncState {
         Self {
             source: String::new(),
             running: false,
-            total: 0,
+            total: None,
             completed: 0,
             success: 0,
             failed: 0,

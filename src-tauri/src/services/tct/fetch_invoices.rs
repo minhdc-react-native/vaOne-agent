@@ -1,35 +1,125 @@
+use chrono::{Datelike, Duration, NaiveDate};
 use serde_json::Value;
+use std::cmp::Ordering as CmpOrdering;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+fn get_url(invoice_type: u8, from_date: &str, to_date: &str) -> String {
+    let size_page = 50;
+
+    let search = format!(
+        "tdlap=ge={}T00:00:00;tdlap=le={}T23:59:59",
+        from_date, to_date
+    );
+
+    match invoice_type {
+        // 1: Mua vào
+        // 3: Mua vào MTT
+        1 | 3 => format!(
+            "https://hoadondientu.gdt.gov.vn/api/query/invoices/purchase?sort=tdlap:desc&size={}&search={};ttxly==5",
+            size_page,
+            search
+        ),
+
+        // 2: Bán ra
+        // 4: Bán ra MTT
+        2 | 4 => format!(
+            "https://hoadondientu.gdt.gov.vn/api/query/invoices/sold?sort=tdlap:desc&size={}&search={}",
+            size_page,
+            search
+        ),
+
+        _ => panic!("Invalid invoice type"),
+    }
+}
+
 async fn fetch_all_invoices(
-    url: String,
+    invoice_type: u8,
+    from_date: String,
+    to_date: String,
     token: Option<String>,
     delay: Option<u64>,
     cancel: Arc<AtomicBool>,
 ) -> Result<Vec<Value>, String> {
-    let mut result = vec![];
-    let mut has_more = true;
-    let mut fix_url = url.clone();
+    let mut result = Vec::new();
+    let mut current =
+        NaiveDate::parse_from_str(&from_date, "%Y-%m-%d").map_err(|e| e.to_string())?;
 
-    while has_more {
+    let end = NaiveDate::parse_from_str(&to_date, "%Y-%m-%d").map_err(|e| e.to_string())?;
+
+    while current <= end {
         if cancel.load(Ordering::Relaxed) {
             break;
         }
 
-        let res: Value = crate::api::http::get(&fix_url, token.as_deref(), delay, None).await?;
+        // ngày cuối của tháng hiện tại
+        let first_next_month = if current.month() == 12 {
+            NaiveDate::from_ymd_opt(current.year() + 1, 1, 1).unwrap()
+        } else {
+            NaiveDate::from_ymd_opt(current.year(), current.month() + 1, 1).unwrap()
+        };
 
-        let datas = res["datas"].clone();
-        let state = res["state"].clone();
+        let month_end = (first_next_month - Duration::days(1)).min(end);
 
-        if let Some(arr) = datas.as_array() {
-            result.extend(arr.clone());
+        let from = current.format("%d/%m/%Y").to_string();
+        let to = month_end.format("%d/%m/%Y").to_string();
+
+        // scan hết dữ liệu của tháng này
+        let mut has_more = true;
+        let mut state = None::<String>;
+        let mut url = get_url(invoice_type, &from, &to);
+        while has_more {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
+
+            if let Some(s) = &state {
+                url.push_str(&format!("&state={}", s));
+            }
+
+            let res: Value = crate::api::http::get(&url, token.as_deref(), delay, None).await?;
+
+            if let Some(arr) = res["datas"].as_array() {
+                result.extend(arr.iter().cloned());
+            }
+
+            if res["state"].is_null() {
+                has_more = false;
+            } else {
+                state = Some(res["state"].to_string().replace('"', ""));
+            }
+
+            tokio::time::sleep(std::time::Duration::from_millis(delay.unwrap_or(500))).await;
         }
 
-        has_more = !state.is_null();
-        fix_url = format!("{}&state={}", url, state);
-
-        tokio::time::sleep(std::time::Duration::from_millis(delay.unwrap_or(500))).await;
+        // sang tháng tiếp theo
+        current = first_next_month;
     }
+
+    result.sort_by(|a, b| {
+        let date_a = a["tdlap"].as_str().unwrap_or("");
+        let date_b = b["tdlap"].as_str().unwrap_or("");
+
+        match date_a.cmp(date_b) {
+            CmpOrdering::Equal => {
+                let no_a = a["shdon"]
+                    .as_str()
+                    .unwrap_or("0")
+                    .parse::<u64>()
+                    .unwrap_or(0);
+
+                let no_b = b["shdon"]
+                    .as_str()
+                    .unwrap_or("0")
+                    .parse::<u64>()
+                    .unwrap_or(0);
+
+                no_a.cmp(&no_b)
+            }
+            other => other,
+        }
+    });
+
     Ok(result)
 }
 
@@ -48,8 +138,8 @@ async fn fetch_invoice_detail(
 
         let nbmst = item["nbmst"].as_str().unwrap_or("");
         let khhdon = item["khhdon"].as_str().unwrap_or("");
-        let shdon = item["shdon"].as_str().unwrap_or("");
-        let khmshdon = item["khmshdon"].as_str().unwrap_or("");
+        let shdon = item["shdon"].as_i64().unwrap_or(0);
+        let khmshdon = item["khmshdon"].as_i64().unwrap_or(0);
 
         let url = format!(
             "https://hoadondientu.gdt.gov.vn/api/query/invoices/detail?nbmst={}&khhdon={}&shdon={}&khmshdon={}",
@@ -57,18 +147,20 @@ async fn fetch_invoice_detail(
         );
         match crate::api::http::get(&url, token.as_deref(), delay, None).await {
             Ok(res) => {
+                println!("SUCCESS: {}", url);
                 result.push(res.clone());
                 crate::state::update_sync_emit(|s| {
                     s.completed = s.completed + 1;
-                    s.current_invoice = Some(serde_json::json!(item.clone()));
-                    s.failed = 0;
+                    s.current_invoice = Some(serde_json::json!(res.clone()));
+                    // s.failed = 0;
                 });
             }
             Err(e) => {
+                println!("ERROR: {} => {}", url, e);
                 crate::state::update_sync_emit(|s| {
                     s.completed = s.completed + 1;
                     s.current_invoice = Some(serde_json::json!(item.clone()));
-                    s.failed = 1;
+                    s.failed = s.failed + 1;
                 });
                 continue;
             }
@@ -79,14 +171,28 @@ async fn fetch_invoice_detail(
     Ok(result)
 }
 
-pub async fn run_sync_flow(url: String, token: Option<String>, delay: Option<u64>) {
+pub async fn run_sync_flow(
+    invoice_type: u8,
+    from_date: String,
+    to_date: String,
+    token: Option<String>,
+    delay: Option<u64>,
+) {
     let cancel = crate::state::get_cancel_flag();
 
-    let invoices = match fetch_all_invoices(url, token.clone(), delay, cancel.clone()).await {
+    let invoices = match fetch_all_invoices(
+        invoice_type,
+        from_date,
+        to_date,
+        token.clone(),
+        delay,
+        cancel.clone(),
+    )
+    .await
+    {
         Ok(v) => v,
         Err(e) => {
             crate::state::update_sync_emit(|s| {
-                s.source = "TCT".to_string();
                 s.running = false;
                 s.current_invoice = None;
             });
@@ -95,11 +201,7 @@ pub async fn run_sync_flow(url: String, token: Option<String>, delay: Option<u64
     };
 
     crate::state::update_sync_emit(|s| {
-        s.source = "TCT".to_string();
-        s.running = true;
-        s.total = invoices.len();
-        s.completed = 0;
-        s.current_invoice = None;
+        s.total = Some(invoices.len());
     });
 
     // 2. fetch detail
