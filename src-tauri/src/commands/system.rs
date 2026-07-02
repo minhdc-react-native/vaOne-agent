@@ -41,6 +41,10 @@ pub fn page_ready(name: String, show: Option<bool>) {
                     let monitor_size = monitor.size();
                     let monitor_width = monitor_size.width as f64 / scale;
                     let monitor_height = monitor_size.height as f64 / scale;
+
+                    let width = monitor_width.min(width);
+                    let height = monitor_height.min(height);
+
                     let x = (monitor_width - width) / 2.0;
                     let y = (monitor_height - height) / 2.0;
                     let _ = window.set_position(Position::Logical(LogicalPosition { x, y }));

@@ -30,7 +30,7 @@ const template = {
 export const PreviewReport = () => {
     const [url, setUrl] = useState({ url: "", path: "" });
     const handleGenerate = async () => {
-        invoke("page_ready", { name: 'report' });
+        await invoke("page_ready", { name: 'report' });
         const path = await generatePdf(template) as string;
         const url = convertFileSrc(path);
         setUrl({ url, path });
@@ -43,20 +43,20 @@ export const PreviewReport = () => {
     }
     return (
         <AppWindow title={"Preview Report"}
-            content={
-                (
-                    <div className="flex gap-1 py-2 pr-2 mr-2 border-r border-gray-300">
-                        <Button
-                            variant="ghost"
-                            onClick={onPrint}
-                            icon={<Printer size={16} />}
-                            className="h-7!"
-                        >
-                            In
-                        </Button>
-                    </div>
-                )
-            }
+        // content={
+        //     (
+        //         <div className="flex gap-1 py-2 pr-2 mr-2 border-r border-gray-300">
+        //             <Button
+        //                 variant="ghost"
+        //                 onClick={onPrint}
+        //                 icon={<Printer size={16} />}
+        //                 className="h-7!"
+        //             >
+        //                 In
+        //             </Button>
+        //         </div>
+        //     )
+        // }
         >
             {url.url && <iframe
                 src={url.url}

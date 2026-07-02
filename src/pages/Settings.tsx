@@ -14,6 +14,7 @@ import Switch from "../components/Switch";
 
 import { useAppStore } from "../stores/app.store";
 import { Divider } from "../components/Divider";
+import { trayApi } from "../api/axios/axiosClient";
 
 interface AgentInfo {
     name: string;
@@ -69,6 +70,13 @@ export default function SettingsPage() {
         };
     }, [delayRequest]);
 
+    const hideWindow = async () => {
+        await trayApi.post("/open_tray_page", {
+            route: "/blank",
+            data: {},
+        });
+    };
+
     const handleSave = async () => {
         try {
             if (autoStart !== savedAutoStart) {
@@ -85,7 +93,7 @@ export default function SettingsPage() {
                 setDelayRequest(delay);
             }
 
-            await getCurrentWindow().hide();
+            await hideWindow();
         } catch (err) {
             console.error(err);
         }
@@ -96,7 +104,7 @@ export default function SettingsPage() {
         setAutoStart(savedAutoStart);
         setDelay(delayRequest);
 
-        await getCurrentWindow().hide();
+        await hideWindow();
     };
 
     useEffect(() => {

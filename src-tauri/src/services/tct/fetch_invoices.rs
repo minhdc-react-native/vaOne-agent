@@ -192,6 +192,7 @@ pub async fn run_sync_flow(
     {
         Ok(v) => v,
         Err(e) => {
+            println!("ERROR: {}", e);
             crate::state::update_sync_emit(|s| {
                 s.running = false;
                 s.current_invoice = None;
