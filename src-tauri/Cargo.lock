@@ -2950,6 +2950,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "521739c6d2bac4aa25192232afe6841231376b2b26d4d9fae5ecf8ca5772e441"
 
 [[package]]
+name = "num-format"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a652d9771a63711fd3c3deb670acfbe5c30a4072e664d7a3bf5a9e1056ac72c3"
+dependencies = [
+ "arrayvec",
+ "itoa 1.0.18",
+]
+
+[[package]]
 name = "num-traits"
 version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6152,7 +6162,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "vaone-agent"
+name = "vaone-plugin"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -6160,6 +6170,8 @@ dependencies = [
  "chrono",
  "dirs 6.0.0",
  "futures-util",
+ "num-format",
+ "once_cell",
  "printers",
  "printpdf",
  "regex",

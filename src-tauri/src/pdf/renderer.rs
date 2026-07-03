@@ -1,9 +1,9 @@
+use crate::pdf::layout::TextLayout;
 use crate::pdf::models::*;
 use crate::pdf::text;
-use crate::pdf::utils::load_fonts;
-use printpdf::{Mm, Op, PdfDocument, PdfPage, PdfSaveOptions};
-
-pub fn render(doc: PdfTemplate, output: &str) -> anyhow::Result<()> {
+use crate::pdf::utils::{load_fonts, Unit};
+use printpdf::{Op, PdfDocument, PdfPage, PdfSaveOptions};
+pub fn render(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow::Result<()> {
     let mut pdf = PdfDocument::new("Invoice");
     let mut ops = Vec::<Op>::new();
 
@@ -12,7 +12,9 @@ pub fn render(doc: PdfTemplate, output: &str) -> anyhow::Result<()> {
     for e in doc.elements {
         match e {
             Element::Text(t) => {
-                text::draw_text(&mut ops, &fonts, doc.page.height, &t);
+                let layout = TextLayout::layout(&fonts, doc.page.height, &t, &data);
+
+                text::draw_text(&mut ops, &fonts, &t, &layout);
             }
             Element::Table(_t) => {
                 let fake = TextElement {
@@ -24,13 +26,17 @@ pub fn render(doc: PdfTemplate, output: &str) -> anyhow::Result<()> {
                     field_name: Some("storeInfo.address".to_string()),
                     style: None,
                 };
-
-                text::draw_text(&mut ops, &fonts, doc.page.height, &fake);
+                let layout = TextLayout::layout(&fonts, doc.page.height, &fake, &data);
+                text::draw_text(&mut ops, &fonts, &fake, &layout);
             }
         }
     }
 
-    let page = PdfPage::new(Mm(doc.page.width), Mm(doc.page.height), ops);
+    let page = PdfPage::new(
+        Unit::px_to_mm(doc.page.width),
+        Unit::px_to_mm(doc.page.height),
+        ops,
+    );
 
     pdf.with_pages(vec![page]);
 

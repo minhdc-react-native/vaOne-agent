@@ -1,7 +1,7 @@
 mod api;
 mod commands;
 mod models;
-mod pdf;
+pub mod pdf;
 mod services;
 mod state;
 mod utils;

@@ -14,8 +14,8 @@
       {
         "label": "main",
         "title": "vaOne plugin",
-        "width": 135,
-        "height": 44,
+        "width": 0,
+        "height": 0,
         "resizable": false,
         "decorations": false
       }

@@ -63,4 +63,39 @@ impl PdfFonts {
 
         item.content.chars().count() as f32 * font_size * 0.52
     }
+
+    pub fn font_by_style(&self, bold: bool, italic: bool) -> &PdfFont {
+        match (bold, italic) {
+            (true, false) => &self.bold,
+            (false, true) => &self.italic,
+
+            // Sau này nếu có font BoldItalic thì đổi ở đây
+            (true, true) => &self.bold,
+
+            _ => &self.regular,
+        }
+    }
+
+    pub fn parse_color(&self, value: &str) -> Color {
+        let hex = value.trim_start_matches('#');
+
+        if hex.len() != 6 {
+            return self.default_color();
+        }
+
+        let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(0);
+        let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(0);
+        let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(0);
+
+        Color::Rgb(Rgb::new(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            None,
+        ))
+    }
+
+    pub fn default_color(&self) -> Color {
+        self.parse_color("#000000")
+    }
 }

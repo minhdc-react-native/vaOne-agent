@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    vaone_agent_lib::run()
+    vaone_plugin::run()
 }

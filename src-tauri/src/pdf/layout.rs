@@ -1,26 +1,33 @@
 use crate::pdf::fonts::PdfFonts;
 use crate::pdf::models::{TextElement, TextLayoutResult, TextLine};
+use crate::pdf::template::parser::Parser;
+use crate::pdf::template::tokenizer::Tokenizer;
+use crate::pdf::utils::Unit;
+use serde_json::Value;
 use ttf_parser::Face;
-
 const PT_TO_MM: f32 = 0.352_778;
 
 pub struct TextLayout;
 
 impl TextLayout {
-    fn measure_width(face: &Face, text: &str, font_size: f32) -> f32 {
+    fn measure_width(face: &Face, text: &str, font_size_px: f32) -> f32 {
         let units_per_em = face.units_per_em() as f32;
 
-        let mut width = 0.0;
+        let mut width_units = 0.0;
 
         for ch in text.chars() {
             if let Some(glyph) = face.glyph_index(ch) {
                 if let Some(advance) = face.glyph_hor_advance(glyph) {
-                    width += advance as f32;
+                    width_units += advance as f32;
                 }
             }
         }
 
-        width * font_size / units_per_em * PT_TO_MM
+        let font_size_pt = Unit::px_to_pt(font_size_px).0;
+
+        let width_pt = width_units * font_size_pt / units_per_em;
+
+        Unit::pt_to_px(width_pt)
     }
 
     pub fn measure_string(
@@ -89,24 +96,29 @@ impl TextLayout {
 
         let ascender = face.ascender() as f32;
 
-        let baseline = ascender * fonts.font_size(item) / units * PT_TO_MM;
+        let baseline_pt = ascender * Unit::px_to_pt(fonts.font_size(item)).0 / units;
 
-        page_height - item.y - baseline
+        let baseline_px = Unit::pt_to_px(baseline_pt);
+
+        page_height - item.y - baseline_px
     }
 
-    pub fn wrap_text(fonts: &PdfFonts, item: &TextElement) -> TextLayoutResult {
+    pub fn wrap_text(fonts: &PdfFonts, item: &TextElement, data: &Value) -> TextLayoutResult {
         let font = fonts.font(item);
 
         let face = match Face::parse(font.bytes, 0) {
             Ok(face) => face,
             Err(_) => {
+                let tokens = Tokenizer::tokenize(&item.content.clone().to_string());
                 return TextLayoutResult {
                     lines: vec![TextLine {
-                        text: item.content.clone(),
+                        runs: Parser::parse(&tokens, &data),
                         width: item.width,
                     }],
                     x: item.x,
                     y: item.y,
+                    content_height: item.height,
+                    content_width: item.width,
                     width: item.width,
                     height: fonts.font_size(item),
                     line_height: fonts.font_size(item) * 1.2,
@@ -135,9 +147,9 @@ impl TextLayout {
             } else {
                 if !current.is_empty() {
                     let width = Self::measure_width(&face, &current, font_size);
-
+                    let tokens = Tokenizer::tokenize(&current);
                     lines.push(TextLine {
-                        text: current,
+                        runs: Parser::parse(&tokens, &data),
                         width,
                     });
                 }
@@ -148,9 +160,9 @@ impl TextLayout {
 
         if !current.is_empty() {
             let width = Self::measure_width(&face, &current, font_size);
-
+            let tokens = Tokenizer::tokenize(&current);
             lines.push(TextLine {
-                text: current,
+                runs: Parser::parse(&tokens, &data),
                 width,
             });
         }
@@ -163,6 +175,8 @@ impl TextLayout {
             height: lines.len() as f32 * line_height,
             x: item.x,
             y: item.y,
+            content_height: item.height,
+            content_width: item.width,
             width: real_width,
             line_height,
             lines,
@@ -170,8 +184,13 @@ impl TextLayout {
         }
     }
 
-    pub fn layout(fonts: &PdfFonts, page_height: f32, item: &TextElement) -> TextLayoutResult {
-        let mut result = Self::wrap_text(fonts, item);
+    pub fn layout(
+        fonts: &PdfFonts,
+        page_height: f32,
+        item: &TextElement,
+        data: &Value,
+    ) -> TextLayoutResult {
+        let mut result = Self::wrap_text(fonts, item, &data);
         result.base_y = Self::calc_y(fonts, page_height, item);
         result
     }

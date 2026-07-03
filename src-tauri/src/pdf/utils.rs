@@ -4,7 +4,34 @@ use printpdf::{Color, Rgb};
 use printpdf::{ParsedFont, PdfDocument};
 
 use crate::state::{FONT_BOLD, FONT_ITALIC, FONT_REGULAR};
+use printpdf::{Mm, Pt};
+use regex::Regex;
 use serde_json::Value;
+pub struct Unit;
+
+impl Unit {
+    pub const DPI: f32 = 96.0;
+
+    #[inline]
+    pub fn px_to_mm(px: f32) -> Mm {
+        Mm(px * 25.4 / Self::DPI)
+    }
+
+    #[inline]
+    pub fn mm_to_px(mm: f32) -> f32 {
+        mm * Self::DPI / 25.4
+    }
+
+    #[inline]
+    pub fn px_to_pt(px: f32) -> Pt {
+        Pt(px * 72.0 / Self::DPI)
+    }
+
+    #[inline]
+    pub fn pt_to_px(pt: f32) -> f32 {
+        pt * Self::DPI / 72.0
+    }
+}
 
 pub fn resolve_array(data: &serde_json::Value, path: &str) -> Option<Vec<serde_json::Value>> {
     let mut current = data;
@@ -41,21 +68,13 @@ pub fn resolve_value(data: &Value, path: &str) -> Option<String> {
     }
 }
 
-pub fn bind_content(template: &str, data: &serde_json::Value) -> String {
-    let mut result = template.to_string();
+pub fn bind_content(template: &str, data: &Value) -> String {
+    let re = Regex::new(r"\{([^{}]+)\}").unwrap();
 
-    for cap in regex::Regex::new(r"\{\{(.*?)\}\}")
-        .unwrap()
-        .captures_iter(template)
-    {
-        let key = &cap[1];
-
-        if let Some(value) = resolve_value(data, key) {
-            result = result.replace(&format!("{{{{{}}}}}", key), &value);
-        }
-    }
-
-    result
+    re.replace_all(template, |caps: &regex::Captures| {
+        resolve_value(data, &caps[1]).unwrap_or_default()
+    })
+    .into_owned()
 }
 
 pub fn hex_to_color(hex: &str) -> Color {

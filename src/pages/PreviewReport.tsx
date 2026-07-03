@@ -7,18 +7,18 @@ import { Printer } from "lucide-react";
 import { useLocation } from "react-router-dom";
 const template = {
     page: {
-        width: 210,
-        height: 297,
+        width: 794,
+        height: 1123,
     },
     elements: [
         {
             "id": "stglgae01",
             "name": "text_stgl",
             "type": "text",
-            "x": 57.4818141050897,
-            "y": 40.71982281284607,
-            "width": 504.2753783684016,
-            "height": 20,
+            "x": 318.2641603813758,
+            "y": 65.60179851724,
+            "width": 200,
+            "height": 21.760059062384645,
             "content": "<b>Địa chỉ:</b> {value}",
             "fieldName": "storeInfo.address",
             "childElements": [],

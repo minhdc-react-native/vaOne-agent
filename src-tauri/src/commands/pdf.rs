@@ -8,7 +8,7 @@ pub fn render_pdf(report: PdfTemplate, data: serde_json::Value) -> Result<String
 
     let path = dirs::download_dir().unwrap().join("invoice.pdf");
 
-    renderer::render(report, path.to_str().unwrap()).map_err(|e| e.to_string())?;
+    renderer::render(report, data, path.to_str().unwrap()).map_err(|e| e.to_string())?;
 
     Ok(path.to_string_lossy().to_string())
 }

@@ -1,60 +1,84 @@
 use crate::pdf::fonts::PdfFonts;
 use crate::pdf::layout::TextLayout;
-use crate::pdf::models::TextElement;
-use crate::pdf::rich_text::RichTextParser;
-use printpdf::*;
+use crate::pdf::models::{ElementStyle, TextElement, TextLayoutResult, TextStyle};
+use crate::pdf::utils::Unit;
+use printpdf::{Op, Point, TextItem};
 
-pub fn draw_text(ops: &mut Vec<Op>, fonts: &PdfFonts, page_height: f32, item: &TextElement) {
-    let font = fonts.font(item);
-    let font_size = fonts.font_size(item);
-    let color = fonts.color(item);
+pub fn draw_text(
+    ops: &mut Vec<Op>,
+    fonts: &PdfFonts,
+    item: &TextElement,
+    layout: &TextLayoutResult,
+) {
+    let base_style = item.style.clone().unwrap_or_default();
     let align = fonts.text_align(item);
-
-    // Tính toàn bộ layout
-    let layout = TextLayout::layout(fonts, page_height, item);
-
-    ops.push(Op::StartTextSection);
-
-    ops.push(Op::SetFillColor { col: color });
-
-    ops.push(Op::SetFontSize {
-        font: font.id.clone(),
-        size: Pt(font_size),
-    });
 
     for (index, line) in layout.lines.iter().enumerate() {
         let x = TextLayout::calc_x(item, line.width, align);
-
         let y = layout.base_y - index as f32 * layout.line_height;
-        let runs = RichTextParser::parse(&line.text);
+
+        ops.push(Op::StartTextSection);
 
         ops.push(Op::SetTextCursor {
             pos: Point {
-                x: Mm(x).into(),
-                y: Mm(y).into(),
+                x: Unit::px_to_mm(x).into(),
+                y: Unit::px_to_mm(y).into(),
             },
         });
 
-        for run in runs {
-            let font = if run.style.bold() {
-                fonts.bold.id.clone()
-            } else if run.style.italic() {
-                fonts.italic.id.clone()
-            } else {
-                fonts.regular.id.clone()
-            };
+        for run in &line.runs {
+            // ===== MERGE STYLE =====
+            let style = merge_style(&base_style, &run.style);
+
+            // ===== FONT SELECTION =====
+            let font = fonts.font_by_style(style.bold, style.italic);
+
+            // ===== COLOR =====
+            let color = style
+                .color
+                .as_ref()
+                .map(|c| fonts.parse_color(c))
+                .unwrap_or_else(|| fonts.default_color());
+
+            // ===== SIZE =====
+            let font_size = style.font_size.unwrap_or(14.0);
+
+            ops.push(Op::SetFillColor { col: color });
 
             ops.push(Op::SetFontSize {
-                font: font.clone(),
-                size: Pt(font_size),
+                font: font.id.clone(),
+                size: Unit::px_to_pt(font_size),
             });
 
             ops.push(Op::WriteText {
                 items: vec![TextItem::Text(run.text.clone())],
-                font,
+                font: font.id.clone(),
             });
         }
-    }
 
-    ops.push(Op::EndTextSection);
+        ops.push(Op::EndTextSection);
+    }
+}
+
+fn to_text_style(style: &ElementStyle) -> TextStyle {
+    TextStyle {
+        bold: matches!(style.font_weight.as_deref(), Some("bold")),
+        italic: matches!(style.font_style.as_deref(), Some("italic")),
+        underline: false,
+
+        color: style.color.clone(),
+        font_size: style.font_size,
+    }
+}
+fn merge_style(base: &ElementStyle, inline: &TextStyle) -> TextStyle {
+    let base_style = to_text_style(base);
+
+    TextStyle {
+        bold: inline.bold || base_style.bold,
+        italic: inline.italic || base_style.italic,
+        underline: inline.underline || base_style.underline,
+
+        color: inline.color.clone().or(base_style.color),
+        font_size: inline.font_size.or(base_style.font_size),
+    }
 }

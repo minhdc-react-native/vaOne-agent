@@ -1,38 +1,34 @@
 use serde::Deserialize;
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RichStyle {
-    Normal,
-    B,
-    I,
-    U,
-    BI,
-    BU,
-    IU,
-    BIU,
+#[derive(Clone, Debug, Default)]
+pub struct TextStyle {
+    pub bold: bool,
+    pub italic: bool,
+    pub underline: bool,
+    pub color: Option<String>,
+    pub font_size: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TextRun {
     pub text: String,
 
-    pub style: RichStyle,
+    pub style: TextStyle,
 
     pub color: Option<String>,
 
     pub size: Option<f32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct TextLine {
-    /// Nội dung của dòng
-    pub text: String,
-
-    /// Chiều rộng thực tế của dòng (mm)
+    pub runs: Vec<TextRun>,
     pub width: f32,
 }
 #[derive(Debug, Clone)]
 pub struct TextLayoutResult {
     pub lines: Vec<TextLine>,
+    pub content_width: f32,
+    pub content_height: f32,
     pub width: f32,
     pub height: f32,
     pub x: f32,
@@ -86,6 +82,24 @@ pub struct ElementStyle {
     #[serde(default)]
     #[serde(rename = "fontWeight")]
     pub font_weight: Option<String>,
+
+    #[serde(default)]
+    #[serde(rename = "fontStyle")]
+    pub font_style: Option<String>,
+}
+
+impl Default for ElementStyle {
+    fn default() -> Self {
+        Self {
+            background_color: Some("transparent".to_string()),
+            opacity: Some(1.0),
+            font_size: Some(14.0),
+            color: Some("#000000".to_string()),
+            text_align: Some("left".to_string()),
+            font_weight: Some("normal".to_string()),
+            font_style: Some("normal".to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

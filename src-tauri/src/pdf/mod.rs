@@ -8,4 +8,5 @@ pub mod utils;
 pub mod binder;
 pub mod fonts;
 pub mod layout;
-pub mod rich_text;
+
+pub mod template;
