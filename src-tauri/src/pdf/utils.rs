@@ -1,6 +1,6 @@
 use crate::pdf::fonts::{PdfFont, PdfFonts};
 use anyhow::{anyhow, Result};
-use printpdf::{Color, Rgb};
+use printpdf::{Color, Op, Rgb};
 use printpdf::{ParsedFont, PdfDocument};
 
 use crate::state::{FONT_BOLD, FONT_ITALIC, FONT_REGULAR};
@@ -46,33 +46,39 @@ pub fn resolve_array(data: &serde_json::Value, path: &str) -> Option<Vec<serde_j
     }
 }
 
-pub fn resolve_value(data: &Value, path: &str) -> Option<String> {
+pub fn resolve_value(data: &Value, path: &str) -> Option<Value> {
     let mut current = data;
 
     for key in path.split('.') {
         current = match current {
             Value::Object(map) => map.get(key)?,
+
             Value::Array(arr) => {
                 let idx: usize = key.parse().ok()?;
                 arr.get(idx)?
             }
+
             _ => return None,
         };
     }
 
-    match current {
-        Value::String(s) => Some(s.clone()),
-        Value::Number(n) => Some(n.to_string()),
-        Value::Bool(b) => Some(b.to_string()),
-        _ => None,
-    }
+    Some(current.clone())
 }
 
 pub fn bind_content(template: &str, data: &Value) -> String {
     let re = Regex::new(r"\{([^{}]+)\}").unwrap();
 
     re.replace_all(template, |caps: &regex::Captures| {
-        resolve_value(data, &caps[1]).unwrap_or_default()
+        let value = resolve_value(data, &caps[1])
+            .map(|v| match v {
+                Value::String(s) => s,
+                Value::Number(n) => n.to_string(),
+                Value::Bool(b) => b.to_string(),
+                Value::Null => String::new(),
+                other => other.to_string(),
+            })
+            .unwrap_or_else(|| format!("{{{}}}", &caps[1]));
+        return value;
     })
     .into_owned()
 }
@@ -126,4 +132,39 @@ pub fn load_fonts(pdf: &mut PdfDocument) -> Result<PdfFonts> {
             bytes: FONT_ITALIC,
         },
     })
+}
+
+pub fn value_to_string(value: &Value) -> String {
+    match value {
+        Value::String(s) => s.clone(),
+        Value::Number(n) => n.to_string(),
+        Value::Bool(b) => b.to_string(),
+        Value::Null => String::new(),
+        other => other.to_string(),
+    }
+}
+use crate::pdf::border::Border;
+use crate::pdf::models::ElementStyle;
+pub fn draw_element_border(
+    ops: &mut Vec<Op>,
+    fonts: &PdfFonts,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    style: &ElementStyle,
+) {
+    Border::draw(
+        ops,
+        fonts,
+        x,
+        y,
+        width,
+        height,
+        style.border_radius.unwrap_or(0.0),
+        style.background_color.as_deref(),
+        style.border_color.as_deref(),
+        Some(style.border_width.unwrap_or(0.0)),
+        style.border_style.as_deref(),
+    );
 }

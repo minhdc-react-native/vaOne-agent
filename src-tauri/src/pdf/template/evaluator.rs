@@ -1,22 +1,22 @@
-use anyhow::{anyhow, Result};
-use serde_json::Value;
-
 use crate::pdf::template::formatter::FORMATTERS;
 use crate::pdf::utils::resolve_value;
-
+use crate::pdf::utils::value_to_string;
+use anyhow::{anyhow, Result};
+use serde_json::Value;
 pub struct Evaluator;
 
 impl Evaluator {
     pub fn evaluate(expr: &str, data: &Value) -> Result<String> {
-        let expr = expr.trim();
-
         // function(...)
-        if expr.ends_with(')') {
+        if expr.ends_with(")") {
             return Self::eval_function(expr, data);
         }
 
         // variable
-        Ok(resolve_value(data, expr).unwrap_or_default())
+        // Ok(resolve_value(data, expr))
+        Ok(resolve_value(data, expr)
+            .map(|v| value_to_string(&v))
+            .unwrap_or_else(|| format!("{{{}}}", expr)))
     }
 
     fn eval_function(expr: &str, data: &Value) -> Result<String> {
@@ -30,7 +30,7 @@ impl Evaluator {
 
         let args = Self::parse_arguments(args_str, data);
 
-        FORMATTERS.call(name, &args)
+        FORMATTERS.call(&name, &args)
     }
 
     fn parse_arguments(args: &str, data: &Value) -> Vec<Value> {
@@ -62,7 +62,6 @@ impl Evaluator {
         if !current.trim().is_empty() {
             result.push(Self::eval_argument(current.trim(), data));
         }
-
         result
     }
 
@@ -83,8 +82,7 @@ impl Evaluator {
             return serde_json::json!(v);
         }
 
-        // variable
-        if let Some(value) = resolve_value(data, arg) {
+        if let Some(value) = resolve_value(data, &arg) {
             return serde_json::json!(value);
         }
 

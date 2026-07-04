@@ -3,6 +3,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 pub type FormatterFn = fn(&[Value]) -> Result<String>;
+use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime};
 use num_format::{Locale, ToFormattedString};
 use once_cell::sync::Lazy;
 
@@ -61,21 +62,63 @@ fn format_date(args: &[Value]) -> Result<String> {
         "dd/MM/yyyy".to_string()
     };
 
-    // TODO:
-    // sử dụng chrono để format giống React
-    Ok(format!("{} ({})", value, format))
+    let chrono_format = format
+        .replace("yyyy", "%Y")
+        .replace("MM", "%m")
+        .replace("dd", "%d")
+        .replace("HH", "%H")
+        .replace("mm", "%M")
+        .replace("ss", "%S");
+
+    // ISO 8601: 2026-03-04T17:00:00Z
+    if let Ok(dt) = DateTime::parse_from_rfc3339(&value) {
+        return Ok(dt.format(&chrono_format).to_string());
+    }
+
+    // yyyy-MM-dd
+    if let Ok(date) = NaiveDate::parse_from_str(&value, "%Y-%m-%d") {
+        return Ok(date.format(&chrono_format).to_string());
+    }
+
+    Err(anyhow!("Invalid date: {}", value))
 }
 
 fn date_month_year(args: &[Value]) -> Result<String> {
     let value = arg_string(args, 0);
 
-    let format = if args.len() > 1 {
-        arg_string(args, 1)
-    } else {
-        "Ngày dd tháng MM năm yyyy".to_string()
-    };
+    // 2026-03-04T17:00:00Z
+    if let Ok(dt) = DateTime::parse_from_rfc3339(&value) {
+        let d = dt.date_naive();
+        return Ok(format!(
+            "Ngày {:02} tháng {:02} năm {}",
+            d.day(),
+            d.month(),
+            d.year()
+        ));
+    }
 
-    Ok(format!("{} ({})", value, format))
+    // 2026-03-04T17:00:00
+    if let Ok(dt) = NaiveDateTime::parse_from_str(&value, "%Y-%m-%dT%H:%M:%S") {
+        let d = dt.date();
+        return Ok(format!(
+            "Ngày {:02} tháng {:02} năm {}",
+            d.day(),
+            d.month(),
+            d.year()
+        ));
+    }
+
+    // 2026-03-04
+    if let Ok(d) = NaiveDate::parse_from_str(&value, "%Y-%m-%d") {
+        return Ok(format!(
+            "Ngày {:02} tháng {:02} năm {}",
+            d.day(),
+            d.month(),
+            d.year()
+        ));
+    }
+
+    Err(anyhow!("Invalid date: {}", value))
 }
 
 fn format_number(args: &[Value]) -> Result<String> {

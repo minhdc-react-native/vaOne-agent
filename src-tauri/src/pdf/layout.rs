@@ -2,19 +2,15 @@ use crate::pdf::fonts::PdfFonts;
 use crate::pdf::models::{TextElement, TextLayoutResult, TextLine};
 use crate::pdf::template::parser::Parser;
 use crate::pdf::template::tokenizer::Tokenizer;
-use crate::pdf::utils::Unit;
-use serde_json::Value;
+use crate::pdf::utils::{resolve_value, Unit};
+use serde_json::{Map, Value};
 use ttf_parser::Face;
-const PT_TO_MM: f32 = 0.352_778;
-
 pub struct TextLayout;
 
 impl TextLayout {
     fn measure_width(face: &Face, text: &str, font_size_px: f32) -> f32 {
         let units_per_em = face.units_per_em() as f32;
-
         let mut width_units = 0.0;
-
         for ch in text.chars() {
             if let Some(glyph) = face.glyph_index(ch) {
                 if let Some(advance) = face.glyph_hor_advance(glyph) {
@@ -33,7 +29,7 @@ impl TextLayout {
     pub fn measure_string(
         fonts: &PdfFonts,
         text: &str,
-        font_size: f32,
+        font_size_px: f32,
         bold: bool,
         italic: bool,
     ) -> f32 {
@@ -50,19 +46,7 @@ impl TextLayout {
             Err(_) => return 0.0,
         };
 
-        let units_per_em = face.units_per_em() as f32;
-
-        let mut width = 0.0;
-
-        for ch in text.chars() {
-            if let Some(glyph) = face.glyph_index(ch) {
-                if let Some(advance) = face.glyph_hor_advance(glyph) {
-                    width += advance as f32;
-                }
-            }
-        }
-
-        width * font_size / units_per_em * PT_TO_MM
+        Self::measure_width(&face, text, font_size_px)
     }
 
     /// Đo chiều rộng của TextElement (giữ tương thích code cũ)
@@ -105,7 +89,6 @@ impl TextLayout {
 
     pub fn wrap_text(fonts: &PdfFonts, item: &TextElement, data: &Value) -> TextLayoutResult {
         let font = fonts.font(item);
-
         let face = match Face::parse(font.bytes, 0) {
             Ok(face) => face,
             Err(_) => {
@@ -182,6 +165,16 @@ impl TextLayout {
             lines,
             base_y: 0.0,
         }
+    }
+
+    pub fn build_context(data: &Value, source: &str, target: &str) -> Value {
+        let mut map = serde_json::Map::new();
+
+        if let Some(value) = resolve_value(data, source) {
+            map.insert(target.to_string(), value);
+        }
+
+        Value::Object(map)
     }
 
     pub fn layout(

@@ -14,7 +14,21 @@ pub fn draw_text(
     let align = fonts.text_align(item);
 
     for (index, line) in layout.lines.iter().enumerate() {
-        let x = TextLayout::calc_x(item, line.width, align);
+        let mut width = 0.0;
+
+        for run in &line.runs {
+            let style = merge_style(&base_style, &run.style);
+            let font = fonts.font_by_style(style.bold, style.italic);
+            width += TextLayout::measure_string(
+                fonts,
+                &run.text,
+                style.font_size.unwrap_or(14.0),
+                style.bold,
+                style.italic,
+            );
+        }
+
+        let x = TextLayout::calc_x(item, width, align);
         let y = layout.base_y - index as f32 * layout.line_height;
 
         ops.push(Op::StartTextSection);

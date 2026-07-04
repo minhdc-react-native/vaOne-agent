@@ -32,10 +32,8 @@ pub fn bind_template(mut report: PdfTemplate, data: &serde_json::Value) -> PdfTe
                 }
             }
             Element::Table(table) => {
-                if let Some(field) = &table.data_field {
-                    if let Some(rows) = resolve_array(data, field) {
-                        table.rows = rows;
-                    }
+                if let Some(field) = &table.field_name {
+                    if let Some(rows) = resolve_array(data, field) {}
                 }
             }
         }

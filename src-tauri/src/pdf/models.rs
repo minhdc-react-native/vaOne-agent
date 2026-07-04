@@ -1,4 +1,5 @@
-use serde::Deserialize;
+use crate::pdf::table::models::TableElement;
+use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Default)]
 pub struct TextStyle {
     pub bold: bool,
@@ -39,7 +40,8 @@ pub struct TextLayoutResult {
 
 #[derive(Debug, Deserialize)]
 pub struct PdfTemplate {
-    pub page: Page,
+    pub width: f32,
+    pub height: f32,
     pub elements: Vec<Element>,
 }
 
@@ -59,7 +61,7 @@ pub enum Element {
     Table(TableElement),
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ElementStyle {
     #[serde(default)]
     #[serde(rename = "backgroundColor")]
@@ -86,6 +88,45 @@ pub struct ElementStyle {
     #[serde(default)]
     #[serde(rename = "fontStyle")]
     pub font_style: Option<String>,
+
+    #[serde(default)]
+    #[serde(rename = "borderColor")]
+    pub border_color: Option<String>,
+
+    #[serde(default)]
+    #[serde(rename = "borderRadius")]
+    pub border_radius: Option<f32>,
+
+    #[serde(default)]
+    #[serde(rename = "borderWidth")]
+    pub border_width: Option<f32>,
+
+    #[serde(default)]
+    #[serde(rename = "borderStyle")]
+    pub border_style: Option<String>,
+
+    #[serde(default)]
+    pub padding: Option<f32>,
+
+    #[serde(default)]
+    #[serde(rename = "fontFamily")]
+    pub font_family: Option<String>,
+
+    #[serde(default)]
+    #[serde(rename = "marginTop")]
+    pub margin_top: Option<f32>,
+
+    #[serde(default)]
+    #[serde(rename = "marginRight")]
+    pub margin_right: Option<f32>,
+
+    #[serde(default)]
+    #[serde(rename = "marginBottom")]
+    pub margin_bottom: Option<f32>,
+
+    #[serde(default)]
+    #[serde(rename = "marginLeft")]
+    pub margin_left: Option<f32>,
 }
 
 impl Default for ElementStyle {
@@ -98,6 +139,16 @@ impl Default for ElementStyle {
             text_align: Some("left".to_string()),
             font_weight: Some("normal".to_string()),
             font_style: Some("normal".to_string()),
+            border_color: None,
+            border_radius: None,
+            border_width: None,
+            border_style: None,
+            padding: None,
+            font_family: None,
+            margin_top: None,
+            margin_right: None,
+            margin_left: None,
+            margin_bottom: None,
         }
     }
 }
@@ -117,35 +168,4 @@ pub struct TextElement {
 
     #[serde(default)]
     pub style: Option<ElementStyle>,
-}
-#[derive(Debug, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum TableWidth {
-    Px(f32),
-    Auto(String), // "auto"
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct TableColumn {
-    pub id: String,
-    pub header: String,
-    pub field_name: String,
-
-    /// px hoặc auto (string để giữ flexibility)
-    pub width: TableWidth,
-
-    pub content: Option<String>,
-    pub format_string: Option<String>,
-
-    pub header_style: Option<ElementStyle>,
-    pub body_style: Option<ElementStyle>,
-
-    pub col_span: Option<u8>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct TableElement {
-    pub columns: Vec<TableColumn>,
-    pub rows: Vec<serde_json::Value>,
-    pub data_field: Option<String>, // ví dụ: "orders"
 }
