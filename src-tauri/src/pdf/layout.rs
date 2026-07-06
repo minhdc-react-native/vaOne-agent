@@ -71,20 +71,33 @@ impl TextLayout {
         }
     }
 
-    pub fn calc_y(fonts: &PdfFonts, page_height: f32, item: &TextElement) -> f32 {
+    pub fn calc_y(
+        fonts: &PdfFonts,
+        page_height: f32,
+        item: &TextElement,
+        layout: &TextLayoutResult,
+    ) -> f32 {
         let font = fonts.font(item);
-
         let face = Face::parse(font.bytes, 0).unwrap();
 
         let units = face.units_per_em() as f32;
-
         let ascender = face.ascender() as f32;
 
         let baseline_pt = ascender * Unit::px_to_pt(fonts.font_size(item)).0 / units;
 
         let baseline_px = Unit::pt_to_px(baseline_pt);
 
-        page_height - item.y - baseline_px
+        // let offset = if Self::is_center(item) {
+        //     // Center cả chiều dọc
+        //     (item.height - layout.height) / 2.0
+        // } else {
+        //     // Top
+        //     0.0
+        // };
+
+        let offset = (item.height - layout.height) / 2.0;
+
+        page_height - item.y - offset - baseline_px
     }
 
     pub fn wrap_text(fonts: &PdfFonts, item: &TextElement, data: &Value) -> TextLayoutResult {
@@ -167,6 +180,14 @@ impl TextLayout {
         }
     }
 
+    fn is_center(item: &TextElement) -> bool {
+        item.style
+            .as_ref()
+            .and_then(|s| s.text_align.as_deref())
+            .map(|s| s.eq_ignore_ascii_case("center"))
+            .unwrap_or(false)
+    }
+
     pub fn build_context(data: &Value, source: &str, target: &str) -> Value {
         let mut map = serde_json::Map::new();
 
@@ -183,8 +204,8 @@ impl TextLayout {
         item: &TextElement,
         data: &Value,
     ) -> TextLayoutResult {
-        let mut result = Self::wrap_text(fonts, item, &data);
-        result.base_y = Self::calc_y(fonts, page_height, item);
+        let mut result = Self::wrap_text(fonts, item, data);
+        result.base_y = Self::calc_y(fonts, page_height, item, &result);
         result
     }
 }

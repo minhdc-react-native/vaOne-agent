@@ -45,6 +45,8 @@ pub struct TableColumn {
     #[serde(rename = "fieldName")]
     pub field_name: String,
 
+    pub content: Option<String>,
+
     #[serde(default)]
     pub width: serde_json::Value,
 
@@ -90,13 +92,14 @@ pub struct TableRow {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableChildElement {}
 
+#[derive(Debug)]
 pub struct TableLayoutResult {
     pub width: f32,
     pub height: f32,
-
     pub rows: Vec<TableRowLayout>,
 }
 
+#[derive(Debug)]
 pub struct TableRowLayout {
     pub y: f32,
     pub height: f32,
@@ -111,10 +114,12 @@ pub struct TableCellLayout {
     pub width: f32,
     pub height: f32,
 
-    pub runs: Vec<TextRun>,
+    // pub runs: Vec<TextRun>,
+    pub content: String,
 
     pub style: ElementStyle,
 
     pub row_span: usize,
     pub col_span: usize,
+    pub is_row: bool,
 }

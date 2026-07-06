@@ -1,7 +1,10 @@
 use super::super::models::{ElementStyle, TextRun};
 use super::models::{
-    TableCellLayout, TableColumn, TableElement, TableLayoutResult, TableRowLayout,
+    TableCellLayout, TableElement, TableHeaderCell, TableLayoutResult, TableRowLayout,
 };
+use crate::pdf::fonts::PdfFonts;
+use crate::pdf::table::table_row::TableRow;
+use crate::pdf::utils::{resolve_array_table, resolve_value};
 use serde_json::Value;
 pub struct TableLayoutEngine;
 
@@ -16,7 +19,12 @@ impl TableLayoutEngine {
     /// - khởi tạo các dòng header
     ///
     /// Chưa sinh CellLayout.
-    pub fn build(table: &TableElement) -> TableLayoutResult {
+    pub fn build(
+        fonts: &PdfFonts,
+        page_height: f32,
+        table: &TableElement,
+        data: &Value,
+    ) -> TableLayoutResult {
         let widths = Self::calc_column_widths(table);
 
         let positions = Self::calc_column_positions(table.x, &widths);
@@ -27,20 +35,47 @@ impl TableLayoutEngine {
         // Header
         //----------------------------------------------------
 
-        let header = Self::build_header_rows(table, &widths, &positions);
-
-        rows.extend(header);
+        if !table.field_name.as_deref().unwrap_or("").trim().is_empty() {
+            let header = Self::build_header_rows(table, &widths, &positions);
+            rows.extend(header);
+        } else {
+            let fix = Self::build_fix_rows(table, &widths, &positions, rows.len(), data);
+            rows.extend(fix);
+        }
 
         //----------------------------------------------------
         // FixRow
         //----------------------------------------------------
 
-        let fix = Self::build_fix_rows(table, &widths, &positions, rows.len());
-
-        rows.extend(fix);
-
         //----------------------------------------------------
 
+        let header_height: f32 = rows
+            .iter()
+            .map(|row| {
+                row.cells
+                    .iter()
+                    .map(|cell| cell.height)
+                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap_or(0.0)
+            })
+            .sum();
+
+        let field = table
+            .field_name
+            .as_deref()
+            .expect("Table field_name is required");
+
+        let context = resolve_array_table(&data, field);
+
+        rows.extend(TableRow::build_rows(
+            fonts,
+            page_height,
+            table,
+            &widths,
+            &positions,
+            table.y + header_height,
+            context,
+        ));
         let height = rows.iter().map(|r| r.height).sum();
 
         TableLayoutResult {
@@ -144,8 +179,11 @@ impl TableLayoutEngine {
     // Merge Style
     //------------------------------------------------------------------
 
-    pub fn merge_style(table: &Option<ElementStyle>, cell: &Option<ElementStyle>) -> ElementStyle {
-        let mut style = table.clone().unwrap_or_default();
+    pub fn merge_style(
+        element_style: &Option<ElementStyle>,
+        cell: &Option<ElementStyle>,
+    ) -> ElementStyle {
+        let mut style = element_style.clone().unwrap_or_default();
 
         if let Some(c) = cell {
             if c.background_color.is_some() {
@@ -220,108 +258,106 @@ impl TableLayoutEngine {
     ) -> Vec<TableCellLayout> {
         let row_height = DEFAULT_HEADER_HEIGHT;
 
+        //--------------------------------------------------
+        // Header rows
+        //--------------------------------------------------
+
+        let header_rows: Vec<Vec<TableHeaderCell>> = if table.header_layout.is_empty() {
+            vec![table
+                .columns
+                .iter()
+                .map(|col| TableHeaderCell {
+                    content: col.header.clone(),
+                    col_span: 1,
+                    row_span: 1,
+                    style: col.header_style.clone(),
+                })
+                .collect()]
+        } else {
+            table.header_layout.clone()
+        };
+
+        let row_count = header_rows.len();
+        let col_count = table.columns.len();
+
+        //--------------------------------------------------
+        // Grid đánh dấu các ô đã bị chiếm
+        //--------------------------------------------------
+
+        let mut grid = vec![vec![false; col_count]; row_count];
+
         let mut result = Vec::new();
 
-        //------------------------------------------------------
-        // mỗi cột còn bị rowSpan chiếm bao nhiêu dòng
-        //------------------------------------------------------
+        //--------------------------------------------------
 
-        let mut occupied = vec![0usize; table.columns.len()];
-
-        //------------------------------------------------------
-
-        for (row_index, row) in table.header_layout.iter().enumerate() {
-            //--------------------------------------------------
-            // sang dòng mới
-            //--------------------------------------------------
-
-            for c in occupied.iter_mut() {
-                if *c > 0 {
-                    *c -= 1;
-                }
-            }
-
-            let mut column = 0usize;
+        for (row_index, row) in header_rows.iter().enumerate() {
+            let mut search_col = 0usize;
 
             for cell in row {
-                //------------------------------
-                // tìm cột còn trống
-                //------------------------------
-
-                while column < occupied.len() && occupied[column] > 0 {
-                    column += 1;
-                }
-
-                if column >= widths.len() {
-                    break;
-                }
-
                 let col_span = cell.col_span.max(1);
                 let row_span = cell.row_span.max(1);
 
-                //------------------------------
-                // width
-                //------------------------------
+                //------------------------------------------
+                // tìm cột đầu tiên còn trống
+                //------------------------------------------
 
-                let width = TableLayoutEngine::span_width(widths, column, col_span);
+                while search_col < col_count && grid[row_index][search_col] {
+                    search_col += 1;
+                }
 
-                //------------------------------
-                // height
-                //------------------------------
+                if search_col >= col_count {
+                    break;
+                }
 
-                let height = row_height * row_span as f32;
+                //------------------------------------------
+                // đánh dấu toàn bộ vùng rowspan/colspan
+                //------------------------------------------
 
-                //------------------------------
-                // style
-                //------------------------------
-
-                let style = TableLayoutEngine::merge_style(&table.style, &cell.style);
-
-                //------------------------------
-                // runs
-                //------------------------------
-
-                let runs = TableLayoutEngine::build_runs(cell.content.clone());
-
-                //------------------------------
-                // tạo layout
-                //------------------------------
-
-                result.push(TableCellLayout {
-                    x: positions[column],
-
-                    y: table.y + row_index as f32 * row_height,
-
-                    width,
-
-                    height,
-
-                    runs,
-
-                    style,
-
-                    row_span,
-
-                    col_span,
-                });
-
-                //------------------------------
-                // đánh dấu rowSpan
-                //------------------------------
-
-                if row_span > 1 {
-                    for c in column..column + col_span {
-                        if c < occupied.len() {
-                            occupied[c] = row_span - 1;
-                        }
+                for r in row_index..(row_index + row_span).min(row_count) {
+                    for c in search_col..(search_col + col_span).min(col_count) {
+                        grid[r][c] = true;
                     }
                 }
 
-                //------------------------------
-                // sang cột tiếp
-                //------------------------------
+                //------------------------------------------
+                // width
+                //------------------------------------------
 
-                column += col_span;
+                let width = Self::span_width(widths, search_col, col_span);
+
+                //------------------------------------------
+                // height
+                //------------------------------------------
+
+                let height = row_height * row_span as f32;
+
+                //------------------------------------------
+                // style
+                //------------------------------------------
+
+                let style = Self::merge_style(&table.style, &cell.style);
+
+                //------------------------------------------
+                // push
+                //------------------------------------------
+
+                result.push(TableCellLayout {
+                    x: positions[search_col],
+                    y: table.y + row_index as f32 * row_height,
+                    width,
+                    height,
+                    content: cell.content.clone(),
+                    style,
+                    row_span,
+                    col_span,
+                    is_row: false,
+                });
+
+                //------------------------------------------
+                // tìm tiếp
+                //------------------------------------------
+
+                search_col += col_span;
             }
         }
 
@@ -339,14 +375,18 @@ impl TableLayoutEngine {
 
         let mut rows = Vec::new();
 
-        for row_index in 0..table.header_layout.len() {
+        let row_count = if table.header_layout.is_empty() {
+            1
+        } else {
+            table.header_layout.len()
+        };
+
+        for row_index in 0..row_count {
             let y = table.y + row_index as f32 * DEFAULT_HEADER_HEIGHT;
 
             let mut row = TableRowLayout {
                 y,
-
-                height: DEFAULT_HEADER_HEIGHT,
-
+                height: 0.0,
                 cells: Vec::new(),
             };
 
@@ -355,6 +395,12 @@ impl TableLayoutEngine {
                     row.cells.push(cell.clone());
                 }
             }
+
+            row.height = row
+                .cells
+                .iter()
+                .map(|c| c.height)
+                .fold(DEFAULT_HEADER_HEIGHT, f32::max);
 
             rows.push(row);
         }
@@ -370,6 +416,7 @@ impl TableLayoutEngine {
         positions: &[f32],
 
         start_row: usize,
+        data: &Value,
     ) -> Vec<TableRowLayout> {
         let mut rows = Vec::new();
 
@@ -394,7 +441,23 @@ impl TableLayoutEngine {
                 let width = widths[i];
 
                 let style = Self::merge_style(&table.style, &col.body_style);
-
+                let content = if table.field_name.as_deref().unwrap_or("").trim().is_empty() {
+                    if col.field_name.trim().is_empty() {
+                        col.content.clone().unwrap_or_default()
+                    } else {
+                        resolve_value(data, &col.field_name)
+                            .map(|v| {
+                                if let Some(s) = v.as_str() {
+                                    s.to_string()
+                                } else {
+                                    v.to_string()
+                                }
+                            })
+                            .unwrap_or_default()
+                    }
+                } else {
+                    col.header.clone()
+                };
                 row.cells.push(TableCellLayout {
                     x,
 
@@ -404,13 +467,14 @@ impl TableLayoutEngine {
 
                     height: DEFAULT_HEADER_HEIGHT,
 
-                    runs: Self::build_runs(col.header.clone()),
+                    content,
 
                     style,
 
                     row_span: 1,
 
                     col_span: 1,
+                    is_row: false,
                 });
 
                 x += width;

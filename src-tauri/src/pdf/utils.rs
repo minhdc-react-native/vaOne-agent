@@ -33,17 +33,30 @@ impl Unit {
     }
 }
 
-pub fn resolve_array(data: &serde_json::Value, path: &str) -> Option<Vec<serde_json::Value>> {
+pub fn resolve_array_table<'a>(data: &'a Value, path: &str) -> &'a [Value] {
+    let mut current = data;
+
+    for key in path.split('.') {
+        match current.get(key) {
+            Some(value) => current = value,
+            None => return &[],
+        }
+    }
+
+    current.as_array().map(Vec::as_slice).unwrap_or(&[])
+}
+
+pub fn resolve_array<'a>(
+    data: &'a serde_json::Value,
+    path: &str,
+) -> Option<&'a Vec<serde_json::Value>> {
     let mut current = data;
 
     for key in path.split('.') {
         current = current.get(key)?;
     }
 
-    match current {
-        serde_json::Value::Array(arr) => Some(arr.clone()),
-        _ => None,
-    }
+    current.as_array()
 }
 
 pub fn resolve_value(data: &Value, path: &str) -> Option<Value> {

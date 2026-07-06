@@ -1,7 +1,9 @@
 use crate::pdf::layout::TextLayout;
 use crate::pdf::models::*;
+use crate::pdf::table::table_layout::TableLayoutEngine;
+use crate::pdf::table::table_render::TableRenderer;
 use crate::pdf::text;
-use crate::pdf::utils::{draw_element_border, load_fonts, Unit};
+use crate::pdf::utils::{draw_element_border, load_fonts, resolve_array_table, Unit};
 use printpdf::{Op, PdfDocument, PdfPage, PdfSaveOptions};
 pub fn render(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow::Result<()> {
     let mut pdf = PdfDocument::new("Invoice");
@@ -35,18 +37,15 @@ pub fn render(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow
                 text::draw_text(&mut ops, &fonts, &t, &layout);
                 offset += diff;
             }
-            Element::Table(_t) => {
-                let fake = TextElement {
-                    x: _t.x,
-                    y: _t.y,
-                    width: _t.width,
-                    height: _t.height,
-                    content: "TABLE (TODO)".to_string(),
-                    field_name: Some("storeInfo.address".to_string()),
-                    style: None,
-                };
-                let layout = TextLayout::layout(&fonts, doc.height, &fake, &data);
-                text::draw_text(&mut ops, &fonts, &fake, &layout);
+            Element::Table(mut t) => {
+                t.y += offset;
+                let layout = TableLayoutEngine::build(&fonts, doc.height, &t, &data);
+                if let Some(style) = &t.style {
+                    TableRenderer::draw(&mut ops, &layout, &fonts, doc.height, style);
+                }
+                let real = layout.height;
+                let diff = (real - t.height).max(0.0);
+                offset += diff;
             }
         }
     }
