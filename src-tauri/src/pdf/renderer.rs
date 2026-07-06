@@ -3,7 +3,7 @@ use crate::pdf::models::*;
 use crate::pdf::table::table_layout::TableLayoutEngine;
 use crate::pdf::table::table_render::TableRenderer;
 use crate::pdf::text;
-use crate::pdf::utils::{draw_element_border, load_fonts, resolve_array_table, Unit};
+use crate::pdf::utils::{draw_element_border, load_fonts, Unit};
 use printpdf::{Op, PdfDocument, PdfPage, PdfSaveOptions};
 pub fn render(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow::Result<()> {
     let mut pdf = PdfDocument::new("Invoice");
@@ -20,6 +20,7 @@ pub fn render(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow
                 } else {
                     serde_json::Value::Object(serde_json::Map::new())
                 };
+
                 let layout: TextLayoutResult = TextLayout::layout(&fonts, doc.height, &t, &context);
                 let real = layout.height;
                 let diff = (real - t.height).max(0.0);

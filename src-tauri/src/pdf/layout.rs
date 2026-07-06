@@ -189,13 +189,41 @@ impl TextLayout {
     }
 
     pub fn build_context(data: &Value, source: &str, target: &str) -> Value {
-        let mut map = serde_json::Map::new();
+        let mut map = Map::new();
 
         if let Some(value) = resolve_value(data, source) {
-            map.insert(target.to_string(), value);
+            Self::insert_nested(&mut map, source, value.clone());
+            Self::insert_nested(&mut map, target, value);
         }
 
         Value::Object(map)
+    }
+
+    fn insert_nested(map: &mut Map<String, Value>, path: &str, value: Value) {
+        let parts: Vec<&str> = path.split('.').collect();
+
+        fn helper(current: &mut Map<String, Value>, parts: &[&str], value: Value) {
+            if parts.len() == 1 {
+                current.insert(parts[0].to_string(), value);
+                return;
+            }
+
+            let entry = current
+                .entry(parts[0].to_string())
+                .or_insert_with(|| Value::Object(Map::new()));
+
+            match entry {
+                Value::Object(obj) => helper(obj, &parts[1..], value),
+                _ => {
+                    // Nếu key đã tồn tại nhưng không phải Object thì ghi đè
+                    let mut obj = Map::new();
+                    helper(&mut obj, &parts[1..], value);
+                    *entry = Value::Object(obj);
+                }
+            }
+        }
+
+        helper(map, &parts, value);
     }
 
     pub fn layout(

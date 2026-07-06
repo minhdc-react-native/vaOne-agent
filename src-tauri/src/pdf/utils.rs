@@ -79,6 +79,18 @@ pub fn resolve_value(data: &Value, path: &str) -> Option<Value> {
 }
 
 pub fn bind_content(template: &str, data: &Value) -> String {
+    if template.trim().is_empty() {
+        return data
+            .get("value")
+            .map(|v| match v {
+                Value::String(s) => s.clone(),
+                Value::Number(n) => n.to_string(),
+                Value::Bool(b) => b.to_string(),
+                Value::Null => String::new(),
+                other => other.to_string(),
+            })
+            .unwrap_or_default();
+    }
     let re = Regex::new(r"\{([^{}]+)\}").unwrap();
 
     re.replace_all(template, |caps: &regex::Captures| {
