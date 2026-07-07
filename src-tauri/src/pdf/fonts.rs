@@ -1,4 +1,5 @@
 use crate::pdf::models::TextElement;
+use crate::pdf::text::FONT_SIZE;
 use crate::pdf::utils::hex_to_color;
 use printpdf::*;
 
@@ -33,7 +34,7 @@ impl PdfFonts {
         item.style
             .as_ref()
             .and_then(|s| s.font_size)
-            .unwrap_or(12.0)
+            .unwrap_or(FONT_SIZE)
     }
 
     /// left / center / right

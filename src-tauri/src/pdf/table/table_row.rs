@@ -144,6 +144,7 @@ impl TableRow {
                 .unwrap_or_default();
 
             let text = TextElement {
+                name: None,
                 x: 0.0,
                 y: 0.0,
                 width: widths[index],
@@ -151,6 +152,7 @@ impl TableRow {
                 content: value,
                 field_name: None,
                 style: Some(style),
+                auto_height: Some(true),
             };
 
             let layout = TextLayout::layout(fonts, page_height, &text, &serde_json::json!({}));

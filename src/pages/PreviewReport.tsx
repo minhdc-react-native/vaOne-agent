@@ -1,10 +1,11 @@
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { generatePdf, printPdf } from "../api/pdf";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import AppWindow from "../components/AppWindow";
 import Button from "../components/Button";
 import { Printer } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 const template = {
     page: {
         width: 794,
@@ -53,6 +54,7 @@ export const PreviewReport = () => {
     useLayoutEffect(() => {
         handleGenerate();
     }, [])
+
     const onPrint = async () => {
         await printPdf(url.path);
     }

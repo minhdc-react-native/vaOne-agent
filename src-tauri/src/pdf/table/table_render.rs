@@ -39,6 +39,7 @@ impl TableRenderer {
         // Text
         //--------------------------------------------------
         let text = TextElement {
+            name: None,
             x: cell.x + 2.0,
             y: cell.y + if cell.is_row { 2.0 } else { 0.0 },
             width: cell.width - 4.0,
@@ -46,6 +47,7 @@ impl TableRenderer {
             content: cell.content.clone(),
             field_name: None,
             style: Some(cell.style.clone()),
+            auto_height: Some(true),
         };
 
         let context = serde_json::json!({});

@@ -67,7 +67,7 @@ impl TableLayoutEngine {
 
         let context = resolve_array_table(&data, field);
 
-        rows.extend(TableRow::build_rows(
+        let body = TableRow::build_rows(
             fonts,
             page_height,
             table,
@@ -75,8 +75,11 @@ impl TableLayoutEngine {
             &positions,
             table.y + header_height,
             context,
-        ));
-        let height = rows.iter().map(|r| r.height).sum();
+        );
+
+        let height = header_height + body.iter().map(|r| r.height).sum::<f32>();
+
+        rows.extend(body);
 
         TableLayoutResult {
             width: table.width,
@@ -335,7 +338,8 @@ impl TableLayoutEngine {
                 // style
                 //------------------------------------------
 
-                let style = Self::merge_style(&table.style, &cell.style);
+                let mut style = Self::merge_style(&table.style, &cell.style);
+                style.center_y = Some(true);
 
                 //------------------------------------------
                 // push
@@ -440,7 +444,9 @@ impl TableLayoutEngine {
             for (i, col) in row_cfg.columns.iter().enumerate() {
                 let width = widths[i];
 
-                let style = Self::merge_style(&table.style, &col.body_style);
+                let mut style = Self::merge_style(&table.style, &col.body_style);
+                style.center_y = Some(true);
+
                 let content = if table.field_name.as_deref().unwrap_or("").trim().is_empty() {
                     if col.field_name.trim().is_empty() {
                         col.content.clone().unwrap_or_default()

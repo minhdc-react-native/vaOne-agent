@@ -3,6 +3,8 @@ use crate::pdf::layout::TextLayout;
 use crate::pdf::models::{ElementStyle, TextElement, TextLayoutResult, TextStyle};
 use crate::pdf::utils::Unit;
 use printpdf::{Op, Point, TextItem};
+pub const FONT_SIZE: f32 = 12.0;
+pub const LINE_HEIGHT: f32 = 1.2;
 
 pub fn draw_text(
     ops: &mut Vec<Op>,
@@ -18,11 +20,10 @@ pub fn draw_text(
 
         for run in &line.runs {
             let style = merge_style(&base_style, &run.style);
-            let font = fonts.font_by_style(style.bold, style.italic);
             width += TextLayout::measure_string(
                 fonts,
                 &run.text,
-                style.font_size.unwrap_or(14.0),
+                style.font_size.unwrap_or(FONT_SIZE),
                 style.bold,
                 style.italic,
             );
@@ -55,7 +56,7 @@ pub fn draw_text(
                 .unwrap_or_else(|| fonts.default_color());
 
             // ===== SIZE =====
-            let font_size = style.font_size.unwrap_or(14.0);
+            let font_size = style.font_size.unwrap_or(FONT_SIZE);
 
             ops.push(Op::SetFillColor { col: color });
 

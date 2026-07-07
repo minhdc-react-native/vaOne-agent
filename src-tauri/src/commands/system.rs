@@ -1,12 +1,21 @@
 use crate::models::agent_info::AgentInfo;
 use crate::state::APP_HANDLE;
+use crate::state::CURRENT_ROUTE;
 use crate::window_config;
 use reqwest::Client;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
 use std::{thread, time::Duration};
 use tauri::{LogicalPosition, LogicalSize, Manager, Position, Size};
 use tokio::time::sleep;
+#[tauri::command]
+pub fn set_current_route(route: String) {
+    *CURRENT_ROUTE
+        .get_or_init(|| Mutex::new(String::new()))
+        .lock()
+        .unwrap() = route;
+}
 
 #[tauri::command]
 pub fn quit_app(app: tauri::AppHandle) {

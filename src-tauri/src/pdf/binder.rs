@@ -31,11 +31,10 @@ pub fn bind_template(mut report: PdfTemplate, data: &serde_json::Value) -> PdfTe
                     }
                 }
             }
-            Element::Table(table) => {
-                if let Some(field) = &table.field_name {
-                    if let Some(rows) = resolve_array(data, field) {}
-                }
-            }
+            Element::Table(table) => {}
+            Element::Line(line) => {}
+            Element::Rect(rect) => {}
+            Element::Circle(circle) => {}
         }
     }
     report

@@ -4,6 +4,9 @@ import { useEffect } from "react";
 export const BlankPage = () => {
     useEffect(() => {
         invoke("page_ready", { name: "blank", show: false });
+        invoke("set_current_route", {
+            route: "/blank",
+        });
     }, []);
     return null;
 }

@@ -179,7 +179,7 @@ pub fn draw_element_border(
     height: f32,
     style: &ElementStyle,
 ) {
-    Border::draw(
+    Border::draw_rect(
         ops,
         fonts,
         x,
@@ -190,6 +190,75 @@ pub fn draw_element_border(
         style.background_color.as_deref(),
         style.border_color.as_deref(),
         Some(style.border_width.unwrap_or(0.0)),
+        style.border_style.as_deref(),
+    );
+}
+
+pub fn draw_rect(
+    ops: &mut Vec<Op>,
+    fonts: &PdfFonts,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    style: &ElementStyle,
+) {
+    Border::draw_rect(
+        ops,
+        fonts,
+        x,
+        y,
+        width,
+        height,
+        style.border_radius.unwrap_or(0.0),
+        style.background_color.as_deref(),
+        style.border_color.as_deref(),
+        Some(style.border_width.unwrap_or(0.0)),
+        style.border_style.as_deref(),
+    );
+}
+
+pub fn draw_circle(
+    ops: &mut Vec<Op>,
+    fonts: &PdfFonts,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    style: &ElementStyle,
+) {
+    Border::draw_rect(
+        ops,
+        fonts,
+        x,
+        y,
+        width,
+        height,
+        width,
+        style.background_color.as_deref(),
+        style.border_color.as_deref(),
+        Some(style.border_width.unwrap_or(0.0)),
+        style.border_style.as_deref(),
+    );
+}
+
+pub fn draw_line(
+    ops: &mut Vec<Op>,
+    fonts: &PdfFonts,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    style: &ElementStyle,
+) {
+    Border::draw_line(
+        ops,
+        fonts,
+        x,
+        y,
+        width,
+        height,
+        style.background_color.as_deref(),
         style.border_style.as_deref(),
     );
 }

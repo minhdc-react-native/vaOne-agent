@@ -3,6 +3,8 @@ use std::sync::{Mutex, OnceLock};
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
+pub static CURRENT_ROUTE: OnceLock<Mutex<String>> = OnceLock::new();
+
 // ==========================
 // APP HANDLE (Tauri)
 // ==========================

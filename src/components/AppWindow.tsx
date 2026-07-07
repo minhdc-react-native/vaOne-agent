@@ -1,8 +1,10 @@
-import { type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
 import Button from "./Button";
 import { trayApi } from "../api/axios/axiosClient";
 import { useEscape } from "../hook/useEscape";
+import { useLocation } from "react-router-dom";
+import { invoke } from "@tauri-apps/api/core";
 
 interface AppWindowProps {
     title: string;
@@ -23,8 +25,14 @@ export default function AppWindow({
     content,
     disableClose = false
 }: AppWindowProps) {
-
+    const location = useLocation();
     useEscape(hideWindow, !disableClose);
+
+    useEffect(() => {
+        invoke("set_current_route", {
+            route: location.pathname,
+        });
+    }, [location.pathname]);
 
     return (
         <div className="flex h-screen flex-col bg-white">

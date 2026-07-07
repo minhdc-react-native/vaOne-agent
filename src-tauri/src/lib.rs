@@ -6,14 +6,14 @@ mod services;
 mod state;
 mod utils;
 mod window_config;
+use crate::state::CURRENT_ROUTE;
 use crate::state::{AppState, APP_STATE};
-
+use std::sync::Mutex;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     Manager,
 };
-use tauri_plugin_dialog::DialogExt;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -47,6 +47,8 @@ pub fn run() {
                 .set(app.handle().clone())
                 .expect("APP_HANDLE already initialized");
 
+            CURRENT_ROUTE.set(Mutex::new(String::new())).ok();
+
             APP_STATE
                 .set(std::sync::Mutex::new(AppState::default()))
                 .unwrap();
@@ -62,66 +64,50 @@ pub fn run() {
         // HANDLE MENU CLICK
         .on_menu_event(|app, event| match event.id.as_ref() {
             "report" => {
-                // state::update_sync_emit(|s| {
-                //     s.source = "TCT".to_string();
-                //     s.running = true;
-                //     s.total = 100;
-                //     s.completed = 0;
-                //     s.current_invoice = Some(json!({
-                //         "invoiceNumber": "112345",
-                //         "b": 123,
-                //         "c": true
-                //     }));
-                // });
-
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.hide();
-                    let _ = window.eval(
-                        r#"
+                    let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
+                    if current == "/report" {
+                        let _ = window.set_focus();
+                    } else {
+                        let _ = window.hide();
+                        let _ = window.eval(
+                            r#"
                             window.location.hash = "/report";
                         "#,
-                    );
+                        );
+                    }
                 }
             }
 
             "settings" => {
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.hide();
-                    let _ = window.eval(
-                        r#"
+                    let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
+                    if current == "/settings" {
+                        let _ = window.set_focus();
+                    } else {
+                        let _ = window.hide();
+                        let _ = window.eval(
+                            r#"
                             window.location.hash = "/settings";
                         "#,
-                    );
+                        );
+                    }
                 }
             }
             "quit" => {
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.hide();
-                    let _ = window.eval(
-                        r#"
+                    let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
+                    if current == "/quit" {
+                        let _ = window.set_focus();
+                    } else {
+                        let _ = window.hide();
+                        let _ = window.eval(
+                            r#"
                             window.location.hash = "/quit";
                         "#,
-                    );
+                        );
+                    }
                 }
-                // let _ = app.emit(
-                //     "dialog:open",
-                //     serde_json::json!({
-                //         "id": "quit-1",
-                //         "type": "question",
-                //         "title": "Thoát ứng dụng",
-                //         "message": "Bạn có muốn thoát vaOne-agent không?"
-                //     }),
-                // );
-
-                // app.dialog()
-                //     .message("Bạn có muốn thoát ứng dụng vaOne-agent không?")
-                //     .title("Thoát ứng dụng")
-                //     .buttons(tauri_plugin_dialog::MessageDialogButtons::YesNo)
-                //     .show(|answer| {
-                //         if answer {
-                //             std::process::exit(0);
-                //         }
-                //     });
             }
 
             _ => {}
@@ -130,6 +116,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::system::quit_app,
             commands::system::get_agent_info,
+            commands::system::set_current_route,
             commands::api_command::http_get,
             commands::api_command::http_post,
             commands::system::page_ready,

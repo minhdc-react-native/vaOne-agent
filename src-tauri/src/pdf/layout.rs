@@ -1,3 +1,4 @@
+use super::text::LINE_HEIGHT;
 use crate::pdf::fonts::PdfFonts;
 use crate::pdf::models::{TextElement, TextLayoutResult, TextLine};
 use crate::pdf::template::parser::Parser;
@@ -5,6 +6,7 @@ use crate::pdf::template::tokenizer::Tokenizer;
 use crate::pdf::utils::{resolve_value, Unit};
 use serde_json::{Map, Value};
 use ttf_parser::Face;
+
 pub struct TextLayout;
 
 impl TextLayout {
@@ -87,15 +89,15 @@ impl TextLayout {
 
         let baseline_px = Unit::pt_to_px(baseline_pt);
 
-        // let offset = if Self::is_center(item) {
-        //     // Center cả chiều dọc
-        //     (item.height - layout.height) / 2.0
-        // } else {
-        //     // Top
-        //     0.0
-        // };
+        let offset = if Self::is_center(item) {
+            // Center cả chiều dọc
+            (item.height - layout.height) / 2.0
+        } else {
+            // Top
+            0.0
+        };
 
-        let offset = (item.height - layout.height) / 2.0;
+        // let offset = (item.height - layout.height) / 2.0;
 
         page_height - item.y - offset - baseline_px
     }
@@ -116,8 +118,8 @@ impl TextLayout {
                     content_height: item.height,
                     content_width: item.width,
                     width: item.width,
-                    height: fonts.font_size(item),
-                    line_height: fonts.font_size(item) * 1.2,
+                    height: item.height,
+                    line_height: fonts.font_size(item) * LINE_HEIGHT,
                     base_y: 0.0,
                 };
             }
@@ -165,10 +167,17 @@ impl TextLayout {
 
         let real_width = lines.iter().map(|l| l.width).fold(0.0_f32, f32::max);
 
-        let line_height = font_size * 1.2;
+        let line_height = font_size * LINE_HEIGHT;
+        let auto_height = item.auto_height.unwrap_or(false);
+
+        let height = if auto_height {
+            lines.len() as f32 * line_height
+        } else {
+            item.height
+        };
 
         TextLayoutResult {
-            height: lines.len() as f32 * line_height,
+            height,
             x: item.x,
             y: item.y,
             content_height: item.height,
@@ -183,8 +192,7 @@ impl TextLayout {
     fn is_center(item: &TextElement) -> bool {
         item.style
             .as_ref()
-            .and_then(|s| s.text_align.as_deref())
-            .map(|s| s.eq_ignore_ascii_case("center"))
+            .and_then(|style| style.center_y)
             .unwrap_or(false)
     }
 

@@ -37,7 +37,6 @@ pub struct TextLayoutResult {
     pub line_height: f32,
     pub base_y: f32,
 }
-
 #[derive(Debug, Deserialize)]
 pub struct PdfTemplate {
     pub width: f32,
@@ -59,6 +58,15 @@ pub enum Element {
 
     #[serde(rename = "table")]
     Table(TableElement),
+
+    #[serde(rename = "line")]
+    Line(LRCElement),
+
+    #[serde(rename = "rect")]
+    Rect(LRCElement),
+
+    #[serde(rename = "circle")]
+    Circle(LRCElement),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -80,6 +88,8 @@ pub struct ElementStyle {
     #[serde(default)]
     #[serde(rename = "textAlign")]
     pub text_align: Option<String>,
+
+    pub center_y: Option<bool>,
 
     #[serde(default)]
     #[serde(rename = "fontWeight")]
@@ -137,6 +147,7 @@ impl Default for ElementStyle {
             font_size: Some(14.0),
             color: Some("#000000".to_string()),
             text_align: Some("left".to_string()),
+            center_y: Some(false),
             font_weight: Some("normal".to_string()),
             font_style: Some("normal".to_string()),
             border_color: None,
@@ -162,9 +173,26 @@ pub struct TextElement {
     pub height: f32,
 
     pub content: String,
+    pub name: Option<String>,
 
     #[serde(rename = "fieldName")]
     pub field_name: Option<String>,
+
+    #[serde(rename = "autoHeight")]
+    pub auto_height: Option<bool>,
+
+    #[serde(default)]
+    pub style: Option<ElementStyle>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LRCElement {
+    pub name: Option<String>,
+    pub x: f32,
+    pub y: f32,
+
+    pub width: f32,
+    pub height: f32,
 
     #[serde(default)]
     pub style: Option<ElementStyle>,
