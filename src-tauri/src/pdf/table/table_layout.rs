@@ -29,6 +29,7 @@ impl TableLayoutEngine {
 
         let positions = Self::calc_column_positions(table.x, &widths);
 
+        let mut headers = Vec::new();
         let mut rows = Vec::new();
 
         //----------------------------------------------------
@@ -37,7 +38,7 @@ impl TableLayoutEngine {
 
         if !table.field_name.as_deref().unwrap_or("").trim().is_empty() {
             let header = Self::build_header_rows(table, &widths, &positions);
-            rows.extend(header);
+            headers.extend(header);
         } else {
             let fix = Self::build_fix_rows(table, &widths, &positions, rows.len(), data);
             rows.extend(fix);
@@ -85,7 +86,7 @@ impl TableLayoutEngine {
             width: table.width,
 
             height,
-
+            headers,
             rows,
         }
     }

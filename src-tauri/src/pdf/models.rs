@@ -39,6 +39,7 @@ pub struct TextLayoutResult {
 }
 #[derive(Debug, Deserialize)]
 pub struct PdfTemplate {
+    pub name: String,
     pub width: f32,
     pub height: f32,
     pub elements: Vec<Element>,

@@ -5,9 +5,8 @@ use crate::pdf::table::table_render::TableRenderer;
 use crate::pdf::text;
 use crate::pdf::utils::{draw_circle, draw_element_border, draw_line, load_fonts, Unit};
 use printpdf::{Op, PdfDocument, PdfPage, PdfSaveOptions};
-const MINUS_HEIGHT_SHAP: f32 = 10.0;
 pub fn render(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow::Result<()> {
-    let mut pdf = PdfDocument::new("Invoice");
+    let mut pdf = PdfDocument::new(&doc.name);
     let mut ops = Vec::<Op>::new();
 
     let fonts = load_fonts(&mut pdf)?;

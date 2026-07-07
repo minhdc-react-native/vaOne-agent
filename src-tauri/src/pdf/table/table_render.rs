@@ -4,7 +4,7 @@ use crate::pdf::{
     fonts::PdfFonts,
     layout::TextLayout,
     models::{ElementStyle, TextElement, TextLayoutResult},
-    table::models::{TableCellLayout, TableLayoutResult},
+    table::models::{TableCellLayout, TableLayoutResult, TableRowLayout},
     table::rect::Rect,
     table::table_border::TableBorder,
     text,
@@ -22,12 +22,14 @@ impl TableRenderer {
         TableBorder::draw(ops, fonts, layout, style, page_height);
 
         for row in &layout.rows {
-            for cell in &row.cells {
-                Self::draw_cell(ops, cell, fonts, page_height);
-            }
+            Self::draw_row(ops, row, fonts, page_height);
         }
     }
-
+    fn draw_row(ops: &mut Vec<Op>, row: &TableRowLayout, fonts: &PdfFonts, page_height: f32) {
+        for cell in &row.cells {
+            Self::draw_cell(ops, cell, fonts, page_height);
+        }
+    }
     fn draw_cell(ops: &mut Vec<Op>, cell: &TableCellLayout, fonts: &PdfFonts, page_height: f32) {
         //--------------------------------------------------
         // Background

@@ -92,14 +92,15 @@ pub struct TableRow {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableChildElement {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TableLayoutResult {
     pub width: f32,
     pub height: f32,
+    pub headers: Vec<TableRowLayout>,
     pub rows: Vec<TableRowLayout>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TableRowLayout {
     pub y: f32,
     pub height: f32,
