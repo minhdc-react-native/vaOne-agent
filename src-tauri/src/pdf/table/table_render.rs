@@ -20,7 +20,11 @@ impl TableRenderer {
         style: &ElementStyle,
     ) {
         TableBorder::draw(ops, fonts, layout, style, page_height);
-
+        // header
+        for row in &layout.headers {
+            Self::draw_row(ops, row, fonts, page_height);
+        }
+        //body
         for row in &layout.rows {
             Self::draw_row(ops, row, fonts, page_height);
         }

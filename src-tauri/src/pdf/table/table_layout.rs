@@ -38,7 +38,7 @@ impl TableLayoutEngine {
 
         if !table.field_name.as_deref().unwrap_or("").trim().is_empty() {
             let header = Self::build_header_rows(table, &widths, &positions);
-            headers.extend(header);
+            headers.extend(header.clone());
         } else {
             let fix = Self::build_fix_rows(table, &widths, &positions, rows.len(), data);
             rows.extend(fix);
@@ -50,7 +50,7 @@ impl TableLayoutEngine {
 
         //----------------------------------------------------
 
-        let header_height: f32 = rows
+        let header_height: f32 = headers
             .iter()
             .map(|row| {
                 row.cells
@@ -77,12 +77,13 @@ impl TableLayoutEngine {
             table.y + header_height,
             context,
         );
-
-        let height = header_height + body.iter().map(|r| r.height).sum::<f32>();
-
         rows.extend(body);
 
+        let height = header_height + rows.iter().map(|r| r.height).sum::<f32>();
+
         TableLayoutResult {
+            x: table.x,
+            y: table.y,
             width: table.width,
 
             height,

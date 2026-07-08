@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-
+use crate::pdf::table::models::TableRowLayout;
 use printpdf::*;
+use std::collections::HashSet;
 
 use crate::pdf::{
     fonts::PdfFonts, models::ElementStyle, table::models::TableLayoutResult, utils::Unit,
@@ -46,90 +46,79 @@ pub struct VLine {
 pub struct TableBorder;
 
 impl TableBorder {
-    fn collect_edges(layout: &TableLayoutResult) -> HashMap<Edge, usize> {
-        let mut edges = HashMap::<Edge, usize>::new();
+    fn collect_edges(layout: &TableLayoutResult) -> HashSet<Edge> {
+        let mut edges = HashSet::<Edge>::new();
+
+        for row in &layout.headers {
+            Self::collect_row_edges(&row, &mut edges);
+        }
 
         for row in &layout.rows {
-            for cell in &row.cells {
-                //--------------------------------------------------
-                // Top
-                //--------------------------------------------------
-
-                Self::insert_edge(
-                    &mut edges,
-                    Edge {
-                        kind: EdgeKind::Top,
-
-                        x1: px(cell.x),
-                        y1: px(cell.y),
-
-                        x2: px(cell.x + cell.width),
-                        y2: px(cell.y),
-                    },
-                );
-
-                //--------------------------------------------------
-                // Bottom
-                //--------------------------------------------------
-
-                Self::insert_edge(
-                    &mut edges,
-                    Edge {
-                        kind: EdgeKind::Bottom,
-
-                        x1: px(cell.x),
-                        y1: px(cell.y + cell.height),
-
-                        x2: px(cell.x + cell.width),
-                        y2: px(cell.y + cell.height),
-                    },
-                );
-
-                //--------------------------------------------------
-                // Left
-                //--------------------------------------------------
-
-                Self::insert_edge(
-                    &mut edges,
-                    Edge {
-                        kind: EdgeKind::Left,
-
-                        x1: px(cell.x),
-                        y1: px(cell.y),
-
-                        x2: px(cell.x),
-                        y2: px(cell.y + cell.height),
-                    },
-                );
-
-                //--------------------------------------------------
-                // Right
-                //--------------------------------------------------
-
-                Self::insert_edge(
-                    &mut edges,
-                    Edge {
-                        kind: EdgeKind::Right,
-
-                        x1: px(cell.x + cell.width),
-                        y1: px(cell.y),
-
-                        x2: px(cell.x + cell.width),
-                        y2: px(cell.y + cell.height),
-                    },
-                );
-            }
+            Self::collect_row_edges(&row, &mut edges);
         }
 
         edges
     }
 
-    fn insert_edge(edges: &mut HashMap<Edge, usize>, edge: Edge) {
-        *edges.entry(edge).or_insert(0) += 1;
+    fn collect_row_edges(row: &TableRowLayout, edges: &mut HashSet<Edge>) {
+        for cell in &row.cells {
+            let x_start = px(cell.x);
+            let y_start = px(cell.y);
+            let x_end = px(cell.x + cell.width);
+            let y_end = px(cell.y + cell.height);
+
+            Self::insert_edge(
+                edges,
+                Edge {
+                    kind: EdgeKind::Top,
+                    x1: x_start,
+                    y1: y_start,
+                    x2: x_end,
+                    y2: y_start,
+                },
+            );
+
+            Self::insert_edge(
+                edges,
+                Edge {
+                    kind: EdgeKind::Bottom,
+                    x1: x_start,
+                    y1: y_end,
+                    x2: x_end,
+                    y2: y_end,
+                },
+            );
+
+            Self::insert_edge(
+                edges,
+                Edge {
+                    kind: EdgeKind::Left,
+                    x1: x_start,
+                    y1: y_start,
+                    x2: x_start,
+                    y2: y_end,
+                },
+            );
+
+            Self::insert_edge(
+                edges,
+                Edge {
+                    kind: EdgeKind::Right,
+                    x1: x_end,
+                    y1: y_start,
+                    x2: x_end,
+                    y2: y_end,
+                },
+            );
+        }
     }
 
-    fn unique_edges(edges: HashMap<Edge, usize>) -> Vec<Edge> {
-        edges.into_iter().map(|(e, _)| e).collect()
+    fn insert_edge(edges: &mut HashSet<Edge>, edge: Edge) {
+        edges.insert(edge);
+    }
+
+    fn unique_edges(edges: HashSet<Edge>) -> Vec<Edge> {
+        edges.into_iter().collect()
     }
 
     fn merge_horizontal(edges: &[Edge]) -> Vec<HLine> {
@@ -155,7 +144,7 @@ impl TableBorder {
         // Sort
         //--------------------------------------------------
 
-        lines.sort_by(|a, b| a.y.cmp(&b.y).then(a.x1.cmp(&b.x1)).then(a.x2.cmp(&b.x2)));
+        lines.sort_unstable_by(|a, b| a.y.cmp(&b.y).then(a.x1.cmp(&b.x1)).then(a.x2.cmp(&b.x2)));
 
         //--------------------------------------------------
         // Merge
@@ -199,8 +188,7 @@ impl TableBorder {
         //--------------------------------------------------
         // Sort
         //--------------------------------------------------
-
-        lines.sort_by(|a, b| a.x.cmp(&b.x).then(a.y1.cmp(&b.y1)).then(a.y2.cmp(&b.y2)));
+        lines.sort_unstable_by(|a, b| a.x.cmp(&b.x).then(a.y1.cmp(&b.y1)).then(a.y2.cmp(&b.y2)));
 
         //--------------------------------------------------
         // Merge
@@ -224,28 +212,20 @@ impl TableBorder {
 
     fn draw_horizontal(ops: &mut Vec<Op>, lines: &[HLine], page_height: f32) {
         for line in lines {
-            let y = page_height - line.y as f32 / 100.0;
+            let y = Unit::px100_to_mm((page_height * 100.0).round() as i32 - line.y);
+
             ops.push(Op::DrawLine {
                 line: Line {
                     points: vec![
                         LinePoint {
-                            p: Point::new(
-                                Unit::px_to_mm(line.x1 as f32 / 100.0),
-                                Unit::px_to_mm(y),
-                            ),
-
+                            p: Point::new(Unit::px100_to_mm(line.x1), y),
                             bezier: false,
                         },
                         LinePoint {
-                            p: Point::new(
-                                Unit::px_to_mm(line.x2 as f32 / 100.0),
-                                Unit::px_to_mm(y),
-                            ),
-
+                            p: Point::new(Unit::px100_to_mm(line.x2), y),
                             bezier: false,
                         },
                     ],
-
                     is_closed: false,
                 },
             });
@@ -253,30 +233,27 @@ impl TableBorder {
     }
 
     fn draw_vertical(ops: &mut Vec<Op>, lines: &[VLine], page_height: f32) {
+        let page = (page_height * 100.0).round() as i32;
+
         for line in lines {
-            let y1 = page_height - line.y1 as f32 / 100.0;
-            let y2 = page_height - line.y2 as f32 / 100.0;
+            let x = Unit::px100_to_mm(line.x);
+
+            let y1 = Unit::px100_to_mm(page - line.y1);
+
+            let y2 = Unit::px100_to_mm(page - line.y2);
+
             ops.push(Op::DrawLine {
                 line: Line {
                     points: vec![
                         LinePoint {
-                            p: Point::new(
-                                Unit::px_to_mm(line.x as f32 / 100.0),
-                                Unit::px_to_mm(y1),
-                            ),
-
+                            p: Point::new(x, y1),
                             bezier: false,
                         },
                         LinePoint {
-                            p: Point::new(
-                                Unit::px_to_mm(line.x as f32 / 100.0),
-                                Unit::px_to_mm(y2),
-                            ),
-
+                            p: Point::new(x, y2),
                             bezier: false,
                         },
                     ],
-
                     is_closed: false,
                 },
             });

@@ -31,10 +31,7 @@ pub fn bind_template(mut report: PdfTemplate, data: &serde_json::Value) -> PdfTe
                     }
                 }
             }
-            Element::Table(table) => {}
-            Element::Line(line) => {}
-            Element::Rect(rect) => {}
-            Element::Circle(circle) => {}
+            _ => {}
         }
     }
     report

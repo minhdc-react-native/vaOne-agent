@@ -1,45 +1,9 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { generatePdf, printPdf } from "../api/pdf";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import AppWindow from "../components/AppWindow";
-import Button from "../components/Button";
-import { Printer } from "lucide-react";
 import { useLocation } from "react-router-dom";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-const template = {
-    page: {
-        width: 794,
-        height: 1123,
-    },
-    elements: [
-        {
-            "id": "stglgae01",
-            "name": "text_stgl",
-            "type": "text",
-            "x": 318.2641603813758,
-            "y": 65.60179851724,
-            "width": 200,
-            "height": 21.760059062384645,
-            "content": "<b>Địa chỉ:</b> {value}",
-            "fieldName": "storeInfo.address",
-            "childElements": [],
-            "style": {
-                "backgroundColor": "transparent",
-                "opacity": 1,
-                "fontSize": 11,
-                "color": "#000000",
-                "textAlign": "left",
-                "borderRadius": 4,
-                "padding": 8
-            }
-        }
-    ],
-};
-const data = {
-    "storeInfo": {
-        "address": "123 Nguyễn Trãi, Thanh Xuân, Hà Nội"
-    }
-};
+import { imageUrlToBase64 } from "../api/services/image.service";
 
 export const PreviewReport = () => {
     const location = useLocation();
@@ -47,7 +11,19 @@ export const PreviewReport = () => {
     const [url, setUrl] = useState({ url: "", path: "" });
     const handleGenerate = async () => {
         await invoke("page_ready", { name: 'report' });
-        const path = await generatePdf(report || template, data_report || data) as string;
+        if (report.backgroundImage && report.backgroundImage.startsWith("http")) {
+            report.backgroundImage = await imageUrlToBase64(report.backgroundImage);
+        }
+        for (const element of report.elements) {
+            if (
+                element.type === "image" &&
+                typeof element.content === "string" &&
+                element.content.startsWith("http")
+            ) {
+                element.content = await imageUrlToBase64(element.content);
+            }
+        }
+        const path = await generatePdf(report, data_report) as string;
         const url = convertFileSrc(path);
         setUrl({ url, path });
     };

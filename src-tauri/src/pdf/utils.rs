@@ -1,12 +1,22 @@
 use crate::pdf::fonts::{PdfFont, PdfFonts};
-use anyhow::{anyhow, Result};
-use printpdf::{Color, Op, Rgb};
-use printpdf::{ParsedFont, PdfDocument};
-
 use crate::state::{FONT_BOLD, FONT_ITALIC, FONT_REGULAR};
-use printpdf::{Mm, Pt};
+use anyhow::{anyhow, Result};
+use printpdf::{Color, Mm, Op, ParsedFont, PdfDocument, Pt, Rgb};
 use regex::Regex;
 use serde_json::Value;
+
+use std::io::Read;
+
+pub fn decompress_zstd(bytes: Vec<u8>) -> Result<String, Box<dyn std::error::Error>> {
+    let mut decoder = zstd::Decoder::new(bytes.as_slice())?;
+
+    let mut json = String::new();
+
+    decoder.read_to_string(&mut json)?;
+
+    Ok(json)
+}
+
 pub struct Unit;
 
 impl Unit {
@@ -15,6 +25,11 @@ impl Unit {
     #[inline]
     pub fn px_to_mm(px: f32) -> Mm {
         Mm(px * 25.4 / Self::DPI)
+    }
+
+    #[inline(always)]
+    pub fn px100_to_mm(px100: i32) -> Mm {
+        Mm(px100 as f32 * 25.4 / (96.0 * 100.0))
     }
 
     #[inline]

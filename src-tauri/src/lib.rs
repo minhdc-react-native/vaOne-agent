@@ -29,12 +29,12 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
             let window_clone = window.clone();
             let _ = window_clone.hide();
-            let report = MenuItem::with_id(app, "report", "Test print pdf", true, None::<&str>)?;
+            // let report = MenuItem::with_id(app, "report", "Test print pdf", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Thoát ứng dụng", true, None::<&str>)?;
 
-            let menu = Menu::with_items(app, &[&report, &settings, &separator, &quit])?;
+            let menu = Menu::with_items(app, &[&settings, &separator, &quit])?;
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())

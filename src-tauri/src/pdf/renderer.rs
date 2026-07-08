@@ -1,15 +1,25 @@
-use crate::pdf::layout::TextLayout;
-use crate::pdf::models::*;
-use crate::pdf::table::table_layout::TableLayoutEngine;
-use crate::pdf::table::table_render::TableRenderer;
-use crate::pdf::text;
-use crate::pdf::utils::{draw_circle, draw_element_border, draw_line, load_fonts, Unit};
+use crate::pdf::{
+    image::{render_background_image, render_image},
+    layout::TextLayout,
+    models::*,
+    table::{table_layout::TableLayoutEngine, table_render::TableRenderer},
+    text,
+    utils::{draw_circle, draw_element_border, draw_line, load_fonts, Unit},
+};
 use printpdf::{Op, PdfDocument, PdfPage, PdfSaveOptions};
 pub fn render(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow::Result<()> {
     let mut pdf = PdfDocument::new(&doc.name);
     let mut ops = Vec::<Op>::new();
 
-    let fonts = load_fonts(&mut pdf)?;
+    let _ = render_background_image(
+        &mut pdf,
+        &mut ops,
+        doc.background_image,
+        doc.width,
+        doc.height,
+    );
+
+    let fonts: super::fonts::PdfFonts = load_fonts(&mut pdf)?;
     let mut current_offset = 0.0;
     for e in doc.elements {
         match e {
@@ -23,15 +33,6 @@ pub fn render(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow
                 };
 
                 let layout = TextLayout::layout(&fonts, doc.height, &element, &context);
-
-                if let Some(name) = element.name.as_deref() {
-                    if name == "text_son3" || name == "****" {
-                        println!(
-                            "text>>{} {} {} {}",
-                            name, layout.base_y, current_offset, element.y
-                        );
-                    }
-                }
 
                 let real = layout.height;
                 let diff = real - element.height;
@@ -123,11 +124,45 @@ pub fn render(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow
                     );
                 }
             }
+
+            Element::Image(mut element) => {
+                element.y += current_offset;
+                let _ = render_image(&mut pdf, &mut ops, &element, doc.height);
+            }
+
+            Element::Grid(mut element) => {}
         }
     }
     let page = PdfPage::new(Unit::px_to_mm(doc.width), Unit::px_to_mm(doc.height), ops);
 
     pdf.with_pages(vec![page]);
+
+    let mut warnings = Vec::new();
+
+    let bytes = pdf.save(&PdfSaveOptions::default(), &mut warnings);
+
+    std::fs::write(output, bytes)?;
+
+    Ok(())
+}
+
+use crate::pdf::pagination::{paginator::Paginator, PageRenderer};
+
+pub fn render_page(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow::Result<()> {
+    let mut pdf = PdfDocument::new(&doc.name);
+
+    let fonts = load_fonts(&mut pdf)?;
+
+    // 1. Build layout
+    let items = Paginator::build_items(&doc, &fonts, &data)?;
+
+    // 2. Pagination
+    let pages = Paginator::paginate(items, doc.width, doc.height)?;
+
+    // 3. Render
+    let pdf_pages = PageRenderer::render(&mut pdf, &fonts, pages, doc.width, doc.height)?;
+
+    pdf.with_pages(pdf_pages);
 
     let mut warnings = Vec::new();
 

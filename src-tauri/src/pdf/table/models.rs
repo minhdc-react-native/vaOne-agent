@@ -94,6 +94,8 @@ pub struct TableChildElement {}
 
 #[derive(Debug, Clone)]
 pub struct TableLayoutResult {
+    pub x: f32,
+    pub y: f32,
     pub width: f32,
     pub height: f32,
     pub headers: Vec<TableRowLayout>,

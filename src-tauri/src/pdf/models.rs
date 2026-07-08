@@ -42,6 +42,8 @@ pub struct PdfTemplate {
     pub name: String,
     pub width: f32,
     pub height: f32,
+    #[serde(rename = "backgroundImage")]
+    pub background_image: Option<String>,
     pub elements: Vec<Element>,
 }
 
@@ -51,7 +53,7 @@ pub struct Page {
     pub height: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum Element {
     #[serde(rename = "text")]
@@ -68,6 +70,12 @@ pub enum Element {
 
     #[serde(rename = "circle")]
     Circle(LRCElement),
+
+    #[serde(rename = "image")]
+    Image(LRCElement),
+
+    #[serde(rename = "grid")]
+    Grid(GridElement),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -192,8 +200,27 @@ pub struct LRCElement {
     pub x: f32,
     pub y: f32,
 
+    pub content: Option<String>,
+
     pub width: f32,
     pub height: f32,
+
+    #[serde(default)]
+    pub style: Option<ElementStyle>,
+}
+#[derive(Debug, Clone, Deserialize)]
+pub struct GridElement {
+    pub name: Option<String>,
+    pub x: f32,
+    pub y: f32,
+
+    pub width: f32,
+    pub height: f32,
+
+    pub content: Option<String>,
+
+    #[serde(rename = "fieldName")]
+    pub field_name: Option<String>,
 
     #[serde(default)]
     pub style: Option<ElementStyle>,
