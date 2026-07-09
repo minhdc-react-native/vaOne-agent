@@ -37,6 +37,11 @@ pub struct TextLayoutResult {
     pub line_height: f32,
     pub base_y: f32,
 }
+impl TextLayoutResult {
+    pub fn translate_y(&mut self, dy: f32) {
+        self.y += dy;
+    }
+}
 #[derive(Debug, Deserialize)]
 pub struct PdfTemplate {
     pub name: String,
@@ -194,6 +199,12 @@ pub struct TextElement {
     pub style: Option<ElementStyle>,
 }
 
+impl TextElement {
+    pub fn translate_y(&mut self, dy: f32) {
+        self.y += dy;
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct LRCElement {
     pub name: Option<String>,
@@ -207,6 +218,11 @@ pub struct LRCElement {
 
     #[serde(default)]
     pub style: Option<ElementStyle>,
+}
+impl LRCElement {
+    pub fn translate_y(&mut self, dy: f32) {
+        self.y += dy;
+    }
 }
 #[derive(Debug, Clone, Deserialize)]
 pub struct GridElement {
@@ -224,4 +240,27 @@ pub struct GridElement {
 
     #[serde(default)]
     pub style: Option<ElementStyle>,
+}
+impl GridElement {
+    pub fn translate_y(&mut self, dy: f32) {
+        self.y += dy;
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PdfProgress {
+    pub phase: PdfPhase,
+    pub current: usize,
+    pub total: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum PdfPhase {
+    Preparing,
+    Paginating,
+    Rendering,
+    Saving,
+    Completed,
 }

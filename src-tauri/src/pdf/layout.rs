@@ -99,7 +99,7 @@ impl TextLayout {
 
         // let offset = (item.height - layout.height) / 2.0;
 
-        page_height - item.y - offset - baseline_px
+        page_height - layout.y - offset - baseline_px
     }
 
     pub fn wrap_text(fonts: &PdfFonts, item: &TextElement, data: &Value) -> TextLayoutResult {

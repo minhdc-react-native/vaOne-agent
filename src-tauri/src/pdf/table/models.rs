@@ -8,6 +8,7 @@ pub enum ColumnWidth {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TableElement {
+    pub name: Option<String>,
     pub x: f32,
     pub y: f32,
     pub width: f32,
@@ -34,6 +35,11 @@ pub struct TableElement {
 
     #[serde(default)]
     pub style: Option<ElementStyle>,
+}
+impl TableElement {
+    pub fn translate_y(&mut self, dy: f32) {
+        self.y += dy;
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -101,7 +107,77 @@ pub struct TableLayoutResult {
     pub headers: Vec<TableRowLayout>,
     pub rows: Vec<TableRowLayout>,
 }
+impl TableLayoutResult {
+    /// Tổng chiều cao phần header
+    pub fn header_height(&self) -> f32 {
+        self.headers
+            .iter()
+            .map(|row| {
+                row.cells
+                    .iter()
+                    .map(|cell| cell.height)
+                    .min_by(|a, b| a.partial_cmp(b).unwrap())
+                    .unwrap_or(0.0)
+            })
+            .sum()
+    }
 
+    /// Tổng chiều cao phần body
+    pub fn rows_height(&self) -> f32 {
+        self.rows.iter().map(|r| r.height).sum()
+    }
+
+    /// Tính lại chiều cao toàn bộ table
+    pub fn recalc_height(&mut self) {
+        self.height = self.header_height() + self.rows_height();
+    }
+
+    /// Dịch chuyển toàn bộ table theo trục Y
+    pub fn translate_y(&mut self, dy: f32) {
+        self.y += dy;
+
+        for header in &mut self.headers {
+            header.translate_y(dy);
+        }
+
+        for row in &mut self.rows {
+            row.translate_y(dy);
+        }
+    }
+    pub fn clone_headers(&self) -> Vec<TableRowLayout> {
+        self.headers.clone()
+    }
+
+    pub fn empty_body(&self) -> Self {
+        Self {
+            x: self.x,
+            y: self.y,
+            width: self.width,
+            height: self.header_height(),
+            headers: self.headers.clone(),
+            rows: Vec::new(),
+        }
+    }
+
+    pub fn push_row(&mut self, mut row: TableRowLayout) {
+        let y = if let Some(last) = self.rows.last() {
+            last.y + last.height
+        } else if let Some(last_header) = self.headers.last() {
+            last_header.y + last_header.height
+        } else {
+            self.y
+        };
+
+        row.translate_y(y - row.y);
+
+        self.rows.push(row);
+
+        self.recalc_height();
+    }
+    pub fn bottom(&self) -> f32 {
+        self.y + self.height
+    }
+}
 #[derive(Debug, Clone)]
 pub struct TableRowLayout {
     pub y: f32,
@@ -109,6 +185,17 @@ pub struct TableRowLayout {
 
     pub cells: Vec<TableCellLayout>,
 }
+
+impl TableRowLayout {
+    pub fn translate_y(&mut self, dy: f32) {
+        self.y += dy;
+
+        for cell in &mut self.cells {
+            cell.y += dy;
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TableCellLayout {
     pub x: f32,

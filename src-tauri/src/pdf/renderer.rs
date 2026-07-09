@@ -1,152 +1,20 @@
-use crate::pdf::{
-    image::{render_background_image, render_image},
-    layout::TextLayout,
-    models::*,
-    table::{table_layout::TableLayoutEngine, table_render::TableRenderer},
-    text,
-    utils::{draw_circle, draw_element_border, draw_line, load_fonts, Unit},
+use crate::pdf::{layout::TextLayout, models::*, utils::load_fonts};
+use printpdf::{PdfDocument, PdfSaveOptions};
+
+use crate::pdf::pagination::{
+    layout_builder::LayoutBuilder,
+    paginator::{PageItem, Paginator},
+    PageRenderer,
 };
-use printpdf::{Op, PdfDocument, PdfPage, PdfSaveOptions};
-pub fn render(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow::Result<()> {
-    let mut pdf = PdfDocument::new(&doc.name);
-    let mut ops = Vec::<Op>::new();
+use crate::state::APP_HANDLE;
+use tauri::Emitter;
 
-    let _ = render_background_image(
-        &mut pdf,
-        &mut ops,
-        doc.background_image,
-        doc.width,
-        doc.height,
-    );
-
-    let fonts: super::fonts::PdfFonts = load_fonts(&mut pdf)?;
-    let mut current_offset = 0.0;
-    for e in doc.elements {
-        match e {
-            Element::Text(mut element) => {
-                element.y += current_offset;
-
-                let context = if let Some(field) = element.field_name.as_deref() {
-                    TextLayout::build_context(&data, field, "value")
-                } else {
-                    serde_json::Value::Object(serde_json::Map::new())
-                };
-
-                let layout = TextLayout::layout(&fonts, doc.height, &element, &context);
-
-                let real = layout.height;
-                let diff = real - element.height;
-
-                if let Some(style) = &element.style {
-                    draw_element_border(
-                        &mut ops,
-                        &fonts,
-                        element.x,
-                        layout.base_y + element.height - 4.0,
-                        element.width,
-                        element.height,
-                        style,
-                    );
-                }
-
-                text::draw_text(&mut ops, &fonts, &element, &layout);
-
-                current_offset += diff;
-            }
-
-            Element::Table(mut element) => {
-                element.y += current_offset;
-
-                let layout = TableLayoutEngine::build(&fonts, doc.height, &element, &data);
-
-                if let Some(style) = &element.style {
-                    TableRenderer::draw(&mut ops, &layout, &fonts, doc.height, style);
-                }
-
-                let diff = layout.height - element.height;
-
-                current_offset += diff;
-            }
-
-            Element::Line(mut element) => {
-                element.y += current_offset;
-                if let Some(style) = &element.style {
-                    draw_line(
-                        &mut ops,
-                        &fonts,
-                        element.x,
-                        doc.height - element.y,
-                        element.width,
-                        element.height,
-                        style,
-                    );
-                }
-            }
-
-            Element::Rect(mut element) => {
-                element.y += current_offset;
-                if let Some(name) = element.name.as_deref() {
-                    if name == "rect_xh7w" || name == "****" {
-                        println!(
-                            "Rect>>{} {} {} {}",
-                            name,
-                            doc.height - element.y,
-                            current_offset,
-                            element.y
-                        );
-                    }
-                }
-                if let Some(style) = &element.style {
-                    draw_element_border(
-                        &mut ops,
-                        &fonts,
-                        element.x,
-                        doc.height - element.y,
-                        element.width,
-                        element.height,
-                        style,
-                    );
-                }
-            }
-
-            Element::Circle(mut element) => {
-                element.y += current_offset;
-
-                if let Some(style) = &element.style {
-                    draw_circle(
-                        &mut ops,
-                        &fonts,
-                        element.x,
-                        doc.height - element.y,
-                        element.width,
-                        element.height,
-                        style,
-                    );
-                }
-            }
-
-            Element::Image(mut element) => {
-                element.y += current_offset;
-                let _ = render_image(&mut pdf, &mut ops, &element, doc.height);
-            }
-
-            Element::Grid(mut element) => {}
-        }
+fn emit_pdf_progress(progress: PdfProgress) {
+    if let Some(app) = APP_HANDLE.get() {
+        let _ = app.emit("pdf-progress", progress);
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
-    let page = PdfPage::new(Unit::px_to_mm(doc.width), Unit::px_to_mm(doc.height), ops);
-
-    pdf.with_pages(vec![page]);
-
-    let mut warnings = Vec::new();
-
-    let bytes = pdf.save(&PdfSaveOptions::default(), &mut warnings);
-
-    std::fs::write(output, bytes)?;
-
-    Ok(())
 }
-
-use crate::pdf::pagination::{paginator::Paginator, PageRenderer};
 
 pub fn render_page(doc: PdfTemplate, data: serde_json::Value, output: &str) -> anyhow::Result<()> {
     let mut pdf = PdfDocument::new(&doc.name);
@@ -154,15 +22,56 @@ pub fn render_page(doc: PdfTemplate, data: serde_json::Value, output: &str) -> a
     let fonts = load_fonts(&mut pdf)?;
 
     // 1. Build layout
-    let items = Paginator::build_items(&doc, &fonts, &data)?;
+    let items = LayoutBuilder::build_items(&doc, &fonts, &data)?;
 
     // 2. Pagination
-    let pages = Paginator::paginate(items, doc.width, doc.height)?;
-
+    let mut pages = Paginator::paginate(items, doc.width, doc.height)?;
+    let total = pages.len();
+    let context = serde_json::Value::Object(serde_json::Map::new());
+    let style_text = Some(ElementStyle {
+        color: Some("#808080".into()),
+        font_size: Some(10.0),
+        font_style: Some("italic".into()),
+        text_align: Some("right".into()),
+        ..Default::default()
+    });
+    for (index, page) in pages.iter_mut().enumerate() {
+        let text = format!("Trang {}/{}", index + 1, total);
+        let element = TextElement {
+            name: None,
+            x: doc.width - 100.0 - 35.0,
+            y: doc.height - 35.0,
+            width: 100.0,
+            height: 24.0,
+            content: text,
+            field_name: None,
+            style: style_text.clone(),
+            auto_height: Some(false),
+        };
+        page.items.push(PageItem::Text {
+            element: element.clone(),
+            layout: TextLayout::layout(&fonts, doc.height, &element, &context),
+        });
+    }
     // 3. Render
-    let pdf_pages = PageRenderer::render(&mut pdf, &fonts, pages, doc.width, doc.height)?;
+    // let pdf_pages = PageRenderer::render(&mut pdf, &fonts, pages, doc.width, doc.height)?;
 
-    pdf.with_pages(pdf_pages);
+    // pdf.with_pages(pdf_pages);
+
+    PageRenderer::render(
+        &mut pdf,
+        &fonts,
+        pages,
+        doc.width,
+        doc.height,
+        |current, total| {
+            emit_pdf_progress(PdfProgress {
+                phase: PdfPhase::Rendering,
+                current,
+                total,
+            });
+        },
+    )?;
 
     let mut warnings = Vec::new();
 

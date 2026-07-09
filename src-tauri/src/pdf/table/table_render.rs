@@ -58,7 +58,7 @@ impl TableRenderer {
 
         let context = serde_json::json!({});
         let layout: TextLayoutResult = TextLayout::layout(&fonts, page_height, &text, &context);
-        text::draw_text(ops, &fonts, &text, &layout);
+        text::draw_text(ops, &fonts, &text, &layout, page_height);
     }
 
     fn draw_background(

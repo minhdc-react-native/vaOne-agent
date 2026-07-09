@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::{env, fs};
 
 use vaone_plugin::pdf::models::PdfTemplate;
-use vaone_plugin::pdf::renderer::render;
+use vaone_plugin::pdf::renderer::render_page;
 
 fn main() -> Result<()> {
     // report-cli config.json output.pdf
@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     let doc: PdfTemplate = serde_json::from_str(&json_report).context("Invalid report json")?;
     let data: serde_json::Value = serde_json::from_str(&json_data).context("Invalid data json")?;
 
-    render(doc, data, output_path)?;
+    render_page(doc, data, output_path)?;
 
     println!("Render success: {}", output_path);
 

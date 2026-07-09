@@ -66,7 +66,7 @@ export default function AppWindow({
             </header>
 
             {/* Content */}
-            <main className="flex-1 overflow-auto">
+            <main className="flex flex-1 overflow-auto">
                 {children}
             </main>
         </div>

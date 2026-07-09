@@ -33,12 +33,13 @@ pagination/
 
 pub mod constants;
 pub mod cursor;
+pub mod layout_builder;
 pub mod page;
 pub mod page_break;
 pub mod page_context;
 pub mod page_renderer;
+pub mod pagination_context;
 pub mod paginator;
-
 // Re-export các kiểu thường dùng
 pub use cursor::Cursor;
 pub use page::PageLayout;

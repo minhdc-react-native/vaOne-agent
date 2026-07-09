@@ -11,6 +11,7 @@ pub fn draw_text(
     fonts: &PdfFonts,
     item: &TextElement,
     layout: &TextLayoutResult,
+    page_height: f32,
 ) {
     let base_style = item.style.clone().unwrap_or_default();
     let align = fonts.text_align(item);
@@ -30,7 +31,17 @@ pub fn draw_text(
         }
 
         let x = TextLayout::calc_x(item, width, align);
-        let y = layout.base_y - index as f32 * layout.line_height;
+        let base_y = TextLayout::calc_y(fonts, page_height, item, layout);
+        let y = base_y - index as f32 * layout.line_height;
+
+        // if let Some(name) = item.name.as_deref() {
+        //     if name == "text_o3ak" || name == "****" {
+        //         println!(
+        //             "design_y={} layout_y={} base_y={}",
+        //             item.y, layout.y, base_y
+        //         );
+        //     }
+        // }
 
         ops.push(Op::StartTextSection);
 
