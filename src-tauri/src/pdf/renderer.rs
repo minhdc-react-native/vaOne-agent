@@ -12,7 +12,7 @@ use tauri::Emitter;
 fn emit_pdf_progress(progress: PdfProgress) {
     if let Some(app) = APP_HANDLE.get() {
         let _ = app.emit("pdf-progress", progress);
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        // std::thread::sleep(std::time::Duration::from_millis(50));
     }
 }
 
