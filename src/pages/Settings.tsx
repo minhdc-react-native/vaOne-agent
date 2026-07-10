@@ -116,7 +116,7 @@ export default function SettingsPage() {
 
     return (
         <AppWindow title="Settings" icon="Cog">
-            <div className="flex h-full w-82 flex-col justify-between p-4">
+            <div className="flex h-full w-82.5 flex-col justify-between p-4">
 
                 {/* Content */}
 

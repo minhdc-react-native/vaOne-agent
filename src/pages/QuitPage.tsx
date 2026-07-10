@@ -22,7 +22,7 @@ export default function QuitPage() {
 
     return (
         <div className="flex h-screen items-center justify-center">
-            <div className="w-full h-full p-4">
+            <div className="w-87.5 h-full p-4">
                 <h2 className="text-xl font-bold">
                     Thoát ứng dụng
                 </h2>

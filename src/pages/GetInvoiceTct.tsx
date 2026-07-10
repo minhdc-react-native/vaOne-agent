@@ -127,8 +127,8 @@ export const GetInvoiceTct = () => {
     }, [params]);
 
     return (
-        <AppWindow title="Tải hóa đơn..." disableClose={disableClose}>
-            <div className="space-y-2 p-4">
+        <AppWindow title="Tải hóa đơn..." disableClose={disableClose} icon="File">
+            <div className="space-y-2 p-4 w-100">
                 {/* Info panel */}
                 <div className="space-y-1 text-sm">
                     <div className="flex gap-1 items-center">

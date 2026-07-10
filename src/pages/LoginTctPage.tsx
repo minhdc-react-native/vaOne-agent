@@ -97,8 +97,8 @@ export default function LoginTctPage({ params }: IProgs) {
     }
 
     return (
-        <AppWindow title="Đăng nhập" icon="LogIn">
-            <div className="flex h-full flex-col gap-4 p-4">
+        <AppWindow title="Đăng nhập" icon="User">
+            <div className="flex h-full flex-col gap-4 p-4 w-95">
 
                 <div className="mb-2 text-center">
                     <h2 className="text-xl font-bold">
