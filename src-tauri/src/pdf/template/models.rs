@@ -73,37 +73,24 @@ pub struct DecimalConfig {
 #[serde(rename_all = "camelCase")]
 pub struct CurrencyConfig {
     pub code: String,
+
+    #[serde(rename = "currencyNameEN")]
     pub currency_name_en: String,
+
+    #[serde(rename = "separatorEN")]
     pub separator_en: String,
+
+    #[serde(rename = "decimalNameEN")]
     pub decimal_name_en: String,
+
+    #[serde(rename = "currencyNameVN")]
     pub currency_name_vn: String,
+
+    #[serde(rename = "separatorVN")]
     pub separator_vn: String,
+
+    #[serde(rename = "decimalNameVN")]
     pub decimal_name_vn: String,
+
     pub decimal_conversion_rate: i64,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum NumberFormat {
-    Price,
-    ForeignPrice,
-    Quantity,
-    Money,
-    ForeignMoney,
-    Percent,
-    ExchangeRate,
-}
-
-impl NumberFormat {
-    fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "GIA" => Some(Self::Price),
-            "GIA_NT" => Some(Self::ForeignPrice),
-            "SLG" => Some(Self::Quantity),
-            "TIEN" => Some(Self::Money),
-            "TIEN_NT" => Some(Self::ForeignMoney),
-            "PT" => Some(Self::Percent),
-            "EXCHANGE_RATE" => Some(Self::ExchangeRate),
-            _ => None,
-        }
-    }
 }
