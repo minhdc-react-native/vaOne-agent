@@ -4,9 +4,12 @@ use crate::pdf::{
     fonts::PdfFonts,
     layout::TextLayout,
     models::{ElementStyle, TextElement, TextLayoutResult},
-    table::models::{TableCellLayout, TableLayoutResult, TableRowLayout},
-    table::rect::Rect,
-    table::table_border::TableBorder,
+    table::{
+        models::{TableCellLayout, TableLayoutResult, TableRowLayout},
+        rect::Rect,
+        table_border::TableBorder,
+    },
+    template::models::FormatterContext,
     text,
 };
 pub struct TableRenderer;
@@ -18,28 +21,45 @@ impl TableRenderer {
         fonts: &PdfFonts,
         page_height: f32,
         style: &ElementStyle,
+        ctx: FormatterContext,
     ) {
         TableBorder::draw(ops, fonts, layout, style, page_height);
+
+        let border_width = style.border_width.unwrap_or(0.0);
         // header
         for row in &layout.headers {
-            Self::draw_row(ops, row, fonts, page_height);
+            Self::draw_row(ops, row, fonts, border_width, page_height, ctx.clone());
         }
         //body
         for row in &layout.rows {
-            Self::draw_row(ops, row, fonts, page_height);
+            Self::draw_row(ops, row, fonts, border_width, page_height, ctx.clone());
         }
     }
-    fn draw_row(ops: &mut Vec<Op>, row: &TableRowLayout, fonts: &PdfFonts, page_height: f32) {
+    fn draw_row(
+        ops: &mut Vec<Op>,
+        row: &TableRowLayout,
+        fonts: &PdfFonts,
+        border_width: f32,
+        page_height: f32,
+        ctx: FormatterContext,
+    ) {
         for cell in &row.cells {
-            Self::draw_cell(ops, cell, fonts, page_height);
+            Self::draw_cell(ops, cell, fonts, border_width, page_height, ctx.clone());
         }
     }
-    fn draw_cell(ops: &mut Vec<Op>, cell: &TableCellLayout, fonts: &PdfFonts, page_height: f32) {
+    fn draw_cell(
+        ops: &mut Vec<Op>,
+        cell: &TableCellLayout,
+        fonts: &PdfFonts,
+        border_width: f32,
+        page_height: f32,
+        ctx: FormatterContext,
+    ) {
         //--------------------------------------------------
         // Background
         //--------------------------------------------------
 
-        Self::draw_background(ops, cell, fonts, page_height);
+        Self::draw_background(ops, cell, fonts, border_width, page_height);
 
         //--------------------------------------------------
         // Text
@@ -57,7 +77,8 @@ impl TableRenderer {
         };
 
         let context = serde_json::json!({});
-        let layout: TextLayoutResult = TextLayout::layout(&fonts, page_height, &text, &context);
+        let layout: TextLayoutResult =
+            TextLayout::layout(&fonts, page_height, &text, &context, ctx);
         text::draw_text(ops, &fonts, &text, &layout, page_height);
     }
 
@@ -65,6 +86,7 @@ impl TableRenderer {
         ops: &mut Vec<Op>,
         cell: &TableCellLayout,
         fonts: &PdfFonts,
+        border_width: f32,
         page_height: f32,
     ) {
         if cell.is_row {
@@ -81,10 +103,10 @@ impl TableRenderer {
         Rect::fill(
             ops,
             fonts,
-            cell.x + 0.5,
-            page_height - cell.y - cell.height + 0.5,
-            cell.width - 1.0,
-            cell.height - 1.0,
+            cell.x + border_width,
+            page_height - cell.y - cell.height + border_width,
+            cell.width - border_width * 2.0,
+            cell.height - border_width * 2.0,
             color,
         );
     }

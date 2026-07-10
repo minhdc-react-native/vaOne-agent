@@ -1,7 +1,10 @@
 use super::paginator::PageItem;
 use crate::pdf::{
-    fonts::PdfFonts, layout::TextLayout, models::Element, models::PdfTemplate,
+    fonts::PdfFonts,
+    layout::TextLayout,
+    models::{Element, PdfTemplate},
     table::table_layout::TableLayoutEngine,
+    template::models::FormatterContext,
 };
 use serde_json::Value;
 pub struct LayoutBuilder;
@@ -11,6 +14,7 @@ impl LayoutBuilder {
         doc: &PdfTemplate,
         fonts: &PdfFonts,
         data: &Value,
+        ctx: FormatterContext,
     ) -> anyhow::Result<Vec<PageItem>> {
         let mut items = Vec::new();
         let mut current_offset = 0.0;
@@ -25,7 +29,8 @@ impl LayoutBuilder {
                         Value::Object(Default::default())
                     };
 
-                    let layout = TextLayout::layout(fonts, doc.height, &element, &context);
+                    let layout =
+                        TextLayout::layout(fonts, doc.height, &element, &context, ctx.clone());
                     current_offset += layout.height - element.height;
 
                     items.push(PageItem::Text { element, layout });
@@ -34,7 +39,8 @@ impl LayoutBuilder {
                 Element::Table(element) => {
                     let mut element = element.clone();
                     // element.translate_y(current_offset);
-                    let layout = TableLayoutEngine::build(fonts, doc.height, &element, data);
+                    let layout =
+                        TableLayoutEngine::build(fonts, doc.height, &element, data, ctx.clone());
 
                     current_offset += layout.height - element.height;
                     items.push(PageItem::Table { element, layout });

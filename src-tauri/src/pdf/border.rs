@@ -1,9 +1,7 @@
 use crate::pdf::fonts::PdfFonts;
-use crate::pdf::models::ElementStyle;
 use crate::pdf::utils::Unit;
 use printpdf::{
-    Line, LineDashPattern, LinePoint, Mm, Op, PaintMode, Point, Polygon, PolygonRing, Pt,
-    WindingOrder,
+    Line, LineDashPattern, LinePoint, Op, PaintMode, Point, Polygon, PolygonRing, Pt, WindingOrder,
 };
 pub struct Border;
 
@@ -88,7 +86,9 @@ impl Border {
         }
 
         if let Some(width) = border_width {
-            ops.push(Op::SetOutlineThickness { pt: Pt(width) });
+            ops.push(Op::SetOutlineThickness {
+                pt: Unit::px_to_pt(width),
+            });
         }
 
         Self::apply_border_style(ops, border_style);
@@ -130,10 +130,12 @@ impl Border {
         border_color: Option<&str>,
         border_style: Option<&str>,
     ) {
-        let line_width = (width / 2.0).min((height / 2.0)).max(0.1);
+        let line_width = (width).min(height).max(0.1);
 
         // Độ dày nét
-        ops.push(Op::SetOutlineThickness { pt: Pt(line_width) });
+        ops.push(Op::SetOutlineThickness {
+            pt: Unit::px_to_pt(line_width),
+        });
 
         // Màu nét
         if let Some(color) = border_color {
@@ -147,7 +149,7 @@ impl Border {
 
         let (start, end) = if width >= height {
             // Đường ngang, nằm giữa chiều cao
-            let cy = y + height / 2.0;
+            let cy = y + height;
 
             (
                 Point::new(Unit::px_to_mm(x), Unit::px_to_mm(cy)),
@@ -155,7 +157,7 @@ impl Border {
             )
         } else {
             // Đường dọc, nằm giữa chiều rộng
-            let cx = x + width / 2.0;
+            let cx = x + width;
 
             (
                 Point::new(Unit::px_to_mm(cx), Unit::px_to_mm(y - height)),
@@ -221,18 +223,4 @@ fn bp(x: f32, y: f32) -> LinePoint {
         p: Point::new(Unit::px_to_mm(x), Unit::px_to_mm(y)),
         bezier: true,
     }
-}
-
-fn bezier(
-    pts: &mut Vec<LinePoint>,
-    _x0: f32,
-    _y0: f32,
-    x1: f32,
-    y1: f32,
-    x2: f32,
-    y2: f32,
-    x3: f32,
-    y3: f32,
-) {
-    pts.extend([bp(x1, y1), bp(x2, y2), bp(x3, y3)]);
 }

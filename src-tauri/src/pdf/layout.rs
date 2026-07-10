@@ -1,6 +1,7 @@
 use super::text::LINE_HEIGHT;
 use crate::pdf::fonts::PdfFonts;
 use crate::pdf::models::{TextElement, TextLayoutResult, TextLine};
+use crate::pdf::template::models::FormatterContext;
 use crate::pdf::template::parser::Parser;
 use crate::pdf::template::tokenizer::Tokenizer;
 use crate::pdf::utils::{resolve_value, Unit};
@@ -11,6 +12,11 @@ pub struct TextLayout;
 
 impl TextLayout {
     fn measure_width(face: &Face, text: &str, font_size_px: f32) -> f32 {
+        // lines.push(TextLine {
+        //     runs: Parser::parse(&tokens, &data),
+        //     width,
+        // });
+
         let units_per_em = face.units_per_em() as f32;
         let mut width_units = 0.0;
         for ch in text.chars() {
@@ -102,7 +108,12 @@ impl TextLayout {
         page_height - layout.y - offset - baseline_px
     }
 
-    pub fn wrap_text(fonts: &PdfFonts, item: &TextElement, data: &Value) -> TextLayoutResult {
+    pub fn wrap_text(
+        fonts: &PdfFonts,
+        item: &TextElement,
+        data: &Value,
+        ctx: FormatterContext,
+    ) -> TextLayoutResult {
         let font = fonts.font(item);
         let face = match Face::parse(font.bytes, 0) {
             Ok(face) => face,
@@ -110,7 +121,7 @@ impl TextLayout {
                 let tokens = Tokenizer::tokenize(&item.content.clone().to_string());
                 return TextLayoutResult {
                     lines: vec![TextLine {
-                        runs: Parser::parse(&tokens, &data),
+                        runs: Parser::parse(&tokens, &data, ctx),
                         width: item.width,
                     }],
                     x: item.x,
@@ -147,7 +158,7 @@ impl TextLayout {
                     let width = Self::measure_width(&face, &current, font_size);
                     let tokens = Tokenizer::tokenize(&current);
                     lines.push(TextLine {
-                        runs: Parser::parse(&tokens, &data),
+                        runs: Parser::parse(&tokens, &data, ctx.clone()),
                         width,
                     });
                 }
@@ -160,7 +171,7 @@ impl TextLayout {
             let width = Self::measure_width(&face, &current, font_size);
             let tokens = Tokenizer::tokenize(&current);
             lines.push(TextLine {
-                runs: Parser::parse(&tokens, &data),
+                runs: Parser::parse(&tokens, &data, ctx.clone()),
                 width,
             });
         }
@@ -239,8 +250,9 @@ impl TextLayout {
         page_height: f32,
         item: &TextElement,
         data: &Value,
+        ctx: FormatterContext,
     ) -> TextLayoutResult {
-        let mut result = Self::wrap_text(fonts, item, data);
+        let mut result = Self::wrap_text(fonts, item, data, ctx);
         result.base_y = Self::calc_y(fonts, page_height, item, &result);
         result
     }

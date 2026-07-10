@@ -1,4 +1,6 @@
 use crate::pdf::fonts::{PdfFont, PdfFonts};
+use crate::pdf::template::evaluator::Evaluator;
+use crate::pdf::template::models::FormatterContext;
 use crate::state::{FONT_BOLD, FONT_ITALIC, FONT_REGULAR};
 use anyhow::{anyhow, Result};
 use printpdf::{Color, Mm, Op, ParsedFont, PdfDocument, Pt, Rgb};
@@ -276,4 +278,12 @@ pub fn draw_line(
         style.background_color.as_deref(),
         style.border_style.as_deref(),
     );
+}
+
+pub fn get_formatter_context(data: &Value) -> FormatterContext {
+    if let Some(config) = data.get("config") {
+        serde_json::from_value(config.clone()).unwrap_or_default()
+    } else {
+        FormatterContext::default()
+    }
 }

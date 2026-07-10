@@ -48,18 +48,23 @@ pub fn page_ready(name: String, show: Option<bool>) {
                 if let Some(monitor) = window.current_monitor().unwrap() {
                     let scale = monitor.scale_factor();
                     let monitor_size = monitor.size();
-                    let margin = 28.0;
 
                     let monitor_width = monitor_size.width as f64 / scale;
                     let monitor_height = monitor_size.height as f64 / scale;
 
-                    let width = monitor_width.min(width - margin);
-                    let height = monitor_height.min(height - margin);
+                    let max_width = monitor_width * 0.90;
+                    let max_height = monitor_height * 0.90;
+
+                    let width = width.min(max_width);
+                    let height = height.min(max_height);
 
                     let x = (monitor_width - width) / 2.0;
                     let y = (monitor_height - height) / 2.0;
                     let _ = window.set_position(Position::Logical(LogicalPosition { x, y }));
                 }
+                let can_resize = matches!(name.as_str(), "report" | "***");
+                let _ = window.set_resizable(can_resize);
+
                 let _ = window.show();
                 let _ = window.set_focus();
             } else {

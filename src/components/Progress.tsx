@@ -3,6 +3,7 @@ import { cn } from "../lib/utils";
 interface ProgressProps {
     value: number;
     total: number;
+    message?: string;
     showLabel?: boolean;
     className?: string;
 }
@@ -10,6 +11,7 @@ interface ProgressProps {
 export default function Progress({
     value,
     total,
+    message,
     showLabel = true,
     className,
 }: ProgressProps) {
@@ -60,7 +62,9 @@ export default function Progress({
                             mix-blend-difference
                         "
                     >
-                        {Math.round(percent)}% ({value}/{total})
+                        {value !== 0
+                            ? `${Math.round(percent)}% (${value}/${total})`
+                            : message}
                     </div>
                 )}
             </div>

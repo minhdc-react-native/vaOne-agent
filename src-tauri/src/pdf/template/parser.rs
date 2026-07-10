@@ -2,12 +2,13 @@ use serde_json::Value;
 
 use crate::pdf::models::{TextRun, TextStyle};
 use crate::pdf::template::evaluator::Evaluator;
+use crate::pdf::template::models::FormatterContext;
 use crate::pdf::template::tokenizer::Token;
 
 pub struct Parser;
 
 impl Parser {
-    pub fn parse(tokens: &[Token], data: &Value) -> Vec<TextRun> {
+    pub fn parse(tokens: &[Token], data: &Value, ctx: FormatterContext) -> Vec<TextRun> {
         let mut runs = Vec::<TextRun>::new();
 
         let mut bold = false;
@@ -90,9 +91,8 @@ impl Parser {
                         });
                     }
                 }
-
                 Token::Expression(expr) => {
-                    let value = Evaluator::evaluate(expr, data).unwrap_or_default();
+                    let value = Evaluator::evaluate(expr, data, ctx.clone()).unwrap_or_default();
 
                     runs.push(TextRun {
                         text: value,

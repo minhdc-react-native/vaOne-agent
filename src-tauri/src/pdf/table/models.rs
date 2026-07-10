@@ -53,6 +53,9 @@ pub struct TableColumn {
 
     pub content: Option<String>,
 
+    #[serde(rename = "formatString")]
+    pub format_string: Option<String>,
+
     #[serde(default)]
     pub width: serde_json::Value,
 
@@ -196,7 +199,7 @@ impl TableRowLayout {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct TableCellLayout {
     pub x: f32,
     pub y: f32,

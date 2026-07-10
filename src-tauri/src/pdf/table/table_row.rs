@@ -1,4 +1,6 @@
-use crate::pdf::utils::resolve_value;
+use crate::pdf::template::formatter::FORMATTERS;
+use crate::pdf::template::models::FormatterContext;
+use crate::pdf::utils::{get_formatter_context, resolve_value};
 use crate::pdf::{
     fonts::PdfFonts,
     layout::TextLayout,
@@ -20,6 +22,7 @@ impl TableRow {
         positions: &[f32],
         start_y: f32,
         data: &[Value],
+        ctx: FormatterContext,
     ) -> Vec<TableRowLayout> {
         let mut rows = Vec::new();
 
@@ -36,6 +39,7 @@ impl TableRow {
                 positions,
                 current_y,
                 row_height,
+                ctx.clone(),
             );
             current_y += row.height;
             rows.push(row);
@@ -53,6 +57,7 @@ impl TableRow {
         positions: &[f32],
         y: f32,
         row_height: f32,
+        ctx: FormatterContext,
     ) -> TableRowLayout {
         let mut row = TableRowLayout {
             y,
@@ -79,6 +84,7 @@ impl TableRow {
             data,
             widths,
             &table.style,
+            ctx,
         );
         for cell in &mut row.cells {
             cell.height = row_height;
@@ -107,6 +113,10 @@ impl TableRow {
             })
             .unwrap_or_default();
 
+        let format_string = column.format_string.clone();
+
+        let ctx: FormatterContext = get_formatter_context(data);
+
         TableCellLayout {
             x,
             y,
@@ -114,10 +124,36 @@ impl TableRow {
             height: 0.0,
             row_span: 1,
             col_span: 1,
-            content: value,
+            content: Self::apply_format(ctx, value, &format_string),
             style,
             is_row: true,
         }
+    }
+
+    pub fn apply_format(
+        ctx: FormatterContext,
+        value: String,
+        format_string: &Option<String>,
+    ) -> String {
+        let Some(format) = format_string.as_deref() else {
+            return value;
+        };
+
+        let (formatter, args) = match format {
+            "SLG" | "GIA_NT" | "GIA" | "TIEN_NT" | "TIEN" | "EXCHANGE_RATE" | "PT" => (
+                "formatNumber",
+                vec![
+                    Value::from(value.parse::<f64>().unwrap_or(0.0)),
+                    Value::String(format.to_string()),
+                ],
+            ),
+            _ => (
+                "dateMonthYear",
+                vec![Value::String(value), Value::String(format.to_string())],
+            ),
+        };
+
+        FORMATTERS.call(&ctx, formatter, &args).unwrap_or_default()
     }
 
     fn measure_row_height(
@@ -127,6 +163,7 @@ impl TableRow {
         data: &Value,
         widths: &[f32],
         table_style: &Option<ElementStyle>,
+        ctx: FormatterContext,
     ) -> f32 {
         let mut max_height = DEFAULT_ROW_HEIGHT;
 
@@ -155,7 +192,13 @@ impl TableRow {
                 auto_height: Some(true),
             };
 
-            let layout = TextLayout::layout(fonts, page_height, &text, &serde_json::json!({}));
+            let layout = TextLayout::layout(
+                fonts,
+                page_height,
+                &text,
+                &serde_json::json!({}),
+                ctx.clone(),
+            );
 
             // padding trên + dưới
             let cell_height = layout.height + 6.0;

@@ -7,25 +7,8 @@ import { imageUrlToBase64 } from "../api/services/image.service";
 import { listen } from "@tauri-apps/api/event";
 import Progress from "../components/Progress";
 
-export enum PdfPhase {
-    Preparing = "preparing",
-    Paginating = "paginating",
-    Rendering = "rendering",
-    Saving = "saving",
-    Completed = "completed",
-}
-
-const phaseText: Record<PdfPhase, string> = {
-    [PdfPhase.Preparing]: "Đang chuẩn bị dữ liệu...",
-    [PdfPhase.Paginating]: "Đang phân trang...",
-    [PdfPhase.Rendering]: "Đang tạo PDF...",
-    [PdfPhase.Saving]: "Đang lưu tệp...",
-    [PdfPhase.Completed]: "Hoàn thành",
-};
-
-
 export interface IPdfProgress {
-    phase: PdfPhase;
+    message: string;
     current: number;
     total: number;
 }
@@ -54,7 +37,7 @@ export const PreviewReport = () => {
     };
 
     const [progress, setProgress] = useState<IPdfProgress>({
-        phase: PdfPhase.Preparing,
+        message: "Đang thực hiện...",
         current: 0,
         total: 0
     });
@@ -64,7 +47,7 @@ export const PreviewReport = () => {
 
         const setup = async () => {
             unlisten = await listen("pdf-progress", (event: any) => {
-                setProgress(event.payload);
+                setProgress(prev => ({ ...prev, ...event.payload }));
             });
             await handleGenerate();
         };
@@ -83,7 +66,7 @@ export const PreviewReport = () => {
         console.log('progress>>', JSON.stringify(progress));
     }, [progress])
     return (
-        <AppWindow title={"Preview Report"}
+        <AppWindow title={"Preview Report"} icon="Printer"
         // content={
         //     (
         //         <div className="flex gap-1 py-2 pr-2 mr-2 border-r border-gray-300 w-50">
@@ -98,6 +81,7 @@ export const PreviewReport = () => {
             /> : <div className="flex flex-1 items-center justify-center">
                 <div className="w-100">
                     <Progress
+                        message={progress.message}
                         value={progress.current}
                         total={progress.total}
                     />

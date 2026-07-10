@@ -4,9 +4,9 @@ use crate::pdf::{
     fonts::PdfFonts,
     image::render_image,
     table::table_render::TableRenderer,
+    template::models::FormatterContext,
     text,
-    utils::Unit,
-    utils::{draw_circle, draw_element_border, draw_line},
+    utils::{draw_circle, draw_element_border, draw_line, Unit},
 };
 
 use printpdf::{Op, PdfDocument, PdfPage};
@@ -21,6 +21,7 @@ impl PageRenderer {
         page_width: f32,
         page_height: f32,
         progress: impl Fn(usize, usize),
+        ctx: FormatterContext,
     ) -> anyhow::Result<()> {
         // let mut pdf_pages = Vec::new();
         let total = pages.len();
@@ -35,7 +36,14 @@ impl PageRenderer {
 
                     PageItem::Table { element, layout } => {
                         if let Some(style) = &element.style {
-                            TableRenderer::draw(&mut ops, &layout, fonts, page_height, style);
+                            TableRenderer::draw(
+                                &mut ops,
+                                &layout,
+                                fonts,
+                                page_height,
+                                style,
+                                ctx.clone(),
+                            );
                         }
                     }
 

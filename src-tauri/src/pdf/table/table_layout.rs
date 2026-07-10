@@ -4,7 +4,8 @@ use super::models::{
 };
 use crate::pdf::fonts::PdfFonts;
 use crate::pdf::table::table_row::TableRow;
-use crate::pdf::utils::{resolve_array_table, resolve_value};
+use crate::pdf::template::models::FormatterContext;
+use crate::pdf::utils::{get_formatter_context, resolve_array_table, resolve_value};
 use serde_json::Value;
 pub struct TableLayoutEngine;
 
@@ -24,6 +25,7 @@ impl TableLayoutEngine {
         page_height: f32,
         table: &TableElement,
         data: &Value,
+        ctx: FormatterContext,
     ) -> TableLayoutResult {
         let widths = Self::calc_column_widths(table);
 
@@ -76,6 +78,7 @@ impl TableLayoutEngine {
             &positions,
             table.y + header_height,
             context,
+            ctx,
         );
         rows.extend(body);
 
@@ -429,7 +432,7 @@ impl TableLayoutEngine {
         let Some(fix) = &table.fix_row else {
             return rows;
         };
-
+        let ctx: FormatterContext = get_formatter_context(data);
         for (r, row_cfg) in fix.data.iter().enumerate() {
             let y = table.y + (start_row + r) as f32 * DEFAULT_HEADER_HEIGHT;
 
@@ -466,6 +469,9 @@ impl TableLayoutEngine {
                 } else {
                     col.header.clone()
                 };
+
+                let format_string = col.format_string.clone();
+
                 row.cells.push(TableCellLayout {
                     x,
 
@@ -475,7 +481,7 @@ impl TableLayoutEngine {
 
                     height: DEFAULT_HEADER_HEIGHT,
 
-                    content,
+                    content: TableRow::apply_format(ctx.clone(), content, &format_string),
 
                     style,
 

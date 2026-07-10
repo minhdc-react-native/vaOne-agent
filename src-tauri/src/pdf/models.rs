@@ -83,6 +83,92 @@ pub enum Element {
     Grid(GridElement),
 }
 
+impl Element {
+    pub fn name(&self) -> Option<&str> {
+        match self {
+            Element::Text(e) => e.name.as_deref(),
+            Element::Table(e) => e.name.as_deref(),
+            Element::Line(e) => e.name.as_deref(),
+            Element::Rect(e) => e.name.as_deref(),
+            Element::Circle(e) => e.name.as_deref(),
+            Element::Image(e) => e.name.as_deref(),
+            Element::Grid(e) => e.name.as_deref(),
+        }
+    }
+
+    pub fn as_text(&self) -> Option<&TextElement> {
+        match self {
+            Element::Text(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn x(&self) -> f32 {
+        match self {
+            Element::Text(e) => e.x,
+            Element::Table(e) => e.x,
+            Element::Line(e) => e.x,
+            Element::Rect(e) => e.x,
+            Element::Circle(e) => e.x,
+            Element::Image(e) => e.x,
+            Element::Grid(e) => e.x,
+        }
+    }
+
+    pub fn y(&self) -> f32 {
+        match self {
+            Element::Text(e) => e.y,
+            Element::Table(e) => e.y,
+            Element::Line(e) => e.y,
+            Element::Rect(e) => e.y,
+            Element::Circle(e) => e.y,
+            Element::Image(e) => e.y,
+            Element::Grid(e) => e.y,
+        }
+    }
+
+    pub fn height(&self) -> f32 {
+        match self {
+            Element::Text(e) => e.height,
+            Element::Table(e) => e.height,
+            Element::Line(e) => e.height,
+            Element::Rect(e) => e.height,
+            Element::Circle(e) => e.height,
+            Element::Image(e) => e.height,
+            Element::Grid(e) => e.height,
+        }
+    }
+}
+
+pub trait ElementVecExt {
+    fn extract_page_number(self) -> (Option<Element>, Vec<Element>);
+    fn sort_by_y(&mut self);
+}
+
+impl ElementVecExt for Vec<Element> {
+    fn extract_page_number(self) -> (Option<Element>, Vec<Element>) {
+        let mut page_number = None;
+
+        let elements = self
+            .into_iter()
+            .filter_map(|e| {
+                if e.name() == Some("pageNumber") {
+                    page_number = Some(e);
+                    None
+                } else {
+                    Some(e)
+                }
+            })
+            .collect();
+
+        (page_number, elements)
+    }
+
+    fn sort_by_y(&mut self) {
+        self.sort_by(|a, b| a.y().total_cmp(&b.y()));
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ElementStyle {
     #[serde(default)]
@@ -245,22 +331,4 @@ impl GridElement {
     pub fn translate_y(&mut self, dy: f32) {
         self.y += dy;
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PdfProgress {
-    pub phase: PdfPhase,
-    pub current: usize,
-    pub total: usize,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum PdfPhase {
-    Preparing,
-    Paginating,
-    Rendering,
-    Saving,
-    Completed,
 }

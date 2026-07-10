@@ -4,24 +4,21 @@ import Button from "../components/Button";
 import { useEffect } from "react";
 import { Divider } from "../components/Divider";
 import { useEscape } from "../hook/useEscape";
+import { hideWindow } from "../components/AppWindow";
 
 export default function QuitPage() {
     const quit = async () => {
         await invoke("quit_app");
     };
 
-    const cancel = async () => {
-        await trayApi.post("/open_tray_page", {
-            route: "/blank",
-            data: {},
-        });
-    };
-
     useEffect(() => {
         invoke("page_ready", { name: "quit" });
+        invoke("set_current_route", {
+            route: location.pathname,
+        });
     }, []);
 
-    useEscape(cancel, true);
+    useEscape(hideWindow, true);
 
     return (
         <div className="flex h-screen items-center justify-center">
@@ -37,7 +34,7 @@ export default function QuitPage() {
                 <div className="mt-6 flex justify-end gap-2">
                     <Button
                         variant="secondary"
-                        onClick={cancel}
+                        onClick={hideWindow}
                     >
                         Hủy
                     </Button>

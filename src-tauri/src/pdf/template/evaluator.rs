@@ -1,4 +1,5 @@
 use crate::pdf::template::formatter::FORMATTERS;
+use crate::pdf::template::models::FormatterContext;
 use crate::pdf::utils::resolve_value;
 use crate::pdf::utils::value_to_string;
 use anyhow::{anyhow, Result};
@@ -6,10 +7,10 @@ use serde_json::Value;
 pub struct Evaluator;
 
 impl Evaluator {
-    pub fn evaluate(expr: &str, data: &Value) -> Result<String> {
+    pub fn evaluate(expr: &str, data: &Value, ctx: FormatterContext) -> Result<String> {
         // function(...)
         if expr.ends_with(")") {
-            return Self::eval_function(expr, data);
+            return Self::eval_function(expr, data, ctx);
         }
 
         // variable
@@ -19,7 +20,7 @@ impl Evaluator {
             .unwrap_or_else(|| format!("{{{}}}", expr)))
     }
 
-    fn eval_function(expr: &str, data: &Value) -> Result<String> {
+    fn eval_function(expr: &str, data: &Value, ctx: FormatterContext) -> Result<String> {
         let pos = expr
             .find('(')
             .ok_or_else(|| anyhow!("Invalid expression: {}", expr))?;
@@ -29,8 +30,7 @@ impl Evaluator {
         let args_str = &expr[pos + 1..expr.len() - 1];
 
         let args = Self::parse_arguments(args_str, data);
-
-        FORMATTERS.call(&name, &args)
+        FORMATTERS.call(&ctx, &name, &args)
     }
 
     fn parse_arguments(args: &str, data: &Value) -> Vec<Value> {

@@ -57,7 +57,6 @@ impl Tokenizer {
 
                     tokens.push(Token::Expression(expr.trim().to_string()));
                 }
-
                 c => {
                     buffer.push(c);
                 }

@@ -5,8 +5,11 @@ import { trayApi } from "../api/axios/axiosClient";
 import { useEscape } from "../hook/useEscape";
 import { useLocation } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { IconLucide, IconName } from "./IconLucide";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface AppWindowProps {
+    icon?: IconName,
     title: string;
     children: ReactNode;
     content?: ReactNode;
@@ -20,6 +23,7 @@ export const hideWindow = async () => {
 };
 
 export default function AppWindow({
+    icon,
     title,
     children,
     content,
@@ -27,6 +31,14 @@ export default function AppWindow({
 }: AppWindowProps) {
     const location = useLocation();
     useEscape(hideWindow, !disableClose);
+
+    const startDrag = async () => {
+        try {
+            await getCurrentWindow().startDragging();
+        } catch {
+            // ignore
+        }
+    };
 
     useEffect(() => {
         invoke("set_current_route", {
@@ -38,9 +50,15 @@ export default function AppWindow({
         <div className="flex h-screen flex-col bg-white">
             {/* Title Bar */}
             <header
+                onMouseDown={(e) => {
+                    if (e.button === 0) {
+                        startDrag();
+                    }
+                }}
                 data-tauri-drag-region
                 className="
                     flex
+                    gap-2
                     h-10
                     items-center
                     justify-between
@@ -51,9 +69,12 @@ export default function AppWindow({
                     shrink-0
                 "
             >
+                {icon && <IconLucide
+                    name={icon}
+                />}
                 <span
                     data-tauri-drag-region
-                    className="flex-1 text-sm font-semibold text-gray-800"
+                    className="cursor-pointer flex-1 text-sm font-semibold text-gray-800"
                 >
                     {title}
                 </span>
