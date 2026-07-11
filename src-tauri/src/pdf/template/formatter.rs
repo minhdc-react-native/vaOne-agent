@@ -153,9 +153,6 @@ fn format_decimal(
 ) -> String {
     let negative = value < 0.0;
 
-    println!("thousand='{}'", thousand_separator);
-    println!("decimal='{}'", decimal_separator);
-
     let value = value.abs();
 
     let text = format!("{:.*}", decimal_places, value);
