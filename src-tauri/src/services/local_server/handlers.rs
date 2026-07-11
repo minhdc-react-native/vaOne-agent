@@ -6,11 +6,33 @@ use crate::state::CURRENT_ROUTE;
 use crate::utils::notification;
 use axum::Json;
 use serde_json::Value;
-use tauri::{Emitter, LogicalSize, Manager, Size};
-pub async fn ping() -> Json<PingResponse> {
-    if let Err(err) = notification::show("vaOne", "Kết nối thành công!") {
-        eprintln!("Show notification failed: {}", err);
+use tauri::{Emitter, Manager};
+
+pub async fn exit_app() -> &'static str {
+    if let Some(app) = APP_HANDLE.get() {
+        let app = app.clone();
+
+        tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+            // Dừng các tác vụ nếu cần
+            crate::state::update_sync_emit(|s| {
+                s.source.clear();
+                s.running = false;
+                s.current_invoice = None;
+            });
+
+            app.exit(0);
+        });
     }
+
+    "OK"
+}
+
+pub async fn ping() -> Json<PingResponse> {
+    // if let Err(err) = notification::show("vaOne", "Kết nối thành công!") {
+    //     eprintln!("Show notification failed: {}", err);
+    // }
     Json(PingResponse { success: true })
 }
 
