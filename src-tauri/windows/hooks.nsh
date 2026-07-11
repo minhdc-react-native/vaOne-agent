@@ -31,7 +31,7 @@ CloseApp:
 ; Yêu cầu agent tự thoát
 ;---------------------------------------
 
-ExecWait 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "try { Invoke-RestMethod http://127.0.0.1:15682/exit -Method POST | Out-Null } catch {}"'
+ExecWait 'taskkill /F /T /IM vaOne-agent.exe >nul 2>&1'
 
 ;---------------------------------------
 ; Chờ tối đa 15 giây
