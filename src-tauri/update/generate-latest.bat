@@ -13,7 +13,7 @@ set "BUNDLE=%SCRIPT_DIR%..\target\release\bundle\nsis"
 
 set "GITHUB_USER=minhdc-react-native"
 set "REPO=vaOne-update"
-set "NOTES=Sua loi va cai thien hieu nang"
+set "NOTES=- Sửa lỗi đồng bộ dữ liệu\n- Cải thiện hiệu năng\n- Khắc phục lỗi in hóa đơn"
 
 powershell -NoProfile -ExecutionPolicy Bypass ^
 "$bundle='%BUNDLE%';" ^

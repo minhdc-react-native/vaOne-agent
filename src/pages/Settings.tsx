@@ -106,8 +106,8 @@ export default function SettingsPage() {
 
     if (!info) {
         return (
-            <AppWindow title="Settings">
-                <div className="flex h-full items-center justify-center">
+            <AppWindow title="Settings" icon="Cog">
+                <div className="flex h-full w-82.5 items-center justify-center">
                     Loading...
                 </div>
             </AppWindow>

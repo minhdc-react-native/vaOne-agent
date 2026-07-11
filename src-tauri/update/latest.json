@@ -1,6 +1,6 @@
 {
     "version": "1.0.0",
-    "notes": "Bắt đầu phát hành.",
+    "notes": "- Sửa lỗi đồng bộ dữ liệu\n- Cải thiện hiệu năng\n- Khắc phục lỗi in hóa đơn",
     "pub_date": "2026-07-11T13:00:00Z",
     "platforms": {
         "windows-x86_64": {

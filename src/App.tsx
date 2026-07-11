@@ -8,6 +8,8 @@ import LoginPage from "./pages/LoginPage";
 import { BlankPage } from "./pages/BlankPage";
 import { PreviewReport } from "./pages/PreviewReport";
 import QuitPage from "./pages/QuitPage";
+import { useUpdater } from "./hook/useUpdater";
+import UpdatePage from "./pages/Update";
 
 function App() {
   const navigate = useNavigate();
@@ -27,6 +29,8 @@ function App() {
     };
   }, [navigate]);
 
+  useUpdater();
+
   return (
     <Routes>
       <Route path="/" element={<SplashScreen />} />
@@ -35,6 +39,7 @@ function App() {
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/get-invoice-tct" element={<GetInvoiceTct />} />
+      <Route path="/update" element={<UpdatePage />} />
       <Route path="/quit" element={<QuitPage />} />
     </Routes>
   );
