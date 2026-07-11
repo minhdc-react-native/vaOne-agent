@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "vaone-plugin",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "identifier": "com.congtyvacom.vaone-plugin",
   "build": {
     "beforeDevCommand": "yarn dev",
@@ -43,11 +43,14 @@
     ],
     "macOS": {
       "infoPlist": "Info.plist"
-    },
-    "windows": {
-      "nsis": {
-        "installerHooks": "./windows/hooks.nsh"
-      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "-----BEGIN PUBLIC KEY-----dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU5RkIyRDUzMTdEMERFRUMKUldUczN0QVhVeTM3V2M1YjJDM2N4dEVDTGpSL25aY3IwOHlkbFdrck9UdzQ5SkNWWnB0MlNXSEwK-----END PUBLIC KEY-----",
+      "endpoints": [
+        "https://github.com/minhdc-react-native/vaOne-update/releases/latest/download/latest.json"
+      ]
     }
   }
 }

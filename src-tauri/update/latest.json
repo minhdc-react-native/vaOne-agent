@@ -1,0 +1,11 @@
+{
+    "version": "1.0.0",
+    "notes": "Bắt đầu phát hành.",
+    "pub_date": "2026-07-11T13:00:00Z",
+    "platforms": {
+        "windows-x86_64": {
+            "signature": "NỘI_DUNG_FILE_SIG",
+            "url": "https://github.com/minhdc-react-native/vaOne-update/releases/tag/v1.0.0/vaOne-plugin_1.0.8_x64-setup.exe"
+        }
+    }
+}
