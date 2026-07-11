@@ -19,11 +19,11 @@ pub fn set_current_route(route: String) {
 
 #[tauri::command]
 pub fn quit_app(app: tauri::AppHandle) {
-    crate::state::update_sync_emit(|s| {
-        s.source = "TCT".to_string();
-        s.running = false;
-        s.current_invoice = None;
-    });
+    // crate::state::update_sync_emit(|s| {
+    //     s.source = "TCT".to_string();
+    //     s.running = false;
+    //     s.current_invoice = None;
+    // });
     app.exit(0);
 }
 

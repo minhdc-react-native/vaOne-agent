@@ -6,7 +6,6 @@ import { useEscape } from "../hook/useEscape";
 import { useLocation } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { IconLucide, IconName } from "./IconLucide";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface AppWindowProps {
     icon?: IconName,
@@ -32,14 +31,6 @@ export default function AppWindow({
     const location = useLocation();
     useEscape(hideWindow, !disableClose);
 
-    const startDrag = async () => {
-        try {
-            await getCurrentWindow().startDragging();
-        } catch {
-            // ignore
-        }
-    };
-
     useEffect(() => {
         invoke("set_current_route", {
             route: location.pathname,
@@ -50,12 +41,6 @@ export default function AppWindow({
         <div className="flex h-screen flex-col bg-white">
             {/* Title Bar */}
             <header
-                onMouseDown={(e) => {
-                    if (e.button === 0) {
-                        startDrag();
-                    }
-                }}
-                data-tauri-drag-region
                 className="
                     flex
                     gap-2

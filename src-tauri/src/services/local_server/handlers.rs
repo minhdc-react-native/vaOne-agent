@@ -16,11 +16,11 @@ pub async fn exit_app() -> &'static str {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
             // Dừng các tác vụ nếu cần
-            crate::state::update_sync_emit(|s| {
-                s.source.clear();
-                s.running = false;
-                s.current_invoice = None;
-            });
+            // crate::state::update_sync_emit(|s| {
+            //     s.source.clear();
+            //     s.running = false;
+            //     s.current_invoice = None;
+            // });
 
             app.exit(0);
         });

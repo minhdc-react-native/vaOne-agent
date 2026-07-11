@@ -3,68 +3,63 @@
 !macro NSIS_HOOK_PREINSTALL
 
 ;---------------------------------------
-; Kiểm tra HTTP server có chạy không
+; Kiểm tra agent có đang chạy không
 ;---------------------------------------
 
-ClearErrors
-
-nsExec::ExecToStack 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "try { Invoke-WebRequest http://127.0.0.1:15682/ping -UseBasicParsing | Out-Null; exit 0 } catch { exit 1 }"'
+nsExec::ExecToStack 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest http://127.0.0.1:15682/ping -UseBasicParsing | Out-Null; exit 0 } catch { exit 1 }"'
 Pop $0
+Pop $1
 
-; Nếu != 0 nghĩa là không kết nối được -> app không chạy
+; Không kết nối được -> agent không chạy
 ${If} $0 != 0
     Goto Done
 ${EndIf}
 
 ;---------------------------------------
-; App đang chạy
+; Hỏi người dùng
 ;---------------------------------------
 
 MessageBox MB_ICONQUESTION|MB_YESNO \
-    "vaOne Plugin đang chạy.$\r$\n$\r$\nĐóng ứng dụng để tiếp tục cài đặt?" \
-    IDYES CloseApp
+"vaOne Plugin đang chạy.$\r$\n$\r$\nĐóng ứng dụng để tiếp tục cài đặt?" \
+IDYES CloseApp
 
 Abort
 
 CloseApp:
 
 ;---------------------------------------
-; Yêu cầu app tự thoát
+; Yêu cầu agent tự thoát
 ;---------------------------------------
 
-nsExec::Exec 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command "try { Invoke-RestMethod -Uri ''http://127.0.0.1:15682/exit'' -Method POST | Out-Null } catch {}"'
+ExecWait 'powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "try { Invoke-RestMethod http://127.0.0.1:15682/exit -Method POST | Out-Null } catch {}"'
 
 ;---------------------------------------
 ; Chờ tối đa 15 giây
 ;---------------------------------------
 
-StrCpy $1 30
+StrCpy $2 30
 
 WaitLoop:
 
     Sleep 500
 
-    nsExec::ExecToStack 'cmd /C tasklist /FI "IMAGENAME eq vaone-plugin.exe" | find /I "vaone-plugin.exe"'
-    Pop $2
+    nsExec::ExecToStack 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest http://127.0.0.1:15682/ping -UseBasicParsing | Out-Null; exit 0 } catch { exit 1 }"'
     Pop $3
+    Pop $4
 
-    ; process đã biến mất
-    ${If} $2 != 0
+    ; ping thất bại => app đã tắt
+    ${If} $3 != 0
         Goto Done
     ${EndIf}
 
-    IntOp $1 $1 - 1
+    IntOp $2 $2 - 1
 
-    ${If} $1 > 0
+    ${If} $2 > 0
         Goto WaitLoop
     ${EndIf}
 
-;---------------------------------------
-; Hết thời gian
-;---------------------------------------
-
 MessageBox MB_ICONSTOP \
-    "Không thể đóng vaOne Plugin.$\r$\nVui lòng đóng ứng dụng rồi chạy lại trình cài đặt."
+"Không thể đóng vaOne Plugin.$\r$\nVui lòng đóng ứng dụng rồi chạy lại trình cài đặt."
 
 Abort
 
