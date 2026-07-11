@@ -9,35 +9,42 @@ import Progress from "../components/Progress";
 
 export interface IPdfProgress {
     message: string;
+    currentReport: number,
+    totalReport: number,
     current: number;
     total: number;
 }
 
 export const PreviewReport = () => {
     const location = useLocation();
-    const { report, data: data_report } = location.state || {};
+    const { reports, datas } = location.state || {};
     const [url, setUrl] = useState({ url: "", path: "" });
     const handleGenerate = async () => {
         await invoke("page_ready", { name: 'report' });
-        if (report.backgroundImage && report.backgroundImage.startsWith("http")) {
-            report.backgroundImage = await imageUrlToBase64(report.backgroundImage);
-        }
-        for (const element of report.elements) {
-            if (
-                element.type === "image" &&
-                typeof element.content === "string" &&
-                element.content.startsWith("http")
-            ) {
-                element.content = await imageUrlToBase64(element.content);
+        for (const report of reports) {
+            if (report.backgroundImage && report.backgroundImage.startsWith("http")) {
+                report.backgroundImage = await imageUrlToBase64(report.backgroundImage);
+            }
+            for (const element of report.elements) {
+                if (
+                    element.type === "image" &&
+                    typeof element.content === "string" &&
+                    element.content.startsWith("http")
+                ) {
+                    element.content = await imageUrlToBase64(element.content);
+                }
             }
         }
-        const path = await generatePdf(report, data_report) as string;
+
+        const path = await generatePdf(reports, datas) as string;
         const url = convertFileSrc(path);
         setUrl({ url, path });
     };
 
     const [progress, setProgress] = useState<IPdfProgress>({
         message: "Đang thực hiện...",
+        currentReport: 0,
+        totalReport: 0,
         current: 0,
         total: 0
     });
@@ -79,7 +86,8 @@ export const PreviewReport = () => {
                 src={url.url}
                 className="w-full h-full"
             /> : <div className="flex flex-1 items-center justify-center">
-                <div className="w-100">
+                <div className="w-100 flex flex-col gap-2 justify-center">
+                    <div className="text-lg font-semibold">{`Báo cáo: ${progress.currentReport}/${progress.totalReport}`}</div>
                     <Progress
                         message={progress.message}
                         value={progress.current}
@@ -87,6 +95,7 @@ export const PreviewReport = () => {
                     />
                 </div>
             </div>}
+
         </AppWindow>
     )
 }

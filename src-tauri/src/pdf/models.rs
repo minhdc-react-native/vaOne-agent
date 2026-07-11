@@ -42,7 +42,7 @@ impl TextLayoutResult {
         self.y += dy;
     }
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct PdfTemplate {
     pub name: String,
     pub width: f32,

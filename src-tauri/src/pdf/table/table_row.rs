@@ -1,6 +1,6 @@
 use crate::pdf::template::formatter::FORMATTERS;
 use crate::pdf::template::models::FormatterContext;
-use crate::pdf::utils::{get_formatter_context, resolve_value};
+use crate::pdf::utils::resolve_value;
 use crate::pdf::{
     fonts::PdfFonts,
     layout::TextLayout,
@@ -75,6 +75,7 @@ impl TableRow {
                 y,
                 widths[index],
                 &table.style,
+                ctx.clone(),
             ));
         }
         let row_height = Self::measure_row_height(
@@ -84,7 +85,7 @@ impl TableRow {
             data,
             widths,
             &table.style,
-            ctx,
+            ctx.clone(),
         );
         for cell in &mut row.cells {
             cell.height = row_height;
@@ -100,6 +101,7 @@ impl TableRow {
         y: f32,
         width: f32,
         table_style: &Option<ElementStyle>,
+        ctx: FormatterContext,
     ) -> TableCellLayout {
         let style = TableLayoutEngine::merge_style(table_style, &column.body_style);
 
@@ -114,8 +116,6 @@ impl TableRow {
             .unwrap_or_default();
 
         let format_string = column.format_string.clone();
-
-        let ctx: FormatterContext = get_formatter_context(data);
 
         TableCellLayout {
             x,

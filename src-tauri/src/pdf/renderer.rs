@@ -1,7 +1,9 @@
+use crate::pdf::fonts::PdfFonts;
+use crate::pdf::pagination::page::PreparedReport;
 use crate::pdf::utils::get_formatter_context;
 use crate::pdf::{layout::TextLayout, models::*, utils::load_fonts};
 use printpdf::{PdfDocument, PdfSaveOptions};
-use serde_json::json;
+use serde_json::{json, Value};
 
 use crate::pdf::models::ElementVecExt;
 use crate::pdf::pagination::{
@@ -16,63 +18,95 @@ use tauri::Emitter;
 fn emit_pdf_progress(progress: serde_json::Value) {
     if let Some(app) = APP_HANDLE.get() {
         let _ = app.emit("pdf-progress", progress);
-        // std::thread::sleep(std::time::Duration::from_millis(50));
+        std::thread::sleep(std::time::Duration::from_millis(50));
     }
 }
 
 pub fn render_page(
-    mut doc: PdfTemplate,
-    data: serde_json::Value,
+    docs: Vec<PdfTemplate>,
+    datas: Vec<serde_json::Value>,
     output: &str,
 ) -> anyhow::Result<()> {
-    let (page_number, elements) = std::mem::take(&mut doc.elements).extract_page_number();
-    doc.elements = elements;
-    doc.elements.sort_by_y();
+    anyhow::ensure!(!docs.is_empty(), "docs is empty");
 
-    let ctx = get_formatter_context(&data);
-
-    let mut pdf = PdfDocument::new(&doc.name);
-
+    let mut pdf = PdfDocument::new("Report");
     let fonts = load_fonts(&mut pdf)?;
 
-    // 1. Build layout
-    emit_pdf_progress(json!({
-        "message": "Xây dựng giao diện...",
-    }));
-    let items = LayoutBuilder::build_items(&doc, &fonts, &data, ctx.clone())?;
+    let mut prepared = Vec::new();
 
-    emit_pdf_progress(json!({
-        "message": "Tính toán phân trang...",
-    }));
-    // 2. Pagination
-    let mut pages = Paginator::paginate(items, doc.width, doc.height)?;
-    if let Some(page_number) = &page_number {
-        let total = pages.len();
-        let element = page_number.as_text();
-        if let Some(element) = element {
-            for (index, page) in pages.iter_mut().enumerate() {
-                let context = json!({
-                    "page":index+1,
-                    "total":total
-                });
-                page.items.push(PageItem::Text {
-                    element: element.clone(),
-                    layout: TextLayout::layout(&fonts, doc.height, &element, &context, ctx.clone()),
-                });
-            }
+    for (i, data) in datas.into_iter().enumerate() {
+        let doc = docs.get(i).cloned().unwrap_or_else(|| docs[0].clone());
+
+        prepared.push(prepare_report(doc, data, &fonts)?);
+    }
+
+    // Tính tổng số trang
+    let mut total_pages: usize = prepared.iter().map(|r| r.pages.len()).sum();
+
+    // Render
+    let mut start_page = 1;
+    let total = prepared.len();
+    for (index, report) in prepared.into_iter().enumerate() {
+        let continuous_page_numbering = report.ctx.continuous_page_numbering;
+        if !continuous_page_numbering {
+            total_pages = report.pages.len();
+        }
+        emit_pdf_progress(json!({
+            "currentReport": index + 1,
+            "totalReport": total,
+        }));
+        start_page = render_single(&mut pdf, &fonts, report, start_page, total_pages)?;
+
+        if !continuous_page_numbering {
+            start_page = 1;
         }
     }
-    // 3. Render
-    // let pdf_pages = PageRenderer::render(&mut pdf, &fonts, pages, doc.width, doc.height)?;
+    emit_pdf_progress(json!({
+        "message": "Đang lưu file pdf...",
+        "current":0
+    }));
+    let mut warnings = Vec::new();
+    let bytes = pdf.save(&PdfSaveOptions::default(), &mut warnings);
+    std::fs::write(output, bytes)?;
 
-    // pdf.with_pages(pdf_pages);
+    Ok(())
+}
+
+fn render_single(
+    pdf: &mut PdfDocument,
+    fonts: &PdfFonts,
+    mut report: PreparedReport,
+    start_page: usize,
+    total_pages: usize,
+) -> anyhow::Result<usize> {
+    let page_count = report.pages.len();
+
+    if let Some(element) = &report.page_number {
+        for (index, page) in report.pages.iter_mut().enumerate() {
+            let context = json!({
+                "page": start_page + index,
+                "total": total_pages,
+            });
+
+            page.items.push(PageItem::Text {
+                element: element.clone(),
+                layout: TextLayout::layout(
+                    fonts,
+                    report.height,
+                    element,
+                    &context,
+                    report.ctx.clone(),
+                ),
+            });
+        }
+    }
 
     PageRenderer::render(
-        &mut pdf,
-        &fonts,
-        pages,
-        doc.width,
-        doc.height,
+        pdf,
+        fonts,
+        report.pages,
+        report.width,
+        report.height,
         |current, total| {
             emit_pdf_progress(json!({
                 "message": "",
@@ -80,14 +114,37 @@ pub fn render_page(
                 "total": total,
             }));
         },
-        ctx,
+        report.ctx,
+        report.background_image,
+        start_page,
+        total_pages,
     )?;
 
-    let mut warnings = Vec::new();
+    Ok(start_page + page_count)
+}
 
-    let bytes = pdf.save(&PdfSaveOptions::default(), &mut warnings);
+fn prepare_report(
+    mut doc: PdfTemplate,
+    data: Value,
+    fonts: &PdfFonts,
+) -> anyhow::Result<PreparedReport> {
+    let (page_number, elements) = std::mem::take(&mut doc.elements).extract_page_number();
 
-    std::fs::write(output, bytes)?;
+    doc.elements = elements;
+    doc.elements.sort_by_y();
 
-    Ok(())
+    let ctx = get_formatter_context(&data);
+
+    let items = LayoutBuilder::build_items(&doc, fonts, &data, ctx.clone())?;
+
+    let pages = Paginator::paginate(items, doc.width, doc.height)?;
+
+    Ok(PreparedReport {
+        pages,
+        ctx: ctx,
+        page_number: page_number.and_then(|p| p.as_text().cloned()),
+        width: doc.width,
+        height: doc.height,
+        background_image: doc.background_image,
+    })
 }

@@ -2,7 +2,7 @@ use super::page::PageLayout;
 use super::paginator::PageItem;
 use crate::pdf::{
     fonts::PdfFonts,
-    image::render_image,
+    image::{render_background_image, render_image},
     table::table_render::TableRenderer,
     template::models::FormatterContext,
     text,
@@ -22,12 +22,20 @@ impl PageRenderer {
         page_height: f32,
         progress: impl Fn(usize, usize),
         ctx: FormatterContext,
+        background_image: Option<String>,
+        start_page: usize,
+        total_pages: usize,
     ) -> anyhow::Result<()> {
         // let mut pdf_pages = Vec::new();
-        let total = pages.len();
         for (index, page) in pages.into_iter().enumerate() {
             let mut ops = Vec::<Op>::new();
-
+            let _ = render_background_image(
+                doc,
+                &mut ops,
+                background_image.clone(),
+                page_width,
+                page_height,
+            );
             for item in page.items {
                 match item {
                     PageItem::Text { element, layout } => {
@@ -109,7 +117,7 @@ impl PageRenderer {
                 ops,
             ));
 
-            progress(index + 1, total);
+            progress(start_page + index, total_pages);
         }
 
         // Ok(pdf_pages)

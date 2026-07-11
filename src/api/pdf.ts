@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { tempDir } from "@tauri-apps/api/path";
 
-export async function generatePdf(report: any, data: any) {
+export async function generatePdf(reports: any, datas: any) {
     // const dir = await tempDir();
     // const path_report = `${dir}/report.json`;
     // const path_data = `${dir}/report.json`;
@@ -20,7 +20,7 @@ export async function generatePdf(report: any, data: any) {
     // );
 
     return await invoke("render_pdf", {
-        report, data
+        reports, datas
     });
 }
 

@@ -9,7 +9,7 @@ fn main() -> Result<()> {
 
     let args: Vec<String> = env::args().collect();
 
-    if args.len() != 3 {
+    if args.len() != 4 {
         eprintln!("Usage:");
         eprintln!("report-cli <report.json> <output.pdf>");
         std::process::exit(1);
@@ -21,13 +21,15 @@ fn main() -> Result<()> {
 
     let json_report =
         fs::read_to_string(report_path).with_context(|| format!("Cannot read {}", report_path))?;
+
     let json_data =
         fs::read_to_string(data_path).with_context(|| format!("Cannot read {}", data_path))?;
 
     let doc: PdfTemplate = serde_json::from_str(&json_report).context("Invalid report json")?;
+
     let data: serde_json::Value = serde_json::from_str(&json_data).context("Invalid data json")?;
 
-    render_page(doc, data, output_path)?;
+    render_page(vec![doc], vec![data], output_path)?;
 
     println!("Render success: {}", output_path);
 
