@@ -12,3 +12,6 @@ Environment variables used to sign:
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`:  Your private key password (optional if key has no password)
 
 ATTENTION: If you lose your private key OR password, you'll not be able to sign your update package and updates will not work
+
+run on Mac to create latest.json:
+./src-tauri/update/create-latest-json.sh

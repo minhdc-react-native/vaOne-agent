@@ -1,11 +1,11 @@
 {
     "version": "1.0.0",
-    "notes": "- Sửa lỗi đồng bộ dữ liệu\n- Cải thiện hiệu năng\n- Khắc phục lỗi in hóa đơn",
-    "pub_date": "2026-07-11T13:00:00Z",
+    "notes": "Update vaOne plugin",
+    "pub_date": "2026-07-11T00:00:00Z",
     "platforms": {
         "windows-x86_64": {
             "signature": "NỘI_DUNG_FILE_SIG",
-            "url": "https://github.com/minhdc-react-native/vaOne-update/releases/tag/v1.0.0/vaOne-plugin_1.0.8_x64-setup.exe"
+            "url": "https://github.com/minhdc-react-native/vaOne-update/releases/download/v1.0.0/vaone-plugin_1.0.0_x64.nsis.zip"
         }
     }
 }
