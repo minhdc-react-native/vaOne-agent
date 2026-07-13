@@ -27,7 +27,6 @@ $sigFile = "$($exe.FullName).sig"
 if (-not (Test-Path $sigFile)) {
     throw ".sig file not found."
 }
-
 # =====================================
 # Detect version
 # =====================================
