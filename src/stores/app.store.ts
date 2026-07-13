@@ -6,6 +6,8 @@ interface ILoginTct {
     token: string;
 }
 interface IAppState {
+    autostartInitialized: boolean,
+    setAutostartInitialized: (autostartInitialized: boolean) => void;
     delayRequest: number;
     setDelayRequest: (delayRequest: number) => void;
     savePasswordLoginTct: Record<string, string>;
@@ -16,6 +18,8 @@ interface IAppState {
 export const useAppStore = create<IAppState>()(
     persist(
         (set) => ({
+            autostartInitialized: false,
+            setAutostartInitialized: (autostartInitialized) => set({ autostartInitialized }),
             delayRequest: 1500,
             setDelayRequest: (value) =>
                 set({ delayRequest: value }),
@@ -34,6 +38,7 @@ export const useAppStore = create<IAppState>()(
         {
             name: "app-storage",
             partialize: (state) => ({
+                autostartInitialized: state.autostartInitialized,
                 delayRequest: state.delayRequest,
                 savePasswordLoginTct: state.savePasswordLoginTct
             })

@@ -9,6 +9,11 @@ import { BlankPage } from "./pages/BlankPage";
 import { PreviewReport } from "./pages/PreviewReport";
 import QuitPage from "./pages/QuitPage";
 import { UpdatePage } from "./pages/Update";
+import {
+  enable,
+  isEnabled,
+} from "@tauri-apps/plugin-autostart";
+import { useAppStore } from "./stores/app.store";
 
 function App() {
   const navigate = useNavigate();
@@ -29,6 +34,25 @@ function App() {
   }, [navigate]);
 
   // useUpdater();
+  const autostartInitialized = useAppStore(store => store.autostartInitialized);
+  const setAutostartInitialized = useAppStore(store => store.setAutostartInitialized);
+  useEffect(() => {
+    if (autostartInitialized) return;
+
+    (async () => {
+      try {
+        const enabled = await isEnabled();
+
+        if (!enabled) {
+          await enable();
+        }
+
+        setAutostartInitialized(true);
+      } catch (err) {
+        console.error("Failed to initialize autostart:", err);
+      }
+    })();
+  }, [autostartInitialized, setAutostartInitialized]);
 
   return (
     <Routes>
