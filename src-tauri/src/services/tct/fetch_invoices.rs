@@ -15,20 +15,28 @@ fn get_url(invoice_type: u8, from_date: &str, to_date: &str) -> String {
     match invoice_type {
         // 1: Mua vào
         // 3: Mua vào MTT
-        1 | 3 => format!(
+        1 => format!(
             "https://hoadondientu.gdt.gov.vn/api/query/invoices/purchase?sort=tdlap:desc&size={}&search={};ttxly==5",
             size_page,
             search
         ),
-
+        3 => format!(
+            "https://hoadondientu.gdt.gov.vn/api/sco-query/invoices/purchase?sort=tdlap:desc&size={}&search={};ttxly==5",
+            size_page,
+            search
+        ),
         // 2: Bán ra
         // 4: Bán ra MTT
-        2 | 4 => format!(
+        2 => format!(
             "https://hoadondientu.gdt.gov.vn/api/query/invoices/sold?sort=tdlap:desc&size={}&search={}",
             size_page,
             search
         ),
-
+        4 => format!(
+            "https://hoadondientu.gdt.gov.vn/api/sco-query/invoices/sold?sort=tdlap:desc&size={}&search={}",
+            size_page,
+            search
+        ),
         _ => panic!("Invalid invoice type"),
     }
 }
