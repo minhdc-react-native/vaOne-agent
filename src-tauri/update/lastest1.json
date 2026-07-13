@@ -8,8 +8,8 @@
             "url": "https://github.com/minhdc-react-native/vaOne-update/releases/download/v1.0.1/vaone-plugin.app.tar.gz"
         },
         "windows-x86_64":{
-            "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUczN0QVhVeTM3V2VQTkdxTmkrYTNaVzdGQUlzc2ViTGFoMHJmSzBDMUU4cUg5WXIzd3R2U3VwSC9tL1dDa0o4dnJNNWV2bTlqM3g5WnlYQ1o4MjNLN3pvTnR0UU1nM2dVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzOTMxOTA2CWZpbGU6dmFvbmUtcGx1Z2luXzEuMC4xX3g2NC1zZXR1cC5leGUKSlE4WGs0eWpJM2ozMmVXYmZ1YWxZbG5QVzZBZUxURitwN3FTUWJ4S0NtSnpyT2dQOHI5a0RKVWpmbHlwb3p3U245ZlFJbjNObjJ0UER2c3psMlRzQ2c9PQo=",
-            "url":  "https://github.com/minhdc-react-native/vaOne-update/releases/download/v1.0.1/vaone-plugin.exe"
+            "signature":  "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUczN0QVhVeTM3V1lhTjlHb2ZEcVkreXVFeVVZQU0raTUxU2VNQzluek1VSWhJUUZzUVczMUFlRk5wVXluRi9VRzBnNU1YbXFiMHExUTk3RllncXJRd2ZoVExRRUtXTndrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgzOTI5ODI5CWZpbGU6dmFvbmUtcGx1Z2luXzEuMC4wX3g2NC1zZXR1cC5leGUKclU0QlE3VjdMNFc5UDhManBEaU9MWGpsWVlDWUxlR1FveEFhQ25oUUtxUUdWU2NkZmNUV2tKM3E5OUhzdmJDaU5YZWZROEY1SlRUOHZoS3JYbXNkRGc9PQo=",
+            "url":  "https://github.com/minhdc-react-native/vaOne-update/releases/download/v1.0.0/vaone-plugin.exe"
         }
     }
 }
