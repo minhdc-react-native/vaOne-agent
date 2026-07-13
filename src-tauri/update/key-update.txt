@@ -15,3 +15,16 @@ ATTENTION: If you lose your private key OR password, you'll not be able to sign 
 
 run on Mac to create latest.json:
 ./src-tauri/update/create-latest-json.sh
+
+Mật khẩu dành cho ứng dụng của apple:
+vmdr-mbyy-xohn-cnya
+
+
+xcrun notarytool submit \
+src-tauri/target/release/bundle/dmg/vaone-plugin_1.0.1_aarch64.dmg \
+--keychain-profile "tauri-notary" \
+--wait
+
+
+xcrun stapler staple \
+src-tauri/target/release/bundle/dmg/vaone-plugin_1.0.1_aarch64.dmg

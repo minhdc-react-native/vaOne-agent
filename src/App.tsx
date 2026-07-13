@@ -8,8 +8,7 @@ import LoginPage from "./pages/LoginPage";
 import { BlankPage } from "./pages/BlankPage";
 import { PreviewReport } from "./pages/PreviewReport";
 import QuitPage from "./pages/QuitPage";
-import { useUpdater } from "./hook/useUpdater";
-import UpdatePage from "./pages/Update";
+import { UpdatePage } from "./pages/Update";
 
 function App() {
   const navigate = useNavigate();
@@ -29,7 +28,7 @@ function App() {
     };
   }, [navigate]);
 
-  useUpdater();
+  // useUpdater();
 
   return (
     <Routes>

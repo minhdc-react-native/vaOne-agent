@@ -43,7 +43,8 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "infoPlist": "Info.plist"
+      "infoPlist": "Info.plist",
+      "signingIdentity": "Developer ID Application: Duy Thanh Vũ (YTH6G323A9)"
     }
   },
   "plugins": {

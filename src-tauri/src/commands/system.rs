@@ -2,13 +2,8 @@ use crate::models::agent_info::AgentInfo;
 use crate::state::APP_HANDLE;
 use crate::state::CURRENT_ROUTE;
 use crate::window_config;
-use reqwest::Client;
-use serde_json::Value;
-use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
-use std::{thread, time::Duration};
+use std::sync::Mutex;
 use tauri::{LogicalPosition, LogicalSize, Manager, Position, Size};
-use tokio::time::sleep;
 #[tauri::command]
 pub fn set_current_route(route: String) {
     *CURRENT_ROUTE
@@ -30,12 +25,11 @@ pub fn quit_app(app: tauri::AppHandle) {
 #[tauri::command]
 pub fn get_agent_info() -> AgentInfo {
     AgentInfo {
-        name: "vaOne plugin".into(),
-        version: "1.0.0".into(),
+        name: "vaOne-Plugin".to_string(),
+        version: env!("CARGO_PKG_VERSION").into(),
         os: std::env::consts::OS.into(),
     }
 }
-
 #[tauri::command]
 pub fn page_ready(name: String, show: Option<bool>) {
     if let Some(app) = APP_HANDLE.get() {

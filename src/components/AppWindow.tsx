@@ -12,7 +12,7 @@ interface AppWindowProps {
     title: string;
     children: ReactNode;
     content?: ReactNode;
-    disableClose?: boolean
+    disableClose?: boolean;
 }
 export const hideWindow = async () => {
     await trayApi.post("/open_tray_page", {
@@ -64,11 +64,11 @@ export default function AppWindow({
                     {title}
                 </span>
                 {content}
-                <Button
-                    disabled={disableClose}
+                {!disableClose && <Button
+                    // disabled={disableClose}
                     onClick={hideWindow} variant="ghost"
                     iconOnly icon={<X size={15} />}
-                />
+                />}
             </header>
 
             {/* Content */}

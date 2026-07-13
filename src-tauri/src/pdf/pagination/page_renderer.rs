@@ -98,7 +98,7 @@ impl PageRenderer {
                     }
 
                     PageItem::Image { element, layout } => {
-                        render_image(doc, &mut ops, &layout, page_height);
+                        let _ = render_image(doc, &mut ops, &layout, page_height);
                     }
 
                     PageItem::Grid { element, layout } => {

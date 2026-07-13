@@ -1,114 +1,68 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { generatePdf, printPdf } from "../api/pdf";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import AppWindow, { hideWindow } from "../components/AppWindow";
-import Button from "../components/Button";
-import { Divider } from "../components/Divider";
-import { check, Update } from "@tauri-apps/plugin-updater";
+import { useLocation } from "react-router-dom";
+import { imageUrlToBase64 } from "../api/services/image.service";
+import { listen } from "@tauri-apps/api/event";
+import Progress from "../components/Progress";
 
-export default function UpdatePage() {
-    const [update, setUpdate] = useState<Update | null>(null);
-    const checkUpdate = async () => {
-        try {
-            const update = await check();
-            setUpdate(update);
-        } catch (err) {
-            console.error("Check update failed:", err);
-        } finally {
-        }
+export interface IProgress {
+    message: string;
+    "currentVersion": string,
+    "newVersion": string,
+    downloaded: number;
+    total: number;
+    finish: boolean;
+}
+
+export const UpdatePage = () => {
+    const handleGenerate = async () => {
+        await invoke("page_ready", { name: 'update' });
     };
 
-    const handleUpdate = async () => {
-        try {
-            await hideWindow();
-            await update!.downloadAndInstall();
-        } catch (err) {
-            console.error(err);
-        }
-    };
+    const [progress, setProgress] = useState<IProgress>({
+        message: "Đang thực hiện...",
+        currentVersion: "",
+        newVersion: "",
+        downloaded: 0,
+        total: 0,
+        finish: false
+    });
+    useEffect(() => {
+        if (progress.finish) hideWindow();
+    }, [progress.finish]);
 
     useEffect(() => {
-        invoke("page_ready", { name: "update" });
-        checkUpdate();
+        let unlisten: (() => void) | undefined;
+
+        const setup = async () => {
+            await handleGenerate();
+            unlisten = await listen("update-progress", (event: any) => {
+                setProgress(prev => ({ ...prev, ...event.payload }));
+            });
+        };
+
+        setup();
+
+        return () => {
+            unlisten?.();
+        };
     }, []);
 
-    if (!update) {
-        return (
-            <AppWindow title="Nâng cấp" icon="Package">
-                <div className="flex h-full w-82.5 items-center justify-center">
-                    Loading...
-                </div>
-            </AppWindow>
-        );
-    }
-
     return (
-        <AppWindow title="Nâng cấp" icon="Package">
-            <div className="flex h-full w-82.5 flex-col justify-between p-4">
-
-                <div className="space-y-5">
-
-                    <div className="flex justify-between">
-                        <span className="text-sm text-gray-500">
-                            Phiên bản hiện tại
-                        </span>
-
-                        <span className="font-medium">
-                            {update.currentVersion}
-                        </span>
-                    </div>
-
-                    <div className="flex justify-between">
-                        <span className="text-sm text-gray-500">
-                            Phiên bản mới
-                        </span>
-
-                        <span className="font-medium text-green-600">
-                            {update.version}
-                        </span>
-                    </div>
-
-                    {update.date && (
-                        <div className="flex justify-between">
-                            <span className="text-sm text-gray-500">
-                                Ngày phát hành
-                            </span>
-
-                            <span>
-                                {new Date(update.date).toLocaleString("vi-VN")}
-                            </span>
-                        </div>
-                    )}
-
-                    <Divider />
-
-                    <div>
-                        <div className="mb-2 font-medium">
-                            Nội dung cập nhật
-                        </div>
-
-                        <div className="max-h-48 overflow-auto rounded-md border bg-gray-50 p-3 text-sm whitespace-pre-wrap">
-                            {update.body || "Không có mô tả."}
-                        </div>
-                    </div>
-
-                </div>
-                <Divider />
-                <div className="flex justify-end gap-2">
-
-                    <Button
-                        variant="secondary"
-                        onClick={hideWindow}
-                    >
-                        Hủy bỏ
-                    </Button>
-
-                    <Button onClick={handleUpdate}>
-                        Cập nhật
-                    </Button>
-
-                </div>
-
+        <AppWindow title="Cập nhật" icon="Download" disableClose={true}>
+            <div className="w-82.5 flex flex-col gap-2 p-4 justify-center">
+                <span className="text-sm text-gray-500">
+                    Tải file cài đặt...
+                </span>
+                <Progress
+                    message={progress.message}
+                    value={progress.downloaded}
+                    total={progress.total}
+                    unit="MB"
+                />
             </div>
         </AppWindow>
-    );
+    )
 }

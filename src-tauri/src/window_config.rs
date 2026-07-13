@@ -7,7 +7,7 @@ pub fn get_window_size(id: &str) -> Option<(f64, f64)> {
         "getInvoiceTct" => Some((400.0, 520.0)),
         "loginMInvoice" => Some((380.0, 400.0)),
         "blank" => Some((10.0, 10.0)),
-        "update" => Some((330.0, 350.0)),
+        "update" => Some((330.0, 120.0)),
         "quit" => Some((350.0, 180.0)),
         _ => None,
     }

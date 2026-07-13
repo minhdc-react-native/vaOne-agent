@@ -6,6 +6,7 @@ interface ProgressProps {
     message?: string;
     showLabel?: boolean;
     className?: string;
+    unit?: string;
 }
 
 export default function Progress({
@@ -14,6 +15,7 @@ export default function Progress({
     message,
     showLabel = true,
     className,
+    unit = ""
 }: ProgressProps) {
     const safeTotal = Math.max(total, 1);
 
@@ -38,7 +40,7 @@ export default function Progress({
                     className="
                         h-full
                         rounded-full
-                        bg-[var(--primary)]
+                        bg-(--primary)
                         transition-all
                         duration-300
                     "
@@ -63,7 +65,7 @@ export default function Progress({
                         "
                     >
                         {value !== 0
-                            ? `${Math.round(percent)}% (${value}/${total})`
+                            ? `${Math.round(percent)}% (${value}/${total} ${unit})`
                             : message}
                     </div>
                 )}

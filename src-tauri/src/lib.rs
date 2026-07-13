@@ -6,6 +6,7 @@ mod services;
 mod state;
 mod utils;
 mod window_config;
+use crate::services::update::check_update_on_startup;
 use crate::state::CURRENT_ROUTE;
 use crate::state::{AppState, APP_STATE};
 use std::sync::Mutex;
@@ -30,12 +31,13 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
             let window_clone = window.clone();
             let _ = window_clone.hide();
-            // let report = MenuItem::with_id(app, "report", "Test print pdf", true, None::<&str>)?;
+            let check_update =
+                MenuItem::with_id(app, "update", "Kiểm tra phiên bản", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Thoát ứng dụng", true, None::<&str>)?;
 
-            let menu = Menu::with_items(app, &[&settings, &separator, &quit])?;
+            let menu = Menu::with_items(app, &[&check_update, &settings, &separator, &quit])?;
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -60,10 +62,15 @@ pub fn run() {
                 services::local_server::start().await;
             });
 
+            check_update_on_startup(app.handle().clone(), Some(true));
+
             Ok(())
         })
         // HANDLE MENU CLICK
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "update" => {
+                let _ = check_update_on_startup(app.clone(), Some(false));
+            }
             "report" => {
                 if let Some(window) = app.get_webview_window("main") {
                     let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
