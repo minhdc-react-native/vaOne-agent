@@ -17,6 +17,7 @@ run on Mac to create latest.json:
 ./src-tauri/update/generate-latest.bat
 ./src-tauri/update/create-latest-json.sh
 
+
 Mật khẩu dành cho ứng dụng của apple:
 vmdr-mbyy-xohn-cnya
 
