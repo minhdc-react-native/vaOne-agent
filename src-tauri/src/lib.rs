@@ -26,6 +26,9 @@ pub fn run() {
         ))
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_single_instance::init(|_, _, _| {
+            println!("Application is already running.");
+        }))
         // INIT APP
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
