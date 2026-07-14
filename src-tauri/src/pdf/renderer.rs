@@ -1,8 +1,9 @@
+use crate::pdf::binder;
 use crate::pdf::fonts::PdfFonts;
 use crate::pdf::pagination::page::PreparedReport;
-use crate::pdf::utils::get_formatter_context;
+use crate::pdf::utils::{get_formatter_context, Unit};
 use crate::pdf::{layout::TextLayout, models::*, utils::load_fonts};
-use printpdf::{PdfDocument, PdfSaveOptions};
+use printpdf::{Mm, PdfDocument, PdfSaveOptions};
 use serde_json::{json, Value};
 
 use crate::pdf::models::ElementVecExt;
@@ -28,6 +29,15 @@ pub fn render_page(
     output: &str,
 ) -> anyhow::Result<()> {
     anyhow::ensure!(!docs.is_empty(), "docs is empty");
+
+    // let docs = docs
+    //     .into_iter()
+    //     .enumerate()
+    //     .map(|(i, report)| {
+    //         let data = datas.get(i).unwrap_or(&datas[0]);
+    //         binder::bind_template(report, data)
+    //     })
+    //     .collect::<Vec<_>>();
 
     let mut pdf = PdfDocument::new("Report");
     let fonts = load_fonts(&mut pdf)?;
@@ -101,7 +111,6 @@ fn render_single(
                 "page": start_page_number + index,
                 "total": total_pages_number,
             });
-
             page.items.push(PageItem::Text {
                 element: element.clone(),
                 layout: TextLayout::layout(
@@ -137,6 +146,28 @@ fn render_single(
     Ok(start_page + page_count)
 }
 
+fn is_continuous_page(width_px: f32, height_px: f32) -> bool {
+    let width = Unit::px_to_mm(width_px).0;
+    let height = Unit::px_to_mm(height_px).0;
+
+    const EPSILON: f32 = 2.0;
+
+    const PAPER_SIZES: &[(f32, f32)] = &[
+        (420.0, 594.0), // A2
+        (297.0, 420.0), // A3
+        (210.0, 297.0), // A4
+        (148.0, 210.0), // A5
+        (105.0, 148.0), // A6
+        (216.0, 279.0), // Letter
+        (216.0, 356.0), // Legal
+    ];
+
+    !PAPER_SIZES.iter().any(|&(w, h)| {
+        ((width - w).abs() <= EPSILON && (height - h).abs() <= EPSILON)
+            || ((width - h).abs() <= EPSILON && (height - w).abs() <= EPSILON)
+    })
+}
+
 fn prepare_report(
     mut doc: PdfTemplate,
     data: Value,
@@ -151,14 +182,20 @@ fn prepare_report(
 
     let items = LayoutBuilder::build_items(&doc, fonts, &data, ctx.clone())?;
 
-    let pages = Paginator::paginate(items, doc.width, doc.height)?;
+    let continuous = is_continuous_page(doc.width, doc.height);
+
+    let (pages, height) = Paginator::paginate(items, doc.width, doc.height, continuous)?;
 
     Ok(PreparedReport {
         pages,
         ctx: ctx,
-        page_number: page_number.and_then(|p| p.as_text().cloned()),
+        page_number: if continuous {
+            None
+        } else {
+            page_number.and_then(|p| p.as_text().cloned())
+        },
         width: doc.width,
-        height: doc.height,
+        height,
         background_image: doc.background_image,
     })
 }

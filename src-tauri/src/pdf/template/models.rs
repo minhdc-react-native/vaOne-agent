@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FormatterContext {
+    pub continuous_page: Option<bool>,
+
     pub continuous_page_numbering: bool,
     pub lang: String,
     pub decimal: DecimalConfig,
@@ -12,6 +14,7 @@ pub struct FormatterContext {
 impl Default for FormatterContext {
     fn default() -> Self {
         Self {
+            continuous_page: Some(false),
             continuous_page_numbering: true,
             lang: "vi".to_string(),
             decimal: DecimalConfig::default(),

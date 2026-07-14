@@ -3,6 +3,10 @@ use crate::pdf::template::models::FormatterContext;
 use crate::pdf::utils::resolve_value;
 use crate::pdf::utils::value_to_string;
 use anyhow::{anyhow, Result};
+use evalexpr::{
+    eval_number_with_context, ContextWithMutableVariables, DefaultNumericTypes, HashMapContext,
+    Value as EvalValue,
+};
 use serde_json::Value;
 pub struct Evaluator;
 
@@ -82,10 +86,39 @@ impl Evaluator {
             return serde_json::json!(v);
         }
 
+        if let Some(v) = Self::eval_math(arg, data) {
+            return serde_json::json!(v);
+        }
+
         if let Some(value) = resolve_value(data, &arg) {
             return serde_json::json!(value);
         }
 
         Value::Null
+    }
+
+    fn eval_math(expr: &str, data: &Value) -> Option<f64> {
+        let mut ctx: HashMapContext<DefaultNumericTypes> = HashMapContext::new();
+
+        // Chỉ hỗ trợ object ở root
+        if let Value::Object(map) = data {
+            for (key, value) in map {
+                match value {
+                    Value::Number(n) => {
+                        if let Some(v) = n.as_f64() {
+                            let _ = ctx.set_value(key.clone(), EvalValue::from_float(v));
+                        }
+                    }
+                    Value::Bool(v) => {
+                        let _ = ctx.set_value(key.clone(), EvalValue::Boolean(*v));
+                    }
+                    Value::String(v) => {
+                        let _ = ctx.set_value(key.clone(), EvalValue::String(v.clone()));
+                    }
+                    _ => {}
+                }
+            }
+        }
+        eval_number_with_context(expr, &ctx).ok()
     }
 }

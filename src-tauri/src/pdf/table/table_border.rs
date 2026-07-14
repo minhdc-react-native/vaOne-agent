@@ -273,7 +273,9 @@ impl TableBorder {
 
         let width = style.border_width.unwrap_or(0.0);
 
-        if width <= 0.0 {
+        let border_style = style.border_style.as_deref().unwrap_or("dashed");
+
+        if width <= 0.0 || border_style == "none" {
             return;
         }
 

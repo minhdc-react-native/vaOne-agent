@@ -1,5 +1,6 @@
 use super::paginator::PageItem;
 use crate::pdf::{
+    binder::DynamicContent,
     fonts::PdfFonts,
     layout::TextLayout,
     models::{Element, PdfTemplate},
@@ -22,9 +23,22 @@ impl LayoutBuilder {
             match e {
                 Element::Text(element) => {
                     let mut element = element.clone();
-                    // element.translate_y(current_offset);
+
                     let context = if let Some(field) = element.field_name.as_deref() {
-                        TextLayout::build_context(data, field, "value")
+                        let mut watch = Vec::new();
+
+                        if let Ok(dynamic) =
+                            serde_json::from_str::<DynamicContent>(&element.content)
+                        {
+                            watch = dynamic.watch;
+                            element.content = dynamic.fn_text;
+                        }
+
+                        // if element.name.as_deref() == Some("text_2g5c") {
+                        //     println!("element.content={} watch={:#?}", element.content, watch);
+                        // }
+
+                        TextLayout::build_context(data, field, "value", &watch)
                     } else {
                         Value::Object(Default::default())
                     };

@@ -1,6 +1,6 @@
 pub fn get_window_size(id: &str) -> Option<(f64, f64)> {
     match id {
-        "splash" => Some((500.0, 200.0)),
+        "splash" => Some((250.0, 100.0)),
         "report" => Some((1000.0, 800.0)),
         "settings" => Some((330.0, 350.0)),
         "loginTct" => Some((380.0, 520.0)),

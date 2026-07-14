@@ -10,6 +10,7 @@ use crate::services::update::check_update_on_startup;
 use crate::state::CURRENT_ROUTE;
 use crate::state::{AppState, APP_STATE};
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
@@ -65,7 +66,14 @@ pub fn run() {
                 services::local_server::start().await;
             });
 
-            check_update_on_startup(app.handle().clone(), Some(true));
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(1500)).await;
+                if let Some(splash) = app_handle.get_webview_window("splash_screen") {
+                    let _ = splash.close();
+                    check_update_on_startup(app_handle, Some(true));
+                }
+            });
 
             Ok(())
         })

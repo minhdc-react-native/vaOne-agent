@@ -172,13 +172,14 @@ impl Paginator {
         items: Vec<PageItem>,
         _page_width: f32,
         page_height: f32,
-    ) -> anyhow::Result<Vec<PageLayout>> {
+        continuous: bool,
+    ) -> anyhow::Result<(Vec<PageLayout>, f32)> {
         let mut ctx = PaginationContext::new(page_height);
 
         for item in items {
             match item {
                 PageItem::Table { element, layout } => {
-                    Self::paginate_table(element, layout, &mut ctx);
+                    Self::paginate_table(element, layout, &mut ctx, continuous);
                 }
 
                 mut item => {
@@ -188,7 +189,8 @@ impl Paginator {
                     let next_height = item.height();
                     let available_height = ctx.page_height - ctx.margin_bottom;
 
-                    if ctx.current_y + next_height > available_height
+                    if !continuous
+                        && ctx.current_y + next_height > available_height
                         && !ctx.current_page.is_empty()
                     {
                         ctx.new_page();
@@ -215,14 +217,36 @@ impl Paginator {
                 }
             }
         }
+        let ctx_margin_bottom = ctx.margin_bottom;
+        let pages = ctx.finish();
+        let height = if continuous {
+            let mut max_bottom = 0.0;
 
-        Ok(ctx.finish())
+            for page in &pages {
+                for item in &page.items {
+                    let bottom = match item {
+                        PageItem::Table { layout, .. } => layout.bottom(),
+                        _ => item.bottom(),
+                    };
+
+                    if bottom > max_bottom {
+                        max_bottom = bottom;
+                    }
+                }
+            }
+
+            max_bottom + ctx_margin_bottom
+        } else {
+            page_height
+        };
+        Ok((pages, height))
     }
 
     fn paginate_table(
         element: TableElement,
         layout: TableLayoutResult,
         ctx: &mut PaginationContext,
+        continuous: bool,
     ) {
         let design_bottom = element.y + element.height;
         let header_height = layout.header_height();
@@ -250,7 +274,10 @@ impl Paginator {
 
             let available_height = ctx.page_height - ctx.margin_bottom;
             // Không còn đủ chỗ trên trang hiện tại
-            if ctx.current_y + next_height > available_height && !table.rows.is_empty() {
+            if !continuous
+                && ctx.current_y + next_height > available_height
+                && !table.rows.is_empty()
+            {
                 table.recalc_height();
 
                 let mut table_element = element.clone();
