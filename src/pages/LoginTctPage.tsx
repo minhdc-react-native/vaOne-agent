@@ -12,11 +12,13 @@ import Switch from "../components/Switch";
 import { useLoading } from "../service/loading.service";
 import { dialog } from "../service/dialog.service";
 import { invoke } from "@tauri-apps/api/core";
+import { useLocation } from "react-router-dom";
 
 interface IProgs {
     params: Record<string, any>
 }
 export default function LoginTctPage({ params }: IProgs) {
+    const location = useLocation();
     const loading = useLoading.getState();
     const tokenTct = useAppStore((s) => s.tokenTct);
     const savePasswordLoginTct = useAppStore((s) => s.savePasswordLoginTct);
@@ -64,7 +66,7 @@ export default function LoginTctPage({ params }: IProgs) {
         }
         invoke("page_ready", { name: 'loginTct' });
         loadCaptcha();
-    }, [tokenTct, params.username, loadCaptcha, getInvoiceTCT]);
+    }, [tokenTct, params.username, loadCaptcha, getInvoiceTCT, location.key]);
 
     const handleLogin = async () => {
         if (!password || !cvalue) {
@@ -83,7 +85,7 @@ export default function LoginTctPage({ params }: IProgs) {
 
         setLoginTct({
             username: params.username,
-            password,
+            password: remember ? password : "",
             token: res.token,
         });
         // await getInvoiceTCT(res.token);
@@ -98,16 +100,14 @@ export default function LoginTctPage({ params }: IProgs) {
 
     return (
         <AppWindow title="Đăng nhập" icon="User">
-            <div className="flex h-full flex-col gap-4 p-4 w-95">
+            <div className="flex h-full flex-col gap-4 p-6 w-95">
 
-                <div className="mb-2 text-center">
-                    <h2 className="text-xl font-bold">
-                        vaOne Plugin
-                    </h2>
-
-                    <p className="text-sm text-gray-500">
-                        Đăng nhập Hóa đơn điện tử
-                    </p>
+                <div className="mb-2 w-full flex text-center justify-center">
+                    <img
+                        src="/tct.png"
+                        alt="splash"
+                        className="w-lg h-15 object-contain"
+                    />
                 </div>
 
                 <Input

@@ -4,6 +4,7 @@ use reqwest::{
 };
 use serde_json::Value;
 use std::{collections::HashMap, time::Duration};
+use url::Url;
 
 pub type ApiResult<T> = Result<T, String>;
 
@@ -47,13 +48,30 @@ pub async fn get(
     token: Option<&str>,
     delay: Option<u64>,
     headers: Option<HashMap<String, String>>,
+    params: Option<HashMap<String, serde_json::Value>>,
 ) -> ApiResult<Value> {
     wait(delay).await;
 
     let client = Client::new();
 
+    let mut parsed = Url::parse(url).map_err(|e| e.to_string())?;
+
+    if let Some(params) = params {
+        {
+            let mut pairs = parsed.query_pairs_mut();
+
+            for (k, v) in params {
+                let value = match v {
+                    serde_json::Value::String(s) => s,
+                    _ => v.to_string(),
+                };
+                pairs.append_pair(&k, &value);
+            }
+        } // query_pairs_mut kết thúc ở đây
+    }
+
     let response = client
-        .get(url)
+        .get(parsed.as_str())
         .headers(build_headers(token, headers)?)
         .send()
         .await

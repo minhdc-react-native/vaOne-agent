@@ -74,6 +74,34 @@ where
     }
 }
 
+pub fn try_start_sync(source: &str) -> bool {
+    let mut state = APP_STATE
+        .get()
+        .expect("APP_STATE not initialized")
+        .lock()
+        .unwrap();
+
+    if state.sync.running {
+        return false;
+    }
+
+    state.sync.running = true;
+    state.sync.source = source.to_string();
+    state.sync.completed = 0;
+    state.sync.failed = 0;
+    state.sync.success = 0;
+    state.sync.total = None;
+    state.sync.current_invoice = None;
+    state.sync.message.clear();
+    state.sync.is_error_api = false;
+
+    if let Some(ws) = WS_STATE.get() {
+        ws.broadcast_json("SYNC_STATE", &state.sync);
+    }
+
+    true
+}
+
 // ==========================
 // GET SYNC STATE
 // ==========================

@@ -1,18 +1,28 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-interface ILoginTct {
+interface ILogin {
     username: string;
     password: string;
     token: string;
+    idAccount?: string;
 }
 interface IAppState {
     autostartInitialized: boolean,
     setAutostartInitialized: (autostartInitialized: boolean) => void;
     delayRequest: number;
     setDelayRequest: (delayRequest: number) => void;
+
     savePasswordLoginTct: Record<string, string>;
-    setLoginTct: (loginTct: ILoginTct | null) => void;
-    tokenTct: ILoginTct | null;
+    setLoginTct: (login: ILogin | null) => void;
+    tokenTct: ILogin | null;
+
+    savePasswordLoginMInvoice: Record<string, string>;
+    setLoginMInvoice: (login: ILogin | null) => void;
+    tokenMInvoice: ILogin | null;
+
+    savePasswordLoginSaveInvoice: Record<string, string>;
+    setLoginSaveInvoice: (login: ILogin | null) => void;
+    tokenSaveInvoice: ILogin | null;
 }
 
 export const useAppStore = create<IAppState>()(
@@ -23,17 +33,42 @@ export const useAppStore = create<IAppState>()(
             delayRequest: 1500,
             setDelayRequest: (value) =>
                 set({ delayRequest: value }),
+
             savePasswordLoginTct: {},
-            setLoginTct: (loginTct: ILoginTct | null) => set((state) => ({
-                savePasswordLoginTct: loginTct ? {
+            setLoginTct: (login: ILogin | null) => set((state) => ({
+                savePasswordLoginTct: login ? {
                     ...state.savePasswordLoginTct,
-                    [loginTct.username]: loginTct.password
+                    [login.username]: login.password
                 } : {
                     ...state.savePasswordLoginTct
                 },
-                tokenTct: loginTct
+                tokenTct: login
             })),
-            tokenTct: null
+            tokenTct: null,
+
+            savePasswordLoginMInvoice: {},
+            setLoginMInvoice: (login: ILogin | null) => set((state) => ({
+                savePasswordLoginMInvoice: login ? {
+                    ...state.savePasswordLoginMInvoice,
+                    [login.username]: login.password
+                } : {
+                    ...state.savePasswordLoginMInvoice
+                },
+                tokenMInvoice: login
+            })),
+            tokenMInvoice: null,
+
+            savePasswordLoginSaveInvoice: {},
+            setLoginSaveInvoice: (login: ILogin | null) => set((state) => ({
+                savePasswordLoginSaveInvoice: login ? {
+                    ...state.savePasswordLoginSaveInvoice,
+                    [login.username]: login.password
+                } : {
+                    ...state.savePasswordLoginSaveInvoice
+                },
+                tokenSaveInvoice: login
+            })),
+            tokenSaveInvoice: null
         }),
         {
             name: "app-storage",
