@@ -10,6 +10,9 @@ cargo tauri dev --manifest-path src-tauri/Cargo.toml
 
 build cli linux: 
 1. Nếu Linux là Intel/AMD (phổ biến nhất) (VACOM)
+export CC_x86_64_unknown_linux_gnu="zig cc"
+
+
 cargo build \
   -p report-cli \
   --release \
