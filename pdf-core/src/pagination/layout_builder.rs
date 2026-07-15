@@ -51,7 +51,7 @@ impl LayoutBuilder {
                 }
 
                 Element::Table(element) => {
-                    let mut element = element.clone();
+                    let element = element.clone();
                     // element.translate_y(current_offset);
                     let layout =
                         TableLayoutEngine::build(fonts, doc.height, &element, data, ctx.clone());
@@ -61,35 +61,35 @@ impl LayoutBuilder {
                 }
 
                 Element::Line(element) => {
-                    let mut element = element.clone();
+                    let element = element.clone();
                     let layout = element.clone();
                     // element.translate_y(current_offset);
                     items.push(PageItem::Line { element, layout });
                 }
 
                 Element::Rect(element) => {
-                    let mut element = element.clone();
+                    let element = element.clone();
                     let layout = element.clone();
                     // element.translate_y(current_offset);
                     items.push(PageItem::Rect { element, layout });
                 }
 
                 Element::Circle(element) => {
-                    let mut element = element.clone();
+                    let element = element.clone();
                     let layout = element.clone();
                     // element.translate_y(current_offset);
                     items.push(PageItem::Circle { element, layout });
                 }
 
                 Element::Image(element) => {
-                    let mut element = element.clone();
+                    let element = element.clone();
                     let layout = element.clone();
                     // element.translate_y(current_offset);
                     items.push(PageItem::Image { element, layout });
                 }
 
                 Element::Grid(element) => {
-                    let mut element = element.clone();
+                    let element = element.clone();
                     let layout = element.clone();
                     // element.translate_y(current_offset);
                     items.push(PageItem::Grid { element, layout });

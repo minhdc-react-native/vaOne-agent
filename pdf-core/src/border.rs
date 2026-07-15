@@ -1,7 +1,7 @@
 use crate::fonts::PdfFonts;
 use crate::utils::Unit;
 use printpdf::{
-    Line, LineDashPattern, LinePoint, Op, PaintMode, Point, Polygon, PolygonRing, Pt, WindingOrder,
+    Line, LineDashPattern, LinePoint, Op, PaintMode, Point, Polygon, PolygonRing, WindingOrder,
 };
 pub struct Border;
 

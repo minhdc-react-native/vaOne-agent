@@ -1,6 +1,5 @@
 use crate::fonts::{PdfFont, PdfFonts};
 use crate::state::{FONT_BOLD, FONT_ITALIC, FONT_REGULAR};
-use crate::template::evaluator::Evaluator;
 use crate::template::models::FormatterContext;
 use anyhow::{anyhow, Result};
 use printpdf::{Color, Mm, Op, ParsedFont, PdfDocument, Pt, Rgb};

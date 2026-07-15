@@ -1,5 +1,4 @@
 use crate::utils::notification;
-use printers::get_printers;
 use std::process::Command;
 #[tauri::command]
 pub fn get_default_printer() -> Result<String, String> {
@@ -20,13 +19,6 @@ pub fn get_default_printer() -> Result<String, String> {
     }
 
     Err("No default printer found".into())
-}
-
-#[tauri::command]
-pub fn get_printer_list() -> Result<Vec<String>, String> {
-    let printers = get_printers();
-    let names = printers.into_iter().map(|p| p.name).collect();
-    Ok(names)
 }
 
 #[tauri::command]

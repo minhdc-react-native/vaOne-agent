@@ -1,7 +1,7 @@
 use crate::utils::bind_content;
 use crate::{layout::TextLayout, models::*};
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,7 +31,7 @@ pub fn bind_template(mut report: PdfTemplate, data: &serde_json::Value) -> PdfTe
         match element {
             Element::Text(text) => {
                 if let Some(field) = &text.field_name {
-                    if let Some(value) = resolve_value(data, field) {
+                    if let Some(_value) = resolve_value(data, field) {
                         // Mặc định
                         let mut content = text.content.clone();
                         let mut watch = Vec::new();

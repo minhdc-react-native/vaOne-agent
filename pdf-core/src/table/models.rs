@@ -1,4 +1,4 @@
-use crate::models::{ElementStyle, TextRun};
+use crate::models::ElementStyle;
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ColumnWidth {

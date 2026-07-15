@@ -55,13 +55,13 @@ impl PageItem {
     }
     pub fn x(&self) -> f32 {
         match self {
-            Self::Text { element, layout } => layout.x,
-            Self::Table { element, layout } => layout.x,
-            Self::Line { element, layout } => layout.x,
-            Self::Rect { element, layout } => layout.x,
-            Self::Circle { element, layout } => layout.x,
-            Self::Image { element, layout } => layout.x,
-            Self::Grid { element, layout } => layout.x,
+            Self::Text { element: _, layout } => layout.x,
+            Self::Table { element: _, layout } => layout.x,
+            Self::Line { element: _, layout } => layout.x,
+            Self::Rect { element: _, layout } => layout.x,
+            Self::Circle { element: _, layout } => layout.x,
+            Self::Image { element: _, layout } => layout.x,
+            Self::Grid { element: _, layout } => layout.x,
         }
     }
     pub fn design_x(&self) -> f32 {
@@ -78,13 +78,13 @@ impl PageItem {
 
     pub fn y(&self) -> f32 {
         match self {
-            Self::Text { element, layout } => layout.y,
-            Self::Table { element, layout } => layout.y,
-            Self::Line { element, layout } => layout.y,
-            Self::Rect { element, layout } => layout.y,
-            Self::Circle { element, layout } => layout.y,
-            Self::Image { element, layout } => layout.y,
-            Self::Grid { element, layout } => layout.y,
+            Self::Text { element: _, layout } => layout.y,
+            Self::Table { element: _, layout } => layout.y,
+            Self::Line { element: _, layout } => layout.y,
+            Self::Rect { element: _, layout } => layout.y,
+            Self::Circle { element: _, layout } => layout.y,
+            Self::Image { element: _, layout } => layout.y,
+            Self::Grid { element: _, layout } => layout.y,
         }
     }
     pub fn design_y(&self) -> f32 {
@@ -101,13 +101,13 @@ impl PageItem {
 
     pub fn height(&self) -> f32 {
         match self {
-            Self::Text { element, layout } => layout.height,
-            Self::Table { element, layout } => layout.height,
-            Self::Line { element, layout } => layout.height,
-            Self::Rect { element, layout } => layout.height,
-            Self::Circle { element, layout } => layout.height,
-            Self::Image { element, layout } => layout.height,
-            Self::Grid { element, layout } => layout.height,
+            Self::Text { element: _, layout } => layout.height,
+            Self::Table { element: _, layout } => layout.height,
+            Self::Line { element: _, layout } => layout.height,
+            Self::Rect { element: _, layout } => layout.height,
+            Self::Circle { element: _, layout } => layout.height,
+            Self::Image { element: _, layout } => layout.height,
+            Self::Grid { element: _, layout } => layout.height,
         }
     }
     pub fn design_height(&self) -> f32 {
@@ -124,34 +124,34 @@ impl PageItem {
 
     pub fn set_y(&mut self, y: f32) {
         match self {
-            Self::Text { element, layout } => layout.y = y,
-            Self::Table { element, layout } => layout.y = y,
-            Self::Line { element, layout } => layout.y = y,
-            Self::Rect { element, layout } => layout.y = y,
-            Self::Circle { element, layout } => layout.y = y,
-            Self::Image { element, layout } => layout.y = y,
-            Self::Grid { element, layout } => layout.y = y,
+            Self::Text { element: _, layout } => layout.y = y,
+            Self::Table { element: _, layout } => layout.y = y,
+            Self::Line { element: _, layout } => layout.y = y,
+            Self::Rect { element: _, layout } => layout.y = y,
+            Self::Circle { element: _, layout } => layout.y = y,
+            Self::Image { element: _, layout } => layout.y = y,
+            Self::Grid { element: _, layout } => layout.y = y,
         }
     }
 
     pub fn translate_y(&mut self, dy: f32) {
         match self {
-            Self::Text { element, layout } => {
+            Self::Text { element: _, layout } => {
                 layout.translate_y(dy);
             }
 
-            Self::Table { element, layout } => {
+            Self::Table { element: _, layout } => {
                 layout.translate_y(dy);
             }
 
-            Self::Line { element, layout }
-            | Self::Rect { element, layout }
-            | Self::Circle { element, layout }
-            | Self::Image { element, layout } => {
+            Self::Line { element: _, layout }
+            | Self::Rect { element: _, layout }
+            | Self::Circle { element: _, layout }
+            | Self::Image { element: _, layout } => {
                 layout.translate_y(dy);
             }
 
-            Self::Grid { element, layout } => {
+            Self::Grid { element: _, layout } => {
                 layout.translate_y(dy);
             }
         }

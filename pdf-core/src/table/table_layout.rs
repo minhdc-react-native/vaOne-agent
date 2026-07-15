@@ -422,7 +422,7 @@ impl TableLayoutEngine {
 
         widths: &[f32],
 
-        positions: &[f32],
+        _positions: &[f32],
 
         start_row: usize,
         data: &Value,

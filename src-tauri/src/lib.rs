@@ -1,7 +1,6 @@
 mod api;
 mod commands;
 mod models;
-pub mod pdf;
 mod services;
 mod state;
 mod utils;
@@ -140,7 +139,6 @@ pub fn run() {
             commands::api_command::http_post,
             commands::system::page_ready,
             commands::pdf::render_pdf,
-            commands::printer::get_printer_list,
             commands::printer::print_pdf,
             commands::invoice::get_sync_state,
             commands::invoice::start_invoice_tct_sync,

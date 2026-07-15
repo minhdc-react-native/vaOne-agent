@@ -11,15 +11,6 @@ pub static CURRENT_ROUTE: OnceLock<Mutex<String>> = OnceLock::new();
 pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
 // ==========================
-// FONT STATIC RESOURCE
-// ==========================
-pub static FONT_REGULAR: &[u8] = include_bytes!("../fonts/NotoSans-Regular.ttf");
-
-pub static FONT_BOLD: &[u8] = include_bytes!("../fonts/NotoSans-Bold.ttf");
-
-pub static FONT_ITALIC: &[u8] = include_bytes!("../fonts/NotoSans-Italic.ttf");
-
-// ==========================
 // APP STATE (BUSINESS STATE)
 // ==========================
 pub static APP_STATE: OnceLock<Mutex<AppState>> = OnceLock::new();

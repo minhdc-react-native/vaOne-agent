@@ -101,11 +101,11 @@ impl PageRenderer {
                         }
                     }
 
-                    PageItem::Image { element, layout } => {
+                    PageItem::Image { element: _, layout } => {
                         let _ = render_image(doc, &mut ops, &layout, page_height);
                     }
 
-                    PageItem::Grid { element, layout } => {
+                    PageItem::Grid { element: _, layout: _ } => {
                         // TODO
                     }
                 }

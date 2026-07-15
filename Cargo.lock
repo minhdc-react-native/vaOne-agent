@@ -3697,15 +3697,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
-name = "printers"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9973d6bf0ed339da9230a83eccbd7c2564f392bdc80246853645e9a60efb38b0"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "printpdf"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6355,16 +6346,10 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "axum",
- "base64 0.22.1",
  "chrono",
  "dirs 6.0.0",
- "evalexpr",
  "futures-util",
- "num-format",
- "once_cell",
- "printers",
- "printpdf",
- "regex",
+ "pdf-core",
  "reqwest",
  "serde",
  "serde_json",
@@ -6376,13 +6361,10 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
- "thiserror 2.0.18",
  "tokio",
  "tokio-tungstenite 0.24.0",
  "tower-http",
- "ttf-parser 0.25.1",
  "url",
- "zstd",
 ]
 
 [[package]]
