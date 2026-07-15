@@ -4,6 +4,7 @@ interface ILogin {
     username: string;
     password: string;
     token: string;
+    taxCode?: string;
     idAccount?: string;
 }
 interface IAppState {

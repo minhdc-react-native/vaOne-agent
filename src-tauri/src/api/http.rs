@@ -1,10 +1,9 @@
-use reqwest::{
-    header::{HeaderMap, HeaderName, HeaderValue},
-    Client,
-};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde_json::Value;
 use std::{collections::HashMap, time::Duration};
 use url::Url;
+
+use crate::state::get_client;
 
 pub type ApiResult<T> = Result<T, String>;
 
@@ -52,7 +51,7 @@ pub async fn get(
 ) -> ApiResult<Value> {
     wait(delay).await;
 
-    let client = Client::new();
+    let client = get_client();
 
     let mut parsed = Url::parse(url).map_err(|e| e.to_string())?;
 
@@ -69,7 +68,7 @@ pub async fn get(
             }
         } // query_pairs_mut kết thúc ở đây
     }
-
+    println!("url={:#?}", parsed.as_str());
     let response = client
         .get(parsed.as_str())
         .headers(build_headers(token, headers)?)
@@ -97,7 +96,7 @@ pub async fn post(
 ) -> ApiResult<Value> {
     wait(delay).await;
 
-    let client = Client::new();
+    let client = get_client();
 
     let response = client
         .post(url)

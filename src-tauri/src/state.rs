@@ -1,5 +1,6 @@
 use std::sync::{Mutex, OnceLock};
 
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
@@ -20,11 +21,18 @@ pub struct AppState {
     pub sync: SyncState,
 }
 
+static HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
+
+pub fn get_client() -> &'static Client {
+    HTTP_CLIENT.get_or_init(|| Client::builder().cookie_store(true).build().unwrap())
+}
+
 // ==========================
 // SYNC STATE (JOB STATUS)
 // ==========================
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SyncState {
+    pub invoice_type: u8,
     pub source: String,
     pub running: bool,
     pub total: Option<usize>,
@@ -39,6 +47,7 @@ pub struct SyncState {
 impl Default for SyncState {
     fn default() -> Self {
         Self {
+            invoice_type: 0,
             source: String::new(),
             running: false,
             total: None,

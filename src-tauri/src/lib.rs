@@ -142,7 +142,8 @@ pub fn run() {
             commands::printer::print_pdf,
             commands::invoice::get_sync_state,
             commands::invoice::start_invoice_tct_sync,
-            commands::invoice::start_save_invoice_sync
+            commands::invoice::start_save_invoice_sync,
+            commands::invoice::start_m_invoice_sync
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

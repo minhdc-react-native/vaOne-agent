@@ -1,23 +1,83 @@
 import { invoke } from "@tauri-apps/api/core";
-import AppWindow from "../components/AppWindow";
+import AppWindow, { hideWindow } from "../components/AppWindow";
 import Button from "../components/Button";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Input from "../components/Input";
-import { useAppStore } from "../stores/app.store";
+import { getDelayRequest, useAppStore } from "../stores/app.store";
 import Switch from "../components/Switch";
+import { useLocation } from "react-router-dom";
+import { useLoading } from "../service/loading.service";
+import { dialog } from "../service/dialog.service";
+import { mInvoiceService } from "../api/services/mInvoice.service";
 interface IProgs {
     params: Record<string, any>
 }
 export default function LoginMInvoicePage({ params }: IProgs) {
+    const location = useLocation();
+    const loading = useLoading.getState();
     const [remember, setRemember] = useState(true);
+    const tokenMInvoice = useAppStore(s => s.tokenMInvoice);
+    const setLoginMInvoice = useAppStore(s => s.setLoginMInvoice);
     const savePasswordLoginMInvoice = useAppStore((s) => s.savePasswordLoginMInvoice);
+
+    const [username, setUserName] = useState(params.username);
+
     const [password, setPassword] = useState(
         savePasswordLoginMInvoice?.[params.username] ?? ""
     );
 
+    const getInvoice = useCallback(async (token: string, taxCode: string) => {
+        await hideWindow();
+        const delay = getDelayRequest();
+        await invoke("start_m_invoice_sync", {
+            invoiceType: params.type,
+            fromDate: params.fromDate,
+            toDate: params.toDate,
+            token,
+            delay,
+            taxCode
+        });
+    }, [params]);
     useEffect(() => {
-        invoke("page_ready", { name: 'loginMInvoice' });
-    }, []);
+        if (
+            tokenMInvoice &&
+            tokenMInvoice.taxCode === params.taxCode
+        ) {
+            getInvoice(tokenMInvoice.token, tokenMInvoice.taxCode!);
+            return;
+        }
+        invoke("page_ready", { name: 'loginSaveInvoice' });
+    }, [tokenMInvoice, params.taxCode, location.key]);
+
+    const handleLogin = async () => {
+        if (!password) {
+            await dialog.warning(`Bạn phải nhập ${!password ? 'mật khẩu' : 'captcha'}!`);
+            return;
+        }
+        loading.show("...")
+        const res = await mInvoiceService.apiToken({
+            taxCode: params.taxCode,
+            username: params.username,
+            password,
+        });
+        loading.hide();
+        if (!res) return;
+
+        setLoginMInvoice({
+            taxCode: params.taxCode,
+            username: params.username,
+            password: remember ? password : "",
+            token: res.token,
+            idAccount: res.id
+        });
+    };
+
+    if (
+        tokenMInvoice &&
+        tokenMInvoice.taxCode === params.taxCode
+    ) {
+        return null;
+    }
 
     return (
         <AppWindow title="Đăng nhập" icon="User">
@@ -30,10 +90,19 @@ export default function LoginMInvoicePage({ params }: IProgs) {
                         className="w-lg h-40 object-contain"
                     />
                 </div>
+
+                <Input
+                    label="Mã số thuế"
+                    value={params.taxCode}
+                    readOnly
+                />
+
                 <Input
                     label="Tên đăng nhập"
-                    value={params.username}
-                    readOnly
+                    value={username}
+                    onChange={(e) =>
+                        setUserName(e.target.value)
+                    }
                 />
 
                 <Input
@@ -52,7 +121,7 @@ export default function LoginMInvoicePage({ params }: IProgs) {
                 />
                 <Button
                     className="mt-2 w-full"
-                    onClick={() => { }}
+                    onClick={handleLogin}
                 >
                     Đăng nhập
                 </Button>

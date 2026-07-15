@@ -56,8 +56,10 @@ async fn fetch_all_invoices(
     let end = NaiveDate::parse_from_str(&to_date, "%Y-%m-%d").map_err(|e| e.to_string())?;
 
     let invoice_types = match invoice_type {
-        1 => vec![1, 3],
-        2 => vec![2, 4],
+        1 => vec![1],
+        2 => vec![2],
+        3 => vec![3],
+        4 => vec![4],
         _ => vec![invoice_type],
     };
 

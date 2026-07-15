@@ -7,12 +7,12 @@ use std::sync::Arc;
 fn get_url(invoice_type: u8, id_account: &str) -> String {
     match invoice_type {
         // 1: Mua vào
-        1 => format!(
+        1 | 3 => format!(
             "https://login.saveinvoice.vn/api/invoices/account/{}/type/purchase",
             id_account
         ),
         // 2: Bán ra
-        2 => format!(
+        2 | 4 => format!(
             "https://login.saveinvoice.vn/api/invoices/account/{}/type/sold",
             id_account
         ),

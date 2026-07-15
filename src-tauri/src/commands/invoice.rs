@@ -1,3 +1,4 @@
+use crate::services::other_invoice::m_invoice::run_sync_flow_m_invoice;
 use crate::services::other_invoice::save_invoice::run_sync_flow_save_invoice;
 use crate::services::tct::fetch_invoices::run_sync_flow;
 use crate::state::SyncState;
@@ -19,6 +20,7 @@ pub async fn start_invoice_tct_sync(
     }
     // 1. reset state
     crate::state::update_sync_emit(|s| {
+        s.invoice_type = invoice_type;
         s.completed = 0;
         s.failed = 0;
         s.source = "TCT".to_string();
@@ -29,6 +31,43 @@ pub async fn start_invoice_tct_sync(
 
     tokio::spawn(async move {
         run_sync_flow(invoice_type, from_date, to_date, Some(token), Some(delay)).await;
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn start_m_invoice_sync(
+    invoice_type: u8,
+    from_date: String,
+    to_date: String,
+    token: String,
+    delay: u64,
+    tax_code: String,
+) -> Result<(), String> {
+    if !crate::state::try_start_sync("M-INVOICE") {
+        return Ok(());
+    }
+    // 1. reset state
+    crate::state::update_sync_emit(|s| {
+        s.invoice_type = invoice_type;
+        s.completed = 0;
+        s.failed = 0;
+        s.source = "M-INVOICE".to_string();
+        s.running = true;
+        s.current_invoice = None;
+        s.total = None;
+    });
+    tokio::spawn(async move {
+        run_sync_flow_m_invoice(
+            invoice_type,
+            from_date,
+            to_date,
+            Some(token),
+            Some(delay),
+            tax_code,
+        )
+        .await;
     });
 
     Ok(())
@@ -48,6 +87,7 @@ pub async fn start_save_invoice_sync(
     }
     // 1. reset state
     crate::state::update_sync_emit(|s| {
+        s.invoice_type = invoice_type;
         s.completed = 0;
         s.failed = 0;
         s.source = "SAVE-INVOICE".to_string();

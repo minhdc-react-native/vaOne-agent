@@ -2,6 +2,7 @@ import axios from "axios";
 import { invoke } from "@tauri-apps/api/core";
 import { dialog } from "../../service/dialog.service";
 interface IInfoLogin {
+    taxCode: string;
     username: string;
     password: string;
 }
@@ -17,7 +18,7 @@ export const saveInvoiceService = {
                 body: data
             });
             const token = res.token;
-            const id = await saveInvoiceService.getExternalAccountsFirstId(token);
+            const id = await saveInvoiceService.getExternalAccountsIdByUserName(token, data);
 
             return { token, id } as ILoginRequest;
 
@@ -32,39 +33,34 @@ export const saveInvoiceService = {
             return null;
         }
     },
-    async getExternalAccountsFirstId(
-        token: string
+    async getExternalAccountsIdByUserName(
+        token: string,
+        data: IInfoLogin
     ) {
-        try {
-
-            const res: any = await invoke("http_get", {
-                url: "https://login.saveinvoice.vn/api/external_accounts",
-                headers: {
-                    apiToken: token
-                },
-                params: {
-                    lazyLoadEvent: JSON.stringify({
-                        first: 0,
-                        rows: 20,
-                        page: 0,
-                        sortField: null,
-                        sortOrder: null,
-                        filters: {
-                            tags: {
-                                value: null,
-                                matchMode: "in"
-                            }
+        const res: any = await invoke("http_get", {
+            url: "https://login.saveinvoice.vn/api/external_accounts",
+            headers: {
+                apiToken: token
+            },
+            params: {
+                lazyLoadEvent: JSON.stringify({
+                    first: 0,
+                    rows: 20,
+                    page: 0,
+                    sortField: null,
+                    sortOrder: null,
+                    filters: {
+                        tags: {
+                            value: null,
+                            matchMode: "in"
                         }
-                    })
-                }
-            });
-            const id = Array.isArray(res.items) && res.items.length > 0
-                ? res.items[0]._id
-                : null;
-            return id;
-        } catch (e) {
-            await dialog.error("Không thể lấy mã Captcha!");
-            return null;
-        }
+                    }
+                })
+            }
+        });
+        const id = Array.isArray(res.items)
+            ? res.items.find((item: any) => item.username === data.taxCode)?._id ?? null
+            : null;
+        return id;
     }
 }

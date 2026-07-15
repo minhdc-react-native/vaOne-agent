@@ -19,6 +19,9 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
     const tokenSaveInvoice = useAppStore(s => s.tokenSaveInvoice);
     const setLoginSaveInvoice = useAppStore(s => s.setLoginSaveInvoice);
     const savePasswordLoginSaveInvoice = useAppStore((s) => s.savePasswordLoginSaveInvoice);
+
+    const [username, setUserName] = useState(params.username);
+
     const [password, setPassword] = useState(
         savePasswordLoginSaveInvoice?.[params.username] ?? ""
     );
@@ -38,13 +41,13 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
     useEffect(() => {
         if (
             tokenSaveInvoice &&
-            tokenSaveInvoice.username === params.username
+            tokenSaveInvoice.taxCode === params.taxCode
         ) {
             getInvoice(tokenSaveInvoice.token, tokenSaveInvoice.idAccount!);
             return;
         }
         invoke("page_ready", { name: 'loginSaveInvoice' });
-    }, [tokenSaveInvoice, params.username, location.key]);
+    }, [tokenSaveInvoice, params.taxCode, location.key]);
 
     const handleLogin = async () => {
         if (!password) {
@@ -53,13 +56,15 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
         }
         loading.show("...")
         const res = await saveInvoiceService.apiToken({
+            taxCode: params.taxCode,
             username: params.username,
-            password,
+            password
         });
         loading.hide();
         if (!res) return;
 
         setLoginSaveInvoice({
+            taxCode: params.taxCode,
             username: params.username,
             password: remember ? password : "",
             token: res.token,
@@ -87,9 +92,17 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
                     />
                 </div>
                 <Input
-                    label="Tên đăng nhập"
-                    value={params.username}
+                    label="Mã số thuế"
+                    value={params.taxCode}
                     readOnly
+                />
+
+                <Input
+                    label="Tên đăng nhập"
+                    value={username}
+                    onChange={(e) =>
+                        setUserName(e.target.value)
+                    }
                 />
 
                 <Input
