@@ -200,7 +200,7 @@ where
     }
 }
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 static SYNC_CANCEL: OnceLock<Arc<AtomicBool>> = OnceLock::new();
 
 pub fn get_cancel_flag() -> Arc<AtomicBool> {

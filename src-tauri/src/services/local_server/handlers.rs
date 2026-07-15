@@ -43,7 +43,7 @@ pub async fn message(Json(req): Json<MessageRequest>) -> Json<PingResponse> {
     Json(PingResponse { success: true })
 }
 
-pub async fn sync_token(Json(token): Json<Value>) -> Json<serde_json::Value> {
+pub async fn sync_token(Json(_token): Json<Value>) -> Json<serde_json::Value> {
     // Implementation for syncing token
     Json(serde_json::json!({
         "success": true

@@ -1,6 +1,8 @@
 use crate::fonts::PdfFonts;
 use crate::models::{TextElement, TextLayoutResult, TextLine, TextRun};
-use crate::template::{models::FormatterContext, parser::Parser, tokenizer::Tokenizer};
+use crate::template::{
+    evaluator::Evaluator, models::FormatterContext, parser::Parser, tokenizer::Tokenizer,
+};
 use crate::text::LINE_HEIGHT;
 use crate::utils::{resolve_value, Unit};
 use serde_json::{Map, Value};
@@ -201,6 +203,7 @@ impl TextLayout {
             line_height,
             lines,
             base_y: 0.0,
+            visible: None,
         }
     }
 

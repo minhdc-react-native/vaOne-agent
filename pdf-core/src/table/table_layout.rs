@@ -92,6 +92,7 @@ impl TableLayoutEngine {
             height,
             headers,
             rows,
+            visible: Some(true),
         }
     }
 

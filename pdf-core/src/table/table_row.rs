@@ -190,6 +190,7 @@ impl TableRow {
                 field_name: None,
                 style: Some(style),
                 auto_height: Some(true),
+                visible_if: None,
             };
 
             let layout = TextLayout::layout(

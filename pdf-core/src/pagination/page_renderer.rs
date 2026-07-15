@@ -105,7 +105,10 @@ impl PageRenderer {
                         let _ = render_image(doc, &mut ops, &layout, page_height);
                     }
 
-                    PageItem::Grid { element: _, layout: _ } => {
+                    PageItem::Grid {
+                        element: _,
+                        layout: _,
+                    } => {
                         // TODO
                     }
                 }

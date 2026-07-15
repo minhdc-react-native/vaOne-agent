@@ -42,6 +42,19 @@ pub enum PageItem {
 }
 
 impl PageItem {
+    pub fn visible(&self) -> bool {
+        match self {
+            Self::Text { element: _, layout } => layout.visible.unwrap_or(true),
+            Self::Table { element: _, layout } => layout.visible.unwrap_or(true),
+            Self::Line { element: _, layout } => layout.visible.unwrap_or(true),
+            Self::Rect { element: _, layout } => layout.visible.unwrap_or(true),
+            Self::Circle { element: _, layout } => layout.visible.unwrap_or(true),
+            Self::Image { element: _, layout } => layout.visible.unwrap_or(true),
+            Self::Grid { element: _, layout } => layout.visible.unwrap_or(true),
+            _ => true,
+        }
+    }
+
     pub fn name(&self) -> Option<String> {
         match self {
             Self::Text { element, .. } => element.clone().name,
@@ -176,6 +189,10 @@ impl Paginator {
         let mut ctx = PaginationContext::new(page_height);
 
         for item in items {
+            if !item.visible() {
+                ctx.previous_design_bottom = item.design_bottom();
+                continue;
+            }
             match item {
                 PageItem::Table { element, layout } => {
                     Self::paginate_table(element, layout, &mut ctx, continuous);
@@ -198,17 +215,6 @@ impl Paginator {
                     let diff = ctx.current_y - item.y();
 
                     item.translate_y(diff);
-                    // if let Some(name) = item.name().as_deref() {
-                    //     if name == "text_o3ak" || name == "****" {
-                    //         println!(
-                    //             "design_y={} layout_y={} current_y={} diff={}",
-                    //             item.design_y(),
-                    //             item.y(),
-                    //             ctx.current_y,
-                    //             ctx.current_y - item.y(),
-                    //         );
-                    //     }
-                    // }
                     ctx.current_y = item.bottom();
                     ctx.previous_design_bottom = item.design_bottom();
 

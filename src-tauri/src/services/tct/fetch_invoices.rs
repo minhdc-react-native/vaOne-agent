@@ -151,7 +151,7 @@ async fn fetch_invoice_detail(
 ) -> Result<Vec<Value>, String> {
     let mut result = vec![];
 
-    for (i, item) in datas.iter().enumerate() {
+    for (_i, item) in datas.iter().enumerate() {
         if cancel.load(Ordering::Relaxed) {
             break;
         }
@@ -227,7 +227,7 @@ pub async fn run_sync_flow(
     });
 
     // 2. fetch detail
-    let details = match fetch_invoice_detail(invoices, token, delay, cancel).await {
+    let _details = match fetch_invoice_detail(invoices, token, delay, cancel).await {
         Ok(v) => v,
         Err(_) => vec![],
     };

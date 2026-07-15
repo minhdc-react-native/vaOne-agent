@@ -36,6 +36,7 @@ pub struct TextLayoutResult {
     pub y: f32,
     pub line_height: f32,
     pub base_y: f32,
+    pub visible: Option<bool>,
 }
 impl TextLayoutResult {
     pub fn translate_y(&mut self, dy: f32) {
@@ -84,6 +85,18 @@ pub enum Element {
 }
 
 impl Element {
+    pub fn visible_if(&self) -> Option<String> {
+        match self {
+            Element::Text(e) => e.visible_if.clone(),
+            Element::Table(e) => e.visible_if.clone(),
+            Element::Line(e) => e.visible_if.clone(),
+            Element::Rect(e) => e.visible_if.clone(),
+            Element::Circle(e) => e.visible_if.clone(),
+            Element::Image(e) => e.visible_if.clone(),
+            Element::Grid(e) => e.visible_if.clone(),
+        }
+    }
+
     pub fn name(&self) -> Option<&str> {
         match self {
             Element::Text(e) => e.name.as_deref(),
@@ -275,6 +288,9 @@ pub struct TextElement {
     pub content: String,
     pub name: Option<String>,
 
+    #[serde(rename = "visibleIf")]
+    pub visible_if: Option<String>,
+
     #[serde(rename = "fieldName")]
     pub field_name: Option<String>,
 
@@ -297,13 +313,21 @@ pub struct LRCElement {
     pub x: f32,
     pub y: f32,
 
+    #[serde(rename = "fieldName")]
+    pub field_name: Option<String>,
+
     pub content: Option<String>,
 
     pub width: f32,
     pub height: f32,
 
+    #[serde(rename = "visibleIf")]
+    pub visible_if: Option<String>,
+
     #[serde(default)]
     pub style: Option<ElementStyle>,
+
+    pub visible: Option<bool>,
 }
 impl LRCElement {
     pub fn translate_y(&mut self, dy: f32) {
@@ -324,8 +348,13 @@ pub struct GridElement {
     #[serde(rename = "fieldName")]
     pub field_name: Option<String>,
 
+    #[serde(rename = "visibleIf")]
+    pub visible_if: Option<String>,
+
     #[serde(default)]
     pub style: Option<ElementStyle>,
+
+    pub visible: Option<bool>,
 }
 impl GridElement {
     pub fn translate_y(&mut self, dy: f32) {

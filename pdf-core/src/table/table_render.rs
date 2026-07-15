@@ -74,6 +74,7 @@ impl TableRenderer {
             field_name: None,
             style: Some(cell.style.clone()),
             auto_height: Some(true),
+            visible_if: None,
         };
 
         let context = serde_json::json!({});

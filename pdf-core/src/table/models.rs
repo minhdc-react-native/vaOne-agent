@@ -18,6 +18,9 @@ pub struct TableElement {
     #[serde(rename = "fieldName")]
     pub field_name: Option<String>,
 
+    #[serde(rename = "visibleIf")]
+    pub visible_if: Option<String>,
+
     #[serde(default)]
     pub columns: Vec<TableColumn>,
 
@@ -109,6 +112,7 @@ pub struct TableLayoutResult {
     pub height: f32,
     pub headers: Vec<TableRowLayout>,
     pub rows: Vec<TableRowLayout>,
+    pub visible: Option<bool>,
 }
 impl TableLayoutResult {
     /// Tổng chiều cao phần header
@@ -159,6 +163,7 @@ impl TableLayoutResult {
             height: self.header_height(),
             headers: self.headers.clone(),
             rows: Vec::new(),
+            visible: Some(true),
         }
     }
 

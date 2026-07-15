@@ -98,7 +98,7 @@ fn render_single<F>(
     start_page_number: usize,
     total_pages_number: usize,
     progress: &mut F,
-) -> anyhow::Result<usize >
+) -> anyhow::Result<usize>
 where
     F: FnMut(serde_json::Value),
 {
