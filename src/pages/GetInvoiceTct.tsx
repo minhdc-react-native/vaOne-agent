@@ -37,7 +37,7 @@ export const GetInvoiceTct = () => {
     const { isCancelled } = useCancellation();
     const params = location.state as LocationState;
     const { taxCode, type, fromDate, toDate } = params;
-    const setLoginTct = useAppStore((s) => s.setLoginTct);
+    const setLogin = useAppStore((s) => s.setLogin);
     const [disableClose, setDisableClose] = useState(false);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
     const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -115,7 +115,7 @@ export const GetInvoiceTct = () => {
     const { khhdon, shdon, tdlap } = currentInvoice || {};
 
     const reLogin = useCallback(async () => {
-        setLoginTct(null);
+        setLogin(null);
         await getCurrentWindow().hide();
         await trayApi.post("/open_tray_page", {
             route: "/login",

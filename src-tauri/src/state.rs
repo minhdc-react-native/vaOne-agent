@@ -2,7 +2,7 @@ use std::sync::{Mutex, OnceLock};
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use tauri::AppHandle;
+use tauri::{menu::MenuItem, AppHandle, Wry};
 
 pub static CURRENT_ROUTE: OnceLock<Mutex<String>> = OnceLock::new();
 
@@ -20,6 +20,8 @@ pub static APP_STATE: OnceLock<Mutex<AppState>> = OnceLock::new();
 pub struct AppState {
     pub sync: SyncState,
 }
+
+pub static ONLINE_MENU: OnceLock<MenuItem<Wry>> = OnceLock::new();
 
 static HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
 

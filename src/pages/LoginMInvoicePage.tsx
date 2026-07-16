@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import AppWindow, { hideWindow } from "../components/AppWindow";
 import Button from "../components/Button";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Input from "../components/Input";
 import { getDelayRequest, useAppStore } from "../stores/app.store";
 import Switch from "../components/Switch";
@@ -16,18 +16,19 @@ export default function LoginMInvoicePage({ params }: IProgs) {
     const location = useLocation();
     const loading = useLoading.getState();
     const [remember, setRemember] = useState(true);
-    const tokenMInvoice = useAppStore(s => s.tokenMInvoice);
-    const setLoginMInvoice = useAppStore(s => s.setLoginMInvoice);
-    const savePasswordLoginMInvoice = useAppStore((s) => s.savePasswordLoginMInvoice);
+    const login = useAppStore(s => s.login);
+    const setLogin = useAppStore(s => s.setLogin);
+    const savePassword = useAppStore((s) => s.savePassword);
 
     const [username, setUserName] = useState(params.username);
 
     const [password, setPassword] = useState(
-        savePasswordLoginMInvoice?.[params.username] ?? ""
+        savePassword?.[params.username] ?? ""
     );
 
     const getInvoice = useCallback(async (token: string, taxCode: string) => {
         await hideWindow();
+        if (!params.type) return;
         const delay = getDelayRequest();
         await invoke("start_m_invoice_sync", {
             invoiceType: params.type,
@@ -38,16 +39,18 @@ export default function LoginMInvoicePage({ params }: IProgs) {
             taxCode
         });
     }, [params]);
+
+    const reConnect = useRef(params.reConnect);
     useEffect(() => {
         if (
-            tokenMInvoice &&
-            tokenMInvoice.taxCode === params.taxCode
+            login &&
+            login.taxCode === params.taxCode && !reConnect.current
         ) {
-            getInvoice(tokenMInvoice.token, tokenMInvoice.taxCode!);
+            getInvoice(login.token, login.taxCode!);
             return;
         }
         invoke("page_ready", { name: 'loginSaveInvoice' });
-    }, [tokenMInvoice, params.taxCode, location.key]);
+    }, [login, location.key]);
 
     const handleLogin = async () => {
         if (!password) {
@@ -62,19 +65,21 @@ export default function LoginMInvoicePage({ params }: IProgs) {
         });
         loading.hide();
         if (!res) return;
-
-        setLoginMInvoice({
+        reConnect.current = false;
+        setLogin({
+            source: "M-INVOICE",
             taxCode: params.taxCode,
             username: params.username,
             password: remember ? password : "",
             token: res.token,
-            idAccount: res.id
+            idAccount: res.id,
+            reConnect: true
         });
     };
 
     if (
-        tokenMInvoice &&
-        tokenMInvoice.taxCode === params.taxCode
+        login &&
+        login.taxCode === params.taxCode && !reConnect.current
     ) {
         return null;
     }
@@ -90,13 +95,7 @@ export default function LoginMInvoicePage({ params }: IProgs) {
                         className="w-lg h-40 object-contain"
                     />
                 </div>
-
-                <Input
-                    label="Mã số thuế"
-                    value={params.taxCode}
-                    readOnly
-                />
-
+                <div className="text-sm flex justify-center bg-amber-50 border border-gray-300 rounded-2xl p-2">Mã số thuế:<span className="pl-2 font-semibold">{params.taxCode}</span></div>
                 <Input
                     label="Tên đăng nhập"
                     value={username}

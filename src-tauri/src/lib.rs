@@ -6,8 +6,9 @@ mod state;
 mod utils;
 mod window_config;
 use crate::services::update::check_update_on_startup;
-use crate::state::CURRENT_ROUTE;
 use crate::state::{AppState, APP_STATE};
+use crate::state::{CURRENT_ROUTE, ONLINE_MENU};
+use crate::utils::public::navigate_to_route;
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{
@@ -34,13 +35,32 @@ pub fn run() {
             let window = app.get_webview_window("main").unwrap();
             let window_clone = window.clone();
             let _ = window_clone.hide();
-            let check_update =
-                MenuItem::with_id(app, "update", "Kiểm tra phiên bản", true, None::<&str>)?;
-            let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
-            let separator = PredefinedMenuItem::separator(app)?;
-            let quit = MenuItem::with_id(app, "quit", "Thoát ứng dụng", true, None::<&str>)?;
+            let online = MenuItem::with_id(
+                app,
+                "online",
+                "⚪ Chưa kết nối nguồn hóa đơn",
+                true,
+                None::<&str>,
+            )?;
+            let _ = ONLINE_MENU.set(online.clone());
 
-            let menu = Menu::with_items(app, &[&check_update, &settings, &separator, &quit])?;
+            let check_update =
+                MenuItem::with_id(app, "update", "↻ Kiểm tra phiên bản", true, None::<&str>)?;
+            let settings = MenuItem::with_id(app, "settings", "⛭ Cài đặt", true, None::<&str>)?;
+            let separator = PredefinedMenuItem::separator(app)?;
+            let quit = MenuItem::with_id(app, "quit", "⏻ Thoát ứng dụng", true, None::<&str>)?;
+
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &online,
+                    &separator,
+                    &settings,
+                    &check_update,
+                    &separator,
+                    &quit,
+                ],
+            )?;
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -78,54 +98,21 @@ pub fn run() {
         })
         // HANDLE MENU CLICK
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "online" => {
+                let _ = navigate_to_route("/login");
+            }
             "update" => {
                 let _ = check_update_on_startup(app.clone(), Some(false));
             }
             "report" => {
-                if let Some(window) = app.get_webview_window("main") {
-                    let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
-                    if current == "/report" {
-                        let _ = window.set_focus();
-                    } else {
-                        let _ = window.hide();
-                        let _ = window.eval(
-                            r#"
-                            window.location.hash = "/report";
-                        "#,
-                        );
-                    }
-                }
+                let _ = navigate_to_route("/report");
             }
 
             "settings" => {
-                if let Some(window) = app.get_webview_window("main") {
-                    let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
-                    if current == "/settings" {
-                        let _ = window.set_focus();
-                    } else {
-                        let _ = window.hide();
-                        let _ = window.eval(
-                            r#"
-                            window.location.hash = "/settings";
-                        "#,
-                        );
-                    }
-                }
+                let _ = navigate_to_route("/settings");
             }
             "quit" => {
-                if let Some(window) = app.get_webview_window("main") {
-                    let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
-                    if current == "/quit" {
-                        let _ = window.set_focus();
-                    } else {
-                        let _ = window.hide();
-                        let _ = window.eval(
-                            r#"
-                            window.location.hash = "/quit";
-                        "#,
-                        );
-                    }
-                }
+                let _ = navigate_to_route("/quit");
             }
 
             _ => {}
@@ -135,6 +122,7 @@ pub fn run() {
             commands::system::quit_app,
             commands::system::get_agent_info,
             commands::system::set_current_route,
+            commands::system::connect_invoice,
             commands::api_command::http_get,
             commands::api_command::http_post,
             commands::system::page_ready,

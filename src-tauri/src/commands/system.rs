@@ -1,9 +1,13 @@
 use crate::models::agent_info::AgentInfo;
 use crate::state::APP_HANDLE;
 use crate::state::CURRENT_ROUTE;
+use crate::state::ONLINE_MENU;
 use crate::window_config;
 use std::sync::Mutex;
 use tauri::{LogicalPosition, LogicalSize, Manager, Position, Size};
+
+use tauri::menu::MenuItemKind;
+
 #[tauri::command]
 pub fn set_current_route(route: String) {
     *CURRENT_ROUTE
@@ -20,6 +24,15 @@ pub fn quit_app(app: tauri::AppHandle) {
     //     s.current_invoice = None;
     // });
     app.exit(0);
+}
+
+#[tauri::command]
+pub fn connect_invoice(new_label: String) -> Result<(), String> {
+    if let Some(item) = ONLINE_MENU.get() {
+        item.set_text(&format!("🟢 {}", new_label))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[tauri::command]

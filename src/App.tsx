@@ -14,6 +14,7 @@ import {
   isEnabled,
 } from "@tauri-apps/plugin-autostart";
 import { useAppStore } from "./stores/app.store";
+import { invoke } from "@tauri-apps/api/core";
 
 function App() {
   const navigate = useNavigate();
@@ -54,6 +55,14 @@ function App() {
     })();
   }, [autostartInitialized, setAutostartInitialized]);
 
+  const login = useAppStore(s => s.login);
+
+  useEffect(() => {
+    if (!login) return;
+    invoke("connect_invoice", {
+      newLabel: `${login.source}:${login.username}`
+    });
+  }, [login]);
   return (
     <Routes>
       <Route path="/" element={<SplashScreen />} />

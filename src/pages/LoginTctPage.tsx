@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { RotateCw } from "lucide-react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 
 import AppWindow, { hideWindow } from "../components/AppWindow";
 import Button from "../components/Button";
@@ -20,12 +19,12 @@ interface IProgs {
 export default function LoginTctPage({ params }: IProgs) {
     const location = useLocation();
     const loading = useLoading.getState();
-    const tokenTct = useAppStore((s) => s.tokenTct);
-    const savePasswordLoginTct = useAppStore((s) => s.savePasswordLoginTct);
-    const setLoginTct = useAppStore((s) => s.setLoginTct);
+    const login = useAppStore((s) => s.login);
+    const savePassword = useAppStore((s) => s.savePassword);
+    const setLogin = useAppStore((s) => s.setLogin);
 
     const [password, setPassword] = useState(
-        savePasswordLoginTct?.[params.username] ?? ""
+        savePassword?.[params.username] ?? ""
     );
 
     const [captchaImage, setCaptchaImage] = useState("");
@@ -36,6 +35,7 @@ export default function LoginTctPage({ params }: IProgs) {
 
     const getInvoiceTCT = useCallback(async (token: string) => {
         await hideWindow();
+        if (!params.type) return;
         const delay = getDelayRequest();
         await invoke("start_invoice_tct_sync", {
             invoiceType: params.type,
@@ -56,17 +56,18 @@ export default function LoginTctPage({ params }: IProgs) {
 
         setLoadingCaptcha(false);
     }, []);
+    const reConnect = useRef(params.reConnect);
     useEffect(() => {
         if (
-            tokenTct &&
-            tokenTct.username === params.username
+            login &&
+            login.username === params.username && !reConnect.current
         ) {
-            getInvoiceTCT(tokenTct.token);
+            getInvoiceTCT(login.token);
             return;
         }
         invoke("page_ready", { name: 'loginTct' });
         loadCaptcha();
-    }, [tokenTct, params.username, loadCaptcha, getInvoiceTCT, location.key]);
+    }, [login, loadCaptcha, getInvoiceTCT, location.key]);
 
     const handleLogin = async () => {
         if (!password || !cvalue) {
@@ -82,18 +83,22 @@ export default function LoginTctPage({ params }: IProgs) {
         });
         loading.hide();
         if (!res) return;
-
-        setLoginTct({
+        reConnect.current = false;
+        setLogin({
+            source: "TCT",
+            taxCode: params.taxCode,
             username: params.username,
             password: remember ? password : "",
             token: res.token,
+            idAccount: "",
+            reConnect: true
         });
         // await getInvoiceTCT(res.token);
     };
 
     if (
-        tokenTct &&
-        tokenTct.username === params.username
+        login &&
+        login.username === params.username && !reConnect.current
     ) {
         return null;
     }

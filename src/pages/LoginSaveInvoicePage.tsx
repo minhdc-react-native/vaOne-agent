@@ -16,38 +16,41 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
     const location = useLocation();
     const loading = useLoading.getState();
     const [remember, setRemember] = useState(true);
-    const tokenSaveInvoice = useAppStore(s => s.tokenSaveInvoice);
-    const setLoginSaveInvoice = useAppStore(s => s.setLoginSaveInvoice);
-    const savePasswordLoginSaveInvoice = useAppStore((s) => s.savePasswordLoginSaveInvoice);
+    const login = useAppStore(s => s.login);
+    const setLogin = useAppStore(s => s.setLogin);
+    const savePassword = useAppStore((s) => s.savePassword);
 
     const [username, setUserName] = useState(params.username);
 
     const [password, setPassword] = useState(
-        savePasswordLoginSaveInvoice?.[params.username] ?? ""
+        savePassword?.[params.username] ?? ""
     );
 
-    const getInvoice = useCallback(async (token: string, idAccount: string) => {
+    const getInvoice = useCallback(async (token: string, taxCode: string) => {
         await hideWindow();
+        if (!params.type) return;
         const delay = getDelayRequest();
-        await invoke("start_save_invoice_sync", {
+        await invoke("start_m_invoice_sync", {
             invoiceType: params.type,
             fromDate: params.fromDate,
             toDate: params.toDate,
             token,
             delay,
-            idAccount
+            taxCode
         });
     }, [params]);
+
+    const reConnect = useRef(params.reConnect);
     useEffect(() => {
         if (
-            tokenSaveInvoice &&
-            tokenSaveInvoice.taxCode === params.taxCode
+            login &&
+            login.taxCode === params.taxCode && !reConnect.current
         ) {
-            getInvoice(tokenSaveInvoice.token, tokenSaveInvoice.idAccount!);
+            getInvoice(login.token, login.taxCode!);
             return;
         }
         invoke("page_ready", { name: 'loginSaveInvoice' });
-    }, [tokenSaveInvoice, params.taxCode, location.key]);
+    }, [login, location.key]);
 
     const handleLogin = async () => {
         if (!password) {
@@ -58,24 +61,25 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
         const res = await saveInvoiceService.apiToken({
             taxCode: params.taxCode,
             username: params.username,
-            password
+            password,
         });
         loading.hide();
         if (!res) return;
-
-        setLoginSaveInvoice({
+        reConnect.current = false;
+        setLogin({
+            source: "SAVE-INVOICE",
             taxCode: params.taxCode,
             username: params.username,
             password: remember ? password : "",
             token: res.token,
-            idAccount: res.id
+            idAccount: res.id,
+            reConnect: true
         });
-        // await getInvoiceTCT(res.token);
     };
 
     if (
-        tokenSaveInvoice &&
-        tokenSaveInvoice.username === params.username
+        login &&
+        login.taxCode === params.taxCode && !reConnect.current
     ) {
         return null;
     }
@@ -91,11 +95,7 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
                         className="w-lg h-40 object-contain"
                     />
                 </div>
-                <Input
-                    label="Mã số thuế"
-                    value={params.taxCode}
-                    readOnly
-                />
+                <div className="text-sm flex justify-center bg-amber-50 border border-gray-300 rounded-2xl p-2">Mã số thuế:<span className="pl-2 font-semibold">{params.taxCode}</span></div>
 
                 <Input
                     label="Tên đăng nhập"

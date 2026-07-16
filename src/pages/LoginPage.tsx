@@ -2,10 +2,12 @@ import { useLocation } from "react-router-dom";
 import LoginTctPage from "./LoginTctPage";
 import LoginMInvoicePage from "./LoginMInvoicePage";
 import LoginSaveInvoicePage from "./LoginSaveInvoicePage";
+import { useAppStore } from "../stores/app.store";
 
 export default function LoginPage() {
+    const login = useAppStore(s => s.login);
     const location = useLocation();
-    const params = location.state;
+    const params = location.state || login;
     const source = params.source;
     switch (source) {
         case "TCT": //TCT

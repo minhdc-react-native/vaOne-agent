@@ -1,11 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 interface ILogin {
+    source: string;
     username: string;
     password: string;
     token: string;
-    taxCode?: string;
-    idAccount?: string;
+    reConnect: boolean;
+    taxCode: string;
+    idAccount: string;
 }
 interface IAppState {
     autostartInitialized: boolean,
@@ -13,17 +15,9 @@ interface IAppState {
     delayRequest: number;
     setDelayRequest: (delayRequest: number) => void;
 
-    savePasswordLoginTct: Record<string, string>;
-    setLoginTct: (login: ILogin | null) => void;
-    tokenTct: ILogin | null;
-
-    savePasswordLoginMInvoice: Record<string, string>;
-    setLoginMInvoice: (login: ILogin | null) => void;
-    tokenMInvoice: ILogin | null;
-
-    savePasswordLoginSaveInvoice: Record<string, string>;
-    setLoginSaveInvoice: (login: ILogin | null) => void;
-    tokenSaveInvoice: ILogin | null;
+    savePassword: Record<string, string>;
+    setLogin: (login: ILogin | null) => void;
+    login: ILogin | null;
 }
 
 export const useAppStore = create<IAppState>()(
@@ -35,53 +29,29 @@ export const useAppStore = create<IAppState>()(
             setDelayRequest: (value) =>
                 set({ delayRequest: value }),
 
-            savePasswordLoginTct: {},
-            setLoginTct: (login: ILogin | null) => set((state) => ({
-                savePasswordLoginTct: login ? {
-                    ...state.savePasswordLoginTct,
+            savePassword: {},
+            setLogin: (login: ILogin | null) => set((state) => ({
+                savePassword: login ? {
+                    ...state.savePassword,
                     [login.username]: login.password
                 } : {
-                    ...state.savePasswordLoginTct
+                    ...state.savePassword
                 },
-                tokenTct: login
+                login: login
             })),
-            tokenTct: null,
-
-            savePasswordLoginMInvoice: {},
-            setLoginMInvoice: (login: ILogin | null) => set((state) => ({
-                savePasswordLoginMInvoice: login ? {
-                    ...state.savePasswordLoginMInvoice,
-                    [login.username]: login.password
-                } : {
-                    ...state.savePasswordLoginMInvoice
-                },
-                tokenMInvoice: login
-            })),
-            tokenMInvoice: null,
-
-            savePasswordLoginSaveInvoice: {},
-            setLoginSaveInvoice: (login: ILogin | null) => set((state) => ({
-                savePasswordLoginSaveInvoice: login ? {
-                    ...state.savePasswordLoginSaveInvoice,
-                    [login.username]: login.password
-                } : {
-                    ...state.savePasswordLoginSaveInvoice
-                },
-                tokenSaveInvoice: login
-            })),
-            tokenSaveInvoice: null
+            login: null,
         }),
         {
             name: "app-storage",
             partialize: (state) => ({
                 autostartInitialized: state.autostartInitialized,
                 delayRequest: state.delayRequest,
-                savePasswordLoginTct: state.savePasswordLoginTct
+                savePassword: state.savePassword
             })
         }
     )
 );
 
-export const getTokenTct = () => useAppStore.getState().tokenTct?.token;
-export const getSavePasswordLoginTct = () => useAppStore.getState().savePasswordLoginTct;
+export const getTokenTct = () => useAppStore.getState().login?.token;
+export const getSavePassword = () => useAppStore.getState().savePassword;
 export const getDelayRequest = () => useAppStore.getState().delayRequest;
