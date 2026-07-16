@@ -9,12 +9,13 @@ import { useLocation } from "react-router-dom";
 import { useLoading } from "../service/loading.service";
 import { dialog } from "../service/dialog.service";
 import { mInvoiceService } from "../api/services/mInvoice.service";
+import { Loading } from "../components/Loading";
 interface IProgs {
     params: Record<string, any>
 }
 export default function LoginMInvoicePage({ params }: IProgs) {
     const location = useLocation();
-    const loading = useLoading.getState();
+    // const loading = useLoading.getState();
     const [remember, setRemember] = useState(true);
     const login = useAppStore(s => s.login);
     const setLogin = useAppStore(s => s.setLogin);
@@ -52,17 +53,20 @@ export default function LoginMInvoicePage({ params }: IProgs) {
         invoke("page_ready", { name: 'loginSaveInvoice' });
     }, [login, location.key]);
 
+    const [loading, setLoading] = useState(false);
     const handleLogin = async () => {
         if (!password) {
             await dialog.warning(`Bạn phải nhập ${!password ? 'mật khẩu' : 'captcha'}!`);
             return;
         }
         // loading.show("...")
+        setLoading(true);
         const res = await mInvoiceService.apiToken({
             taxCode: params.taxCode,
             username: params.username,
             password,
         });
+        setLoading(false);
         // loading.hide();
         if (!res) return;
         reConnect.current = false;
@@ -118,12 +122,12 @@ export default function LoginMInvoicePage({ params }: IProgs) {
                     checked={remember}
                     onChange={setRemember}
                 />
-                <Button
+                {loading ? <div className="flex justify-center"><Loading /></div> : <Button
                     className="mt-2 w-full"
                     onClick={handleLogin}
                 >
                     Đăng nhập
-                </Button>
+                </Button>}
             </div>
         </AppWindow>
     );
