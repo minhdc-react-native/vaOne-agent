@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # src-tauri/target/release/bundle/macos
 BUNDLE="$SCRIPT_DIR/../target/release/bundle/macos"
 
-TAURI_CONFIG="$SCRIPT_DIR/../tauri.conf.json"
+TAURI_CONFIG="$SCRIPT_DIR/../src-tauri/tauri.conf.json"
 
 GITHUB_USER="minhdc-react-native"
 REPO="vaOne-update"
