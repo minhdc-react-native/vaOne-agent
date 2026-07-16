@@ -6,7 +6,7 @@ pub fn navigate_to_route(route: &str) {
     if let Some(app) = APP_HANDLE.get() {
         if let Some(window) = app.get_webview_window("main") {
             let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
-
+            println!("router={}", route);
             if current == route {
                 let _ = window.set_focus();
             } else {

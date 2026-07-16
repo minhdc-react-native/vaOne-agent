@@ -3,12 +3,15 @@ import LoginTctPage from "./LoginTctPage";
 import LoginMInvoicePage from "./LoginMInvoicePage";
 import LoginSaveInvoicePage from "./LoginSaveInvoicePage";
 import { useAppStore } from "../stores/app.store";
+import { useEffect } from "react";
+import { hideWindow } from "../components/AppWindow";
+import LoginEmpty from "./LoginEmpty";
 
 export default function LoginPage() {
     const login = useAppStore(s => s.login);
     const location = useLocation();
     const params = location.state || login;
-    const source = params.source;
+    const source = params?.source;
     switch (source) {
         case "TCT": //TCT
             return <LoginTctPage params={params} />
@@ -17,6 +20,6 @@ export default function LoginPage() {
         case "SAVE-INVOICE": //Save-Invoice
             return <LoginSaveInvoicePage params={params} />
         default:
-            return <LoginTctPage params={params} />
+            return <LoginEmpty />
     }
 }
