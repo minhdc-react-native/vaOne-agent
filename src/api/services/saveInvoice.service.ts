@@ -23,7 +23,7 @@ export const saveInvoiceService = {
             return { token, id } as ILoginRequest;
 
         } catch (e) {
-            let errorMessage = "Đã xảy ra lỗi.";
+            let errorMessage = "Đã xảy ra lỗi. Vui lòng kiểm tra lại!";
             if (axios.isAxiosError(e)) {
                 errorMessage =
                     e.response?.data?.message ??

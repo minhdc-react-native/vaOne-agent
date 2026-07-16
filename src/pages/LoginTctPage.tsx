@@ -12,13 +12,14 @@ import { useLoading } from "../service/loading.service";
 import { dialog } from "../service/dialog.service";
 import { invoke } from "@tauri-apps/api/core";
 import { useLocation } from "react-router-dom";
+import { Loading } from "../components/Loading";
 
 interface IProgs {
     params: Record<string, any>
 }
 export default function LoginTctPage({ params }: IProgs) {
     const location = useLocation();
-    const loading = useLoading.getState();
+    // const loading = useLoading.getState();
     const login = useAppStore((s) => s.login);
     const savePassword = useAppStore((s) => s.savePassword);
     const setLogin = useAppStore((s) => s.setLogin);
@@ -69,19 +70,22 @@ export default function LoginTctPage({ params }: IProgs) {
         loadCaptcha();
     }, [login, loadCaptcha, getInvoiceTCT, location.key]);
 
+    const [loading, setLoading] = useState(false);
     const handleLogin = async () => {
         if (!password || !cvalue) {
             await dialog.warning(`Bạn phải nhập ${!password ? 'mật khẩu' : 'captcha'}!`);
             return;
         }
-        loading.show("...")
+        // loading.show("...")
+        setLoading(true);
         const res = await tctService.login({
             username: params.username,
             password,
             ckey,
             cvalue,
         });
-        loading.hide();
+        // loading.hide();
+        setLoading(false);
         if (!res) return;
         reConnect.current = false;
         setLogin({
@@ -174,12 +178,12 @@ export default function LoginTctPage({ params }: IProgs) {
                         setCvalue(e.target.value)
                     }
                 />
-                <Button
+                {loading ? <div className="flex justify-center"><Loading /></div> : <Button
                     className="mt-2 w-full"
                     onClick={handleLogin}
                 >
                     Đăng nhập
-                </Button>
+                </Button>}
             </div>
         </AppWindow>
     );

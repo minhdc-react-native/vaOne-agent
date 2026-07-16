@@ -57,13 +57,13 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
             await dialog.warning(`Bạn phải nhập ${!password ? 'mật khẩu' : 'captcha'}!`);
             return;
         }
-        loading.show("...")
+        // loading.show("...")
         const res = await saveInvoiceService.apiToken({
             taxCode: params.taxCode,
             username: params.username,
             password,
         });
-        loading.hide();
+        // loading.hide();
         if (!res) return;
         reConnect.current = false;
         setLogin({

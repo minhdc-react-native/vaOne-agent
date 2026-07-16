@@ -38,17 +38,17 @@ pub fn run() {
             let online = MenuItem::with_id(
                 app,
                 "online",
-                "⚪ Chưa kết nối nguồn hóa đơn",
+                "○ Chưa kết nối nguồn hóa đơn",
                 true,
                 None::<&str>,
             )?;
             let _ = ONLINE_MENU.set(online.clone());
 
             let check_update =
-                MenuItem::with_id(app, "update", "↻ Kiểm tra phiên bản", true, None::<&str>)?;
-            let settings = MenuItem::with_id(app, "settings", "⛭ Cài đặt", true, None::<&str>)?;
+                MenuItem::with_id(app, "update", "Kiểm tra phiên bản", true, None::<&str>)?;
+            let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
-            let quit = MenuItem::with_id(app, "quit", "⏻ Thoát ứng dụng", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Thoát ứng dụng", true, None::<&str>)?;
 
             let menu = Menu::with_items(
                 app,

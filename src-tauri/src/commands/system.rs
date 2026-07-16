@@ -29,7 +29,7 @@ pub fn quit_app(app: tauri::AppHandle) {
 #[tauri::command]
 pub fn connect_invoice(new_label: String) -> Result<(), String> {
     if let Some(item) = ONLINE_MENU.get() {
-        item.set_text(&format!("🟢 {}", new_label))
+        item.set_text(&format!("● {}", new_label))
             .map_err(|e| e.to_string())?;
     }
     Ok(())

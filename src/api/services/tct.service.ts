@@ -68,7 +68,7 @@ export const tctService = {
             });
             return res as ILoginRequest;
         } catch (e) {
-            let errorMessage = "Đã xảy ra lỗi.";
+            let errorMessage = "Đã xảy ra lỗi. hãy refresh lại mã captcha rồi thử lại!";
             if (axios.isAxiosError(e)) {
                 errorMessage =
                     e.response?.data?.message ??

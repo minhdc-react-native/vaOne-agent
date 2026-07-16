@@ -27,6 +27,7 @@ pub async fn start_invoice_tct_sync(
         s.running = true;
         s.current_invoice = None;
         s.total = None;
+        s.is_error_api = false;
     });
 
     tokio::spawn(async move {
@@ -45,7 +46,7 @@ pub async fn start_m_invoice_sync(
     delay: u64,
     tax_code: String,
 ) -> Result<(), String> {
-    if !crate::state::try_start_sync("M-INVOICE") {
+    if !crate::state::try_start_sync("M-SMI") {
         return Ok(());
     }
     // 1. reset state
@@ -53,10 +54,11 @@ pub async fn start_m_invoice_sync(
         s.invoice_type = invoice_type;
         s.completed = 0;
         s.failed = 0;
-        s.source = "M-INVOICE".to_string();
+        s.source = "M-SMI".to_string();
         s.running = true;
         s.current_invoice = None;
         s.total = None;
+        s.is_error_api = false;
     });
     tokio::spawn(async move {
         run_sync_flow_m_invoice(
@@ -94,6 +96,7 @@ pub async fn start_save_invoice_sync(
         s.running = true;
         s.current_invoice = None;
         s.total = None;
+        s.is_error_api = false;
     });
     tokio::spawn(async move {
         run_sync_flow_save_invoice(

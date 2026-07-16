@@ -15,7 +15,7 @@ export default function LoginPage() {
     switch (source) {
         case "TCT": //TCT
             return <LoginTctPage params={params} />
-        case "M-INVOICE": //M-Invoice
+        case "M-SMI": //M-SMI
             return <LoginMInvoicePage params={params} />
         case "SAVE-INVOICE": //Save-Invoice
             return <LoginSaveInvoicePage params={params} />

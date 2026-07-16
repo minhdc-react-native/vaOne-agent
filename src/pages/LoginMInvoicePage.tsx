@@ -57,17 +57,17 @@ export default function LoginMInvoicePage({ params }: IProgs) {
             await dialog.warning(`Bạn phải nhập ${!password ? 'mật khẩu' : 'captcha'}!`);
             return;
         }
-        loading.show("...")
+        // loading.show("...")
         const res = await mInvoiceService.apiToken({
             taxCode: params.taxCode,
             username: params.username,
             password,
         });
-        loading.hide();
+        // loading.hide();
         if (!res) return;
         reConnect.current = false;
         setLogin({
-            source: "M-INVOICE",
+            source: "M-SMI",
             taxCode: params.taxCode,
             username: params.username,
             password: remember ? password : "",
