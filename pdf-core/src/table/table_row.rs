@@ -1,4 +1,4 @@
-use crate::table::class_name::class_name_to_style;
+use crate::table::style_class_name::class_name_to_style;
 use crate::template::formatter::FORMATTERS;
 use crate::template::models::FormatterContext;
 use crate::utils::resolve_value;
