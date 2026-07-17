@@ -188,7 +188,7 @@ impl TextLayout {
         let auto_height = item.auto_height.unwrap_or(false);
 
         let height = if auto_height {
-            lines.len() as f32 * line_height
+            lines.len() as f32 * line_height + 3.0
         } else {
             item.height
         };

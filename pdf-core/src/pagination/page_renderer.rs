@@ -43,6 +43,17 @@ impl PageRenderer {
             for item in page.items {
                 match item {
                     PageItem::Text { element, layout } => {
+                        if let Some(style) = &element.style {
+                            draw_element_border(
+                                &mut ops,
+                                fonts,
+                                element.x,
+                                page_height - element.y,
+                                element.width,
+                                element.height,
+                                style,
+                            );
+                        }
                         text::draw_text(&mut ops, fonts, &element, &layout, page_height);
                     }
 

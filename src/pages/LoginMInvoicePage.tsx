@@ -36,7 +36,7 @@ export default function LoginMInvoicePage({ params }: IProgs) {
             fromDate: params.fromDate,
             toDate: params.toDate,
             token,
-            delay,
+            delay: 100,
             taxCode
         });
     }, [params]);

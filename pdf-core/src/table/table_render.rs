@@ -90,25 +90,31 @@ impl TableRenderer {
         border_width: f32,
         page_height: f32,
     ) {
-        if cell.is_row {
-            return;
-        }
-
         const DEFAULT_HEADER_BACKGROUND: &str = "#fafafa";
 
-        let color = match cell.style.background_color.as_deref() {
-            Some(c) if !c.eq_ignore_ascii_case("transparent") => c,
-            _ => DEFAULT_HEADER_BACKGROUND,
+        let color = if cell.is_row {
+            // Row bình thường: chỉ tô nếu có màu và không phải transparent
+            match cell.style.background_color.as_deref() {
+                Some(c) if !c.eq_ignore_ascii_case("transparent") => Some(c),
+                _ => None,
+            }
+        } else {
+            // Header: mặc định #fafafa nếu không có màu
+            Some(match cell.style.background_color.as_deref() {
+                Some(c) if !c.eq_ignore_ascii_case("transparent") => c,
+                _ => DEFAULT_HEADER_BACKGROUND,
+            })
         };
-
-        Rect::fill(
-            ops,
-            fonts,
-            cell.x + border_width,
-            page_height - cell.y - cell.height + border_width,
-            cell.width - border_width * 2.0,
-            cell.height - border_width * 2.0,
-            color,
-        );
+        if let Some(color) = color {
+            Rect::fill(
+                ops,
+                fonts,
+                cell.x + border_width / 2.0,
+                page_height - cell.y - cell.height + border_width / 2.0,
+                cell.width - border_width,
+                cell.height - border_width,
+                color,
+            );
+        }
     }
 }

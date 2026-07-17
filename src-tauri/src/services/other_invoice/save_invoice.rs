@@ -154,7 +154,7 @@ pub async fn run_sync_flow_save_invoice(
 
     for item in invoices {
         crate::state::update_sync_emit(|s| {
-            s.completed = s.completed + 1;
+            // s.completed = s.completed + 1;
             s.current_invoice = Some(serde_json::json!(item.clone()));
         });
         tokio::time::sleep(std::time::Duration::from_millis(delay.unwrap_or(1000))).await;

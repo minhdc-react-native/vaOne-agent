@@ -5,6 +5,7 @@ pub struct TextStyle {
     pub bold: bool,
     pub italic: bool,
     pub underline: bool,
+    pub strike: bool,
     pub color: Option<String>,
     pub font_size: Option<f32>,
 }
@@ -213,6 +214,10 @@ pub struct ElementStyle {
     pub font_style: Option<String>,
 
     #[serde(default)]
+    #[serde(rename = "textDecoration")]
+    pub text_decoration: Option<String>,
+
+    #[serde(default)]
     #[serde(rename = "borderColor")]
     pub border_color: Option<String>,
 
@@ -263,6 +268,7 @@ impl Default for ElementStyle {
             center_y: Some(false),
             font_weight: Some("normal".to_string()),
             font_style: Some("normal".to_string()),
+            text_decoration: Some("none".to_string()),
             border_color: None,
             border_radius: None,
             border_width: None,

@@ -1,3 +1,4 @@
+use crate::table::class_name::class_name_to_style;
 use crate::template::formatter::FORMATTERS;
 use crate::template::models::FormatterContext;
 use crate::utils::resolve_value;
@@ -103,7 +104,14 @@ impl TableRow {
         table_style: &Option<ElementStyle>,
         ctx: FormatterContext,
     ) -> TableCellLayout {
-        let style = TableLayoutEngine::merge_style(table_style, &column.body_style);
+        let mut style = TableLayoutEngine::merge_style(table_style, &column.body_style);
+
+        if let Some(class_name) = data.get("$className").and_then(|v| v.as_str()) {
+            if class_name != "" {
+                class_name_to_style(class_name, &mut style);
+                // println!("class_name={} new style>>{:#?}", class_name, style);
+            }
+        }
 
         let value = resolve_value(data, &column.field_name)
             .map(|v| {

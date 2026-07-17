@@ -4,7 +4,7 @@ import Button from "../components/Button";
 import { useEffect } from "react";
 import { Divider } from "../components/Divider";
 import { useEscape } from "../hook/useEscape";
-import { hideWindow } from "../components/AppWindow";
+import AppWindow, { hideWindow } from "../components/AppWindow";
 
 export default function QuitPage() {
     const quit = async () => {
@@ -13,24 +13,17 @@ export default function QuitPage() {
 
     useEffect(() => {
         invoke("page_ready", { name: "quit" });
-        invoke("set_current_route", {
-            route: location.pathname,
-        });
     }, []);
 
-    useEscape(hideWindow, true);
-
     return (
-        <div className="flex h-screen items-center justify-center">
+        <AppWindow title="Thoát ứng dụng" icon="LogOut">
             <div className="w-87.5 h-full p-4">
-                <h2 className="text-xl font-bold">
-                    Thoát ứng dụng
-                </h2>
-
-                <p className="my-4">
-                    Bạn có muốn thoát vaOne plugin không?
+                <p className="flex justify-center">
+                    Bạn có muốn thoát
                 </p>
-                <Divider />
+                <p className="flex justify-center items-center">
+                    <span className="font-semibold text-red-700 pr-2 text-2xl">vaOne</span><span className="text-gray-500 pr-2 text-2xl">plugin</span>không?
+                </p>
                 <div className="mt-6 flex justify-end gap-2">
                     <Button
                         variant="secondary"
@@ -46,6 +39,6 @@ export default function QuitPage() {
                     </Button>
                 </div>
             </div>
-        </div>
+        </AppWindow>
     );
 }

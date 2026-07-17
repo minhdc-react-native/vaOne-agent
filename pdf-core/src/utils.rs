@@ -1,5 +1,5 @@
 use crate::fonts::{PdfFont, PdfFonts};
-use crate::state::{FONT_BOLD, FONT_ITALIC, FONT_REGULAR};
+use crate::state::{FONT_BOLD, FONT_BOLD_ITALIC, FONT_ITALIC, FONT_REGULAR};
 use crate::template::models::FormatterContext;
 use anyhow::{anyhow, Result};
 use printpdf::{Color, Mm, Op, ParsedFont, PdfDocument, Pt, Rgb};
@@ -156,6 +156,11 @@ pub fn load_fonts(pdf: &mut PdfDocument) -> Result<PdfFonts> {
         .ok_or_else(|| anyhow!("Cannot parse italic font"))?;
     let italic_id = pdf.add_font(&italic);
 
+    // BoldItalic
+    let bold_italic = ParsedFont::from_bytes(FONT_BOLD_ITALIC, 0, &mut warnings)
+        .ok_or_else(|| anyhow!("Cannot parse bold italic font"))?;
+    let bold_italic_id = pdf.add_font(&bold_italic);
+
     Ok(PdfFonts {
         regular: PdfFont {
             id: regular_id,
@@ -171,6 +176,11 @@ pub fn load_fonts(pdf: &mut PdfDocument) -> Result<PdfFonts> {
             id: italic_id,
             parsed: italic,
             bytes: FONT_ITALIC,
+        },
+        bold_italic: PdfFont {
+            id: bold_italic_id,
+            parsed: bold_italic,
+            bytes: FONT_BOLD_ITALIC,
         },
     })
 }

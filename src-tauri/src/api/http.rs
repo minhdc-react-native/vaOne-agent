@@ -68,7 +68,7 @@ pub async fn get(
             }
         } // query_pairs_mut kết thúc ở đây
     }
-    println!("url={:#?}", parsed.as_str());
+    // println!("url={:#?}", parsed.as_str());
     let response = client
         .get(parsed.as_str())
         .headers(build_headers(token, headers)?)

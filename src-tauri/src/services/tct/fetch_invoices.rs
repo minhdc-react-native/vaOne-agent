@@ -154,7 +154,6 @@ async fn fetch_invoice_detail(
     cancel: Arc<AtomicBool>,
 ) -> Result<Vec<Value>, String> {
     let mut result = vec![];
-
     for (_i, item) in datas.iter().enumerate() {
         if cancel.load(Ordering::Relaxed) {
             break;
@@ -171,10 +170,10 @@ async fn fetch_invoice_detail(
         );
         match crate::api::http::get(&url, token.as_deref(), delay, None, None).await {
             Ok(res) => {
-                println!("SUCCESS: {}", url);
+                // println!("SUCCESS: {} res={:#?}", url, res);
                 result.push(res.clone());
                 crate::state::update_sync_emit(|s| {
-                    s.completed = s.completed + 1;
+                    // s.completed = s.completed + 1;
                     s.current_invoice = Some(serde_json::json!(res.clone()));
                     // s.failed = 0;
                 });
@@ -182,7 +181,7 @@ async fn fetch_invoice_detail(
             Err(e) => {
                 println!("ERROR: {} => {}", url, e);
                 crate::state::update_sync_emit(|s| {
-                    s.completed = s.completed + 1;
+                    // s.completed = s.completed + 1;
                     s.current_invoice = Some(serde_json::json!(item.clone()));
                     s.failed = s.failed + 1;
                 });

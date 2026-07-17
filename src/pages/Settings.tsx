@@ -105,7 +105,7 @@ export default function SettingsPage() {
 
     if (!info) {
         return (
-            <AppWindow title="Settings" icon="Cog">
+            <AppWindow title="Cài đặt" icon="Cog">
                 <div className="flex h-full w-82.5 items-center justify-center">
                     Loading...
                 </div>
@@ -114,13 +114,10 @@ export default function SettingsPage() {
     }
 
     return (
-        <AppWindow title="Settings" icon="Cog">
+        <AppWindow title="Cài đặt" icon="Cog">
             <div className="flex h-full w-82.5 flex-col justify-between p-4">
-
-                {/* Content */}
-
-                <div className="space-y-5">
-
+                <div className="space-y-2">
+                    <div className="text-4xl flex justify-center pb-4 text-gray-500"><span className="pr-2 font-semibold text-red-700">vaOne</span>plugin</div>
                     <div className="flex items-center justify-between">
 
                         <span className="text-sm text-gray-500">

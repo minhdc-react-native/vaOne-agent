@@ -1,3 +1,4 @@
+pub mod class_name;
 pub mod models;
 pub mod rect;
 pub mod table_border;

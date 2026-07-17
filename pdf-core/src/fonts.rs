@@ -15,6 +15,7 @@ pub struct PdfFonts {
     pub regular: PdfFont,
     pub bold: PdfFont,
     pub italic: PdfFont,
+    pub bold_italic: PdfFont,
 }
 
 impl PdfFonts {
@@ -69,10 +70,7 @@ impl PdfFonts {
         match (bold, italic) {
             (true, false) => &self.bold,
             (false, true) => &self.italic,
-
-            // Sau này nếu có font BoldItalic thì đổi ở đây
-            (true, true) => &self.bold,
-
+            (true, true) => &self.bold_italic,
             _ => &self.regular,
         }
     }

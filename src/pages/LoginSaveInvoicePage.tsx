@@ -27,17 +27,17 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
         savePassword?.[params.username] ?? ""
     );
 
-    const getInvoice = useCallback(async (token: string, taxCode: string) => {
+    const getInvoice = useCallback(async (token: string, idAccount: string) => {
         await hideWindow();
         if (!params.type) return;
         const delay = getDelayRequest();
-        await invoke("start_m_invoice_sync", {
+        await invoke("start_save_invoice_sync", {
             invoiceType: params.type,
             fromDate: params.fromDate,
             toDate: params.toDate,
             token,
-            delay,
-            taxCode
+            delay: 100,
+            idAccount
         });
     }, [params]);
 
@@ -50,7 +50,7 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
             invoke("set_current_route", {
                 route: location.pathname,
             });
-            getInvoice(login.token, login.taxCode!);
+            getInvoice(login.token, login.idAccount!);
             return;
         }
         invoke("page_ready", { name: 'loginSaveInvoice' });
