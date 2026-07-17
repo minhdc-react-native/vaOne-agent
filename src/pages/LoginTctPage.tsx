@@ -8,7 +8,6 @@ import Input from "../components/Input";
 import { tctService } from "../api/services/tct.service";
 import { getDelayRequest, useAppStore } from "../stores/app.store";
 import Switch from "../components/Switch";
-import { useLoading } from "../service/loading.service";
 import { dialog } from "../service/dialog.service";
 import { invoke } from "@tauri-apps/api/core";
 import { useLocation } from "react-router-dom";
@@ -58,11 +57,15 @@ export default function LoginTctPage({ params }: IProgs) {
         setLoadingCaptcha(false);
     }, []);
     const reConnect = useRef(params.reConnect);
+
     useEffect(() => {
         if (
             login &&
             login.username === params.username && !reConnect.current
         ) {
+            invoke("set_current_route", {
+                route: location.pathname,
+            });
             getInvoiceTCT(login.token);
             return;
         }

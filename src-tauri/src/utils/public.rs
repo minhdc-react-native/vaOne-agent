@@ -10,12 +10,15 @@ pub fn navigate_to_route(route: &str) {
                 let _ = window.set_focus();
             } else {
                 let _ = window.hide();
-                let _ = window.eval(&format!(
+                match window.eval(&format!(
                     r#"
-                window.location.hash = "{}";
-            "#,
+                        window.location.hash = "{}";
+                    "#,
                     route
-                ));
+                )) {
+                    Ok(_) => println!("eval ok"),
+                    Err(e) => println!("eval err: {:?}", e),
+                }
             }
         }
     }

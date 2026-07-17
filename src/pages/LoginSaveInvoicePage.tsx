@@ -47,6 +47,9 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
             login &&
             login.taxCode === params.taxCode && !reConnect.current
         ) {
+            invoke("set_current_route", {
+                route: location.pathname,
+            });
             getInvoice(login.token, login.taxCode!);
             return;
         }

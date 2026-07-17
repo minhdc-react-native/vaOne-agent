@@ -87,7 +87,7 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(1500)).await;
+                tokio::time::sleep(Duration::from_millis(3000)).await;
                 if let Some(splash) = app_handle.get_webview_window("splash_screen") {
                     let _ = splash.close();
                     check_update_on_startup(app_handle, Some(true));

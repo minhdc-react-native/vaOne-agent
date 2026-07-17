@@ -10,8 +10,10 @@ import LoginEmpty from "./LoginEmpty";
 export default function LoginPage() {
     const login = useAppStore(s => s.login);
     const location = useLocation();
+    console.log("location>>", location);
     const params = location.state || login;
     const source = params?.source;
+
     switch (source) {
         case "TCT": //TCT
             return <LoginTctPage params={params} />

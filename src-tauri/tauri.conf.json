@@ -17,7 +17,8 @@
         "width": 10,
         "height": 10,
         "resizable": false,
-        "decorations": false
+        "decorations": false,
+        "visible": false
       },
       {
         "label": "splash_screen",

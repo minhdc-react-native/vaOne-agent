@@ -4,6 +4,8 @@ use std::cmp::Ordering as CmpOrdering;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use crate::utils::public::navigate_to_route;
+
 fn get_url(invoice_type: u8, from_date: &str, to_date: &str) -> String {
     let size_page = 50;
 
@@ -220,6 +222,8 @@ pub async fn run_sync_flow(
                 s.current_invoice = None;
                 s.is_error_api = true;
             });
+            // re login
+            let _ = navigate_to_route("/login");
             return;
         }
     };

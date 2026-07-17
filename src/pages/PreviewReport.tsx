@@ -70,7 +70,7 @@ export const PreviewReport = () => {
         await printPdf(url.path);
     }
     useEffect(() => {
-        console.log('progress>>', JSON.stringify(progress));
+        // console.log('progress>>', JSON.stringify(progress));
     }, [progress])
     return (
         <AppWindow title={"Preview Report"} icon="Printer"
