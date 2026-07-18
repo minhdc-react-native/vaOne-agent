@@ -32,6 +32,7 @@ export default function LoginMInvoicePage({ params }: IProgs) {
         if (!params.type) return;
         const delay = getDelayRequest();
         await invoke("start_m_invoice_sync", {
+            tenantId: params.tenantId,
             invoiceType: params.type,
             fromDate: params.fromDate,
             toDate: params.toDate,
@@ -74,6 +75,7 @@ export default function LoginMInvoicePage({ params }: IProgs) {
         if (!res) return;
         reConnect.current = false;
         setLogin({
+            tenantId: params.tenantId,
             source: "M-SMI",
             taxCode: params.taxCode,
             username: params.username,

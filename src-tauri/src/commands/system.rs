@@ -1,4 +1,4 @@
-use crate::models::agent_info::AgentInfo;
+use crate::models::system::AgentInfo;
 use crate::state::APP_HANDLE;
 use crate::state::CURRENT_ROUTE;
 use crate::state::ONLINE_MENU;

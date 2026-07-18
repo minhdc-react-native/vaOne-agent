@@ -38,6 +38,7 @@ export default function LoginTctPage({ params }: IProgs) {
         if (!params.type) return;
         const delay = getDelayRequest();
         await invoke("start_invoice_tct_sync", {
+            tenantId: params.tenantId,
             invoiceType: params.type,
             fromDate: params.fromDate,
             toDate: params.toDate,
@@ -92,6 +93,7 @@ export default function LoginTctPage({ params }: IProgs) {
         if (!res) return;
         reConnect.current = false;
         setLogin({
+            tenantId: params.tenantId,
             source: "TCT",
             taxCode: params.taxCode,
             username: params.username,

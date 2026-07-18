@@ -1,9 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import { trayApi } from "../api/axios/axiosClient";
 import Button from "../components/Button";
 import { useEffect } from "react";
-import { Divider } from "../components/Divider";
-import { useEscape } from "../hook/useEscape";
 import AppWindow, { hideWindow } from "../components/AppWindow";
 
 export default function QuitPage() {

@@ -1,7 +1,6 @@
 use std::sync::{Mutex, OnceLock};
 
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use tauri::{menu::MenuItem, AppHandle, Wry};
 
 pub static CURRENT_ROUTE: OnceLock<Mutex<String>> = OnceLock::new();
@@ -16,11 +15,6 @@ pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 // ==========================
 pub static APP_STATE: OnceLock<Mutex<AppState>> = OnceLock::new();
 
-#[derive(Debug, Default)]
-pub struct AppState {
-    pub sync: SyncState,
-}
-
 pub static ONLINE_MENU: OnceLock<MenuItem<Wry>> = OnceLock::new();
 
 static HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
@@ -30,75 +24,46 @@ pub fn get_client() -> &'static Client {
 }
 
 // ==========================
-// SYNC STATE (JOB STATUS)
-// ==========================
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SyncState {
-    pub invoice_type: u8,
-    pub source: String,
-    pub running: bool,
-    pub total: Option<usize>,
-    pub completed: usize,
-    pub success: usize,
-    pub failed: usize,
-    pub current_invoice: Option<serde_json::Value>,
-    pub message: String,
-    pub is_error_api: bool,
-}
-
-impl Default for SyncState {
-    fn default() -> Self {
-        Self {
-            invoice_type: 0,
-            source: String::new(),
-            running: false,
-            total: None,
-            completed: 0,
-            success: 0,
-            failed: 0,
-            current_invoice: None,
-            message: String::new(),
-            is_error_api: false,
-        }
-    }
-}
-
-// ==========================
 // UPDATE SYNC STATE
 // ==========================
-pub fn update_sync<F>(f: F)
+pub fn update_sync<F>(tenant_id: &str, f: F)
 where
     F: FnOnce(&mut SyncState),
 {
     if let Some(state) = APP_STATE.get() {
         let mut state = state.lock().unwrap();
-        f(&mut state.sync);
+
+        let tenant = state.tenants.entry(tenant_id.to_string()).or_default();
+
+        f(&mut tenant.sync);
     }
 }
 
-pub fn try_start_sync(source: &str) -> bool {
+pub fn try_start_sync(tenant_id: &str, source: &str) -> bool {
     let mut state = APP_STATE
         .get()
         .expect("APP_STATE not initialized")
         .lock()
         .unwrap();
 
-    if state.sync.running {
+    let tenant = state.tenants.entry(tenant_id.to_string()).or_default();
+
+    if tenant.sync.running {
         return false;
     }
 
-    state.sync.running = true;
-    state.sync.source = source.to_string();
-    state.sync.completed = 0;
-    state.sync.failed = 0;
-    state.sync.success = 0;
-    state.sync.total = None;
-    state.sync.current_invoice = None;
-    state.sync.message.clear();
-    state.sync.is_error_api = false;
+    tenant.sync.running = true;
+    tenant.sync.source = source.to_string();
+    tenant.sync.completed = 0;
+    tenant.sync.failed = 0;
+    tenant.sync.success = 0;
+    tenant.sync.total = None;
+    tenant.sync.current_invoice = None;
+    tenant.sync.message.clear();
+    tenant.sync.is_error_api = false;
 
     if let Some(ws) = WS_STATE.get() {
-        ws.broadcast_json("SYNC_STATE", &state.sync);
+        ws.broadcast_json("SYNC_STATE", tenant_id, &tenant.sync);
     }
 
     true
@@ -107,14 +72,15 @@ pub fn try_start_sync(source: &str) -> bool {
 // ==========================
 // GET SYNC STATE
 // ==========================
-pub fn get_sync() -> SyncState {
+pub fn get_sync(tenant_id: &str) -> Option<SyncState> {
     APP_STATE
         .get()
         .expect("APP_STATE not initialized")
         .lock()
         .unwrap()
-        .sync
-        .clone()
+        .tenants
+        .get(tenant_id)
+        .map(|t| t.sync.clone())
 }
 
 // ======================================================
@@ -126,11 +92,6 @@ use tokio::sync::mpsc;
 
 // Sender channel cho mỗi WebSocket client
 pub type WsTx = mpsc::UnboundedSender<String>;
-
-#[derive(Clone)]
-pub struct WsState {
-    pub clients: Arc<Mutex<Vec<WsTx>>>,
-}
 
 // ==========================
 // GLOBAL WS STATE
@@ -151,6 +112,11 @@ pub fn init_ws_state() {
 // ==========================
 // WS STATE IMPLEMENTATION
 // ==========================
+#[derive(Clone)]
+pub struct WsState {
+    pub clients: Arc<Mutex<Vec<WsTx>>>,
+}
+
 impl WsState {
     /// thêm client khi connect
     pub fn add_client(&self, tx: WsTx) {
@@ -174,9 +140,10 @@ impl WsState {
     }
 
     /// broadcast JSON event chuẩn
-    pub fn broadcast_json<T: serde::Serialize>(&self, event: &str, data: T) {
+    pub fn broadcast_json<T: serde::Serialize>(&self, event: &str, tenant_id: &str, data: T) {
         let payload = serde_json::json!({
             "event": event,
+            "tenantId": tenant_id,
             "data": data
         });
 
@@ -184,34 +151,62 @@ impl WsState {
             self.broadcast(msg);
         }
     }
+
+    // /// broadcast event không thuộc tenant (update app, shutdown...)
+    // pub fn broadcast_global<T: serde::Serialize>(&self, event: &str, data: T) {
+    //     let payload = serde_json::json!({
+    //         "event": event,
+    //         "data": data
+    //     });
+
+    //     if let Ok(msg) = serde_json::to_string(&payload) {
+    //         self.broadcast(msg);
+    //     }
+    // }
+}
+
+pub fn broadcast_token_updated(tenant_id: &str, token: &TokenState) {
+    if let Some(ws) = WS_STATE.get() {
+        let payload = serde_json::json!({
+            "tenantId": tenant_id,
+            "data": token
+        });
+        ws.broadcast_json("TOKEN_UPDATED", tenant_id, payload);
+    }
 }
 
 // ==========================
 // HELPER: EMIT SYNC STATE
 // ==========================
-pub fn emit_sync_state() {
+pub fn emit_sync_state(tenant_id: &str) {
     if let Some(ws) = WS_STATE.get() {
-        let sync = get_sync();
-        ws.broadcast_json("SYNC_STATE", sync);
+        if let Some(sync) = get_sync(tenant_id) {
+            ws.broadcast_json("SYNC_STATE", tenant_id, &sync);
+        }
     }
 }
-
-pub fn update_sync_emit<F>(f: F)
+// ==========================
+// UPDATE SYNC + EMIT
+// ==========================
+pub fn update_sync_emit<F>(tenant_id: &str, f: F)
 where
     F: FnOnce(&mut SyncState),
 {
     if let Some(state) = APP_STATE.get() {
         let mut state = state.lock().unwrap();
 
-        f(&mut state.sync);
+        let tenant = state.tenants.entry(tenant_id.to_string()).or_default();
+
+        f(&mut tenant.sync);
 
         if let Some(ws) = WS_STATE.get() {
-            ws.broadcast_json("SYNC_STATE", &state.sync);
+            ws.broadcast_json("SYNC_STATE", tenant_id, &tenant.sync);
         }
     }
 }
-
 use std::sync::atomic::AtomicBool;
+
+use crate::models::system::{AppState, SyncState, TokenState};
 static SYNC_CANCEL: OnceLock<Arc<AtomicBool>> = OnceLock::new();
 
 pub fn get_cancel_flag() -> Arc<AtomicBool> {

@@ -1,9 +1,12 @@
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use serde_json::Value;
 use std::{collections::HashMap, time::Duration};
-use url::Url;
+use url::{form_urlencoded, Url};
 
-use crate::state::get_client;
+use crate::{
+    auth::auth_api::ensure_valid_token,
+    state::{get_client, APP_STATE},
+};
 
 pub type ApiResult<T> = Result<T, String>;
 
@@ -101,6 +104,94 @@ pub async fn post(
     let response = client
         .post(url)
         .headers(build_headers(token, headers)?)
+        .json(body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = response.status();
+
+    let text = response.text().await.map_err(|e| e.to_string())?;
+
+    if !status.is_success() {
+        return Err(format!("HTTP {}: {}", status, text));
+    }
+
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+pub async fn post_form(
+    url: &str,
+    form: &HashMap<String, String>,
+    token: Option<&str>,
+    delay: Option<u64>,
+    headers: Option<HashMap<String, String>>,
+) -> ApiResult<Value> {
+    wait(delay).await;
+
+    let client = get_client();
+
+    let body = form_urlencoded::Serializer::new(String::new())
+        .extend_pairs(form.iter().map(|(k, v)| (k.as_str(), v.as_str())))
+        .finish();
+
+    let response = client
+        .post(url)
+        .headers(build_headers(token, headers)?)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = response.status();
+
+    let text = response.text().await.map_err(|e| e.to_string())?;
+
+    if !status.is_success() {
+        return Err(format!("HTTP {}: {}", status, text));
+    }
+
+    serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+pub async fn post_data(tenant_id: &str, body: &Value) -> ApiResult<Value> {
+    // Đảm bảo token còn hạn (tự refresh nếu cần)
+    let token = ensure_valid_token(tenant_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Lấy url từ AuthConfig
+    let post_url = {
+        let state = APP_STATE
+            .get()
+            .expect("APP_STATE not initialized")
+            .lock()
+            .unwrap();
+
+        let auth = state
+            .tenants
+            .get(tenant_id)
+            .and_then(|t| t.auth.as_ref())
+            .ok_or_else(|| "Auth config not found".to_string())?;
+
+        auth.post_data_url.clone()
+    };
+
+    if post_url.trim().is_empty() {
+        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+        return Ok(serde_json::json!({
+            "success": true,
+            "mock": true
+        }));
+    }
+
+    let client = get_client();
+
+    let response = client
+        .post(post_url)
+        .bearer_auth(&token.access_token)
+        .header("__tenant", &token.tenant_id)
         .json(body)
         .send()
         .await

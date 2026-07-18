@@ -1,12 +1,14 @@
 mod api;
+mod auth;
 mod commands;
 mod models;
 mod services;
 mod state;
 mod utils;
 mod window_config;
+use crate::models::system::AppState;
 use crate::services::update::check_update_on_startup;
-use crate::state::{AppState, APP_STATE};
+use crate::state::APP_STATE;
 use crate::state::{CURRENT_ROUTE, ONLINE_MENU};
 use crate::utils::public::navigate_to_route;
 use std::sync::Mutex;

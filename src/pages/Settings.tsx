@@ -13,7 +13,6 @@ import Switch from "../components/Switch";
 
 import { useAppStore } from "../stores/app.store";
 import { Divider } from "../components/Divider";
-import { trayApi } from "../api/axios/axiosClient";
 
 interface AgentInfo {
     name: string;

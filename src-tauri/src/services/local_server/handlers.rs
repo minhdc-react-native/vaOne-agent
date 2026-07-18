@@ -1,11 +1,14 @@
 use super::types::MessageRequest;
 use super::types::OpenTrayRequest;
 use super::types::PingResponse;
+use crate::models::system::SyncTokenRequest;
+use crate::models::system::TokenState;
 use crate::state::APP_HANDLE;
+use crate::state::APP_STATE;
 use crate::state::CURRENT_ROUTE;
 use crate::utils::notification;
+use axum::response::IntoResponse;
 use axum::Json;
-use serde_json::Value;
 use tauri::{Emitter, Manager};
 
 pub async fn exit_app() -> &'static str {
@@ -43,8 +46,13 @@ pub async fn message(Json(req): Json<MessageRequest>) -> Json<PingResponse> {
     Json(PingResponse { success: true })
 }
 
-pub async fn sync_token(Json(_token): Json<Value>) -> Json<serde_json::Value> {
-    // Implementation for syncing token
+pub async fn sync_token(Json(req): Json<SyncTokenRequest>) -> impl IntoResponse {
+    println!(
+        "Tenant {} has token = {}",
+        req.tenant_id,
+        req.token.is_some()
+    );
+    update_token(req);
     Json(serde_json::json!({
         "success": true
     }))
@@ -69,4 +77,34 @@ pub async fn open_tray_page(Json(req): Json<OpenTrayRequest>) -> Json<serde_json
     Json(serde_json::json!({
         "success": true
     }))
+}
+
+pub fn update_token(req: SyncTokenRequest) {
+    let mut state = APP_STATE
+        .get()
+        .expect("APP_STATE not initialized")
+        .lock()
+        .unwrap();
+
+    let tenant = state.tenants.entry(req.tenant_id.clone()).or_default();
+
+    // Luôn cập nhật auth config
+    tenant.auth = Some(req.auth);
+    match req.token {
+        Some(token) => {
+            let should_update = match &tenant.token {
+                Some(current) => token.version > current.version,
+                None => true,
+            };
+
+            if should_update {
+                tenant.token = Some(token);
+            }
+        }
+
+        None => {
+            // Web logout
+            tenant.token = None;
+        }
+    }
 }

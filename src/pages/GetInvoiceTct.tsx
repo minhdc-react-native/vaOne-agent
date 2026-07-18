@@ -6,14 +6,11 @@ import { formatDate, tctService } from "../api/services/tct.service";
 import { Divider } from "../components/Divider";
 import { dialog } from "../service/dialog.service";
 import AppWindow from "../components/AppWindow";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { trayApi } from "../api/axios/axiosClient";
 import { useAppStore } from "../stores/app.store";
 import { useLoading } from "../service/loading.service";
 import { Loading } from "../components/Loading";
 import { useCancellation } from "../api/useCancellation";
 import { invoke } from "@tauri-apps/api/core";
-import Button from "../components/Button";
 
 const TYPE_LOADING: Record<number, string> = {
     1: "Hóa đơn mua vào",
@@ -114,18 +111,6 @@ export const GetInvoiceTct = () => {
 
     const { khhdon, shdon, tdlap } = currentInvoice || {};
 
-    const reLogin = useCallback(async () => {
-        setLogin(null);
-        await getCurrentWindow().hide();
-        await trayApi.post("/open_tray_page", {
-            route: "/login",
-            data: {
-                ...params,
-                username: params.taxCode
-            }
-        });
-    }, [params]);
-
     return (
         <AppWindow title="Tải hóa đơn..." disableClose={disableClose} icon="File">
             <div className="space-y-2 p-6 w-100">
@@ -165,14 +150,6 @@ export const GetInvoiceTct = () => {
                         height: invoices.length === 0 ? 250 : 280,
                     }}
                 />
-                {/* <div className="flex justify-end">
-                    <Button
-                        className="mt-2 w-40"
-                        onClick={reLogin} disabled={disableClose}
-                    >
-                        Đăng nhập lại
-                    </Button>
-                </div> */}
             </div>
         </AppWindow>
     );

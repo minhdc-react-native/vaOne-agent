@@ -4,6 +4,7 @@ use std::cmp::Ordering as CmpOrdering;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use crate::api::http;
 use crate::utils::public::navigate_to_route;
 
 fn get_url(invoice_type: u8, from_date: &str, to_date: &str) -> String {
@@ -148,6 +149,7 @@ async fn fetch_all_invoices(
 }
 
 async fn fetch_invoice_detail(
+    tenant_id: String,
     datas: Vec<Value>,
     token: Option<String>,
     delay: Option<u64>,
@@ -169,19 +171,29 @@ async fn fetch_invoice_detail(
             nbmst, khhdon, shdon, khmshdon
         );
         match crate::api::http::get(&url, token.as_deref(), delay, None, None).await {
-            Ok(res) => {
-                // println!("SUCCESS: {} res={:#?}", url, res);
-                result.push(res.clone());
-                crate::state::update_sync_emit(|s| {
-                    // s.completed = s.completed + 1;
-                    s.current_invoice = Some(serde_json::json!(res.clone()));
-                    // s.failed = 0;
+            Ok(invoice) => {
+                // 1. Đẩy sang server
+                if let Err(err) = http::post_data(&tenant_id, &serde_json::json!(invoice)).await {
+                    eprintln!("Post invoice failed: {}", err);
+                    crate::state::update_sync_emit(&tenant_id, |s| {
+                        s.failed += 1;
+                        s.message = err;
+                    });
+                    continue;
+                }
+                // 2. Thành công
+                result.push(invoice.clone());
+
+                crate::state::update_sync_emit(&tenant_id, |s| {
+                    s.completed += 1;
+                    s.success += 1;
+                    s.current_invoice = Some(serde_json::json!(invoice));
                 });
             }
             Err(e) => {
                 println!("ERROR: {} => {}", url, e);
-                crate::state::update_sync_emit(|s| {
-                    // s.completed = s.completed + 1;
+                crate::state::update_sync_emit(&tenant_id, |s| {
+                    s.completed = s.completed + 1;
                     s.current_invoice = Some(serde_json::json!(item.clone()));
                     s.failed = s.failed + 1;
                 });
@@ -195,6 +207,7 @@ async fn fetch_invoice_detail(
 }
 
 pub async fn run_sync_flow(
+    tenant_id: String,
     invoice_type: u8,
     from_date: String,
     to_date: String,
@@ -216,7 +229,7 @@ pub async fn run_sync_flow(
         Ok(v) => v,
         Err(e) => {
             println!("ERROR: {}", e);
-            crate::state::update_sync_emit(|s| {
+            crate::state::update_sync_emit(&tenant_id, |s| {
                 s.running = false;
                 s.current_invoice = None;
                 s.is_error_api = true;
@@ -227,18 +240,18 @@ pub async fn run_sync_flow(
         }
     };
 
-    crate::state::update_sync_emit(|s| {
+    crate::state::update_sync_emit(&tenant_id, |s| {
         s.total = Some(invoices.len());
     });
-
     // 2. fetch detail
-    let _details = match fetch_invoice_detail(invoices, token, delay, cancel).await {
-        Ok(v) => v,
-        Err(_) => vec![],
-    };
+    let _details =
+        match fetch_invoice_detail(tenant_id.clone(), invoices, token, delay, cancel).await {
+            Ok(v) => v,
+            Err(_) => vec![],
+        };
 
     // 3. final state
-    crate::state::update_sync_emit(|s| {
+    crate::state::update_sync_emit(&tenant_id, |s| {
         s.running = false;
         s.current_invoice = None;
     });

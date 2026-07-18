@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 interface ILogin {
+    tenantId: string,
     source: string;
     username: string;
     password: string;

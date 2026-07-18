@@ -116,6 +116,7 @@ async fn fetch_save_invoices(
 }
 
 pub async fn run_sync_flow_save_invoice(
+    tenant_id: String,
     invoice_type: u8,
     from_date: String,
     to_date: String,
@@ -139,7 +140,7 @@ pub async fn run_sync_flow_save_invoice(
         Ok(v) => v,
         Err(e) => {
             println!("ERROR: {}", e);
-            crate::state::update_sync_emit(|s| {
+            crate::state::update_sync_emit(&tenant_id, |s| {
                 s.running = false;
                 s.current_invoice = None;
                 s.is_error_api = true;
@@ -148,20 +149,34 @@ pub async fn run_sync_flow_save_invoice(
         }
     };
 
-    crate::state::update_sync_emit(|s| {
+    crate::state::update_sync_emit(&tenant_id, |s| {
         s.total = Some(invoices.len());
     });
 
     for item in invoices {
-        crate::state::update_sync_emit(|s| {
-            // s.completed = s.completed + 1;
-            s.current_invoice = Some(serde_json::json!(item.clone()));
-        });
-        tokio::time::sleep(std::time::Duration::from_millis(delay.unwrap_or(1000))).await;
+        match crate::api::http::post_data(&tenant_id, &item).await {
+            Ok(_) => {
+                crate::state::update_sync_emit(&tenant_id, |s| {
+                    s.completed += 1;
+                    s.success += 1;
+                    s.current_invoice = Some(item.clone());
+                });
+            }
+            Err(err) => {
+                eprintln!("Post invoice failed: {}", err);
+                crate::state::update_sync_emit(&tenant_id, |s| {
+                    s.completed += 1;
+                    s.failed += 1;
+                    s.current_invoice = Some(item.clone());
+                    s.message = err;
+                    s.is_error_api = true;
+                });
+            }
+        }
     }
 
     // 3. final state
-    crate::state::update_sync_emit(|s| {
+    crate::state::update_sync_emit(&tenant_id, |s| {
         s.running = false;
         s.current_invoice = None;
     });
