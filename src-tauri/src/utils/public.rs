@@ -1,9 +1,6 @@
 use tauri::Manager;
 
-use crate::{
-    models::system::TokenState,
-    state::{APP_HANDLE, APP_STATE, CURRENT_ROUTE},
-};
+use crate::state::{APP_HANDLE, CURRENT_ROUTE};
 
 pub fn navigate_to_route(route: &str) {
     if let Some(app) = APP_HANDLE.get() {

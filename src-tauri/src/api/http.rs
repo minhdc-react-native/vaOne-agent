@@ -5,7 +5,7 @@ use url::{form_urlencoded, Url};
 
 use crate::{
     auth::{auth_api::ensure_valid_token, token_manager::TokenManager},
-    state::{get_client, APP_STATE},
+    state::get_client,
 };
 
 pub type ApiResult<T> = Result<T, String>;
