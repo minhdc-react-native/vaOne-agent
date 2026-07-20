@@ -1,6 +1,7 @@
 use super::types::MessageRequest;
 use super::types::OpenTrayRequest;
 use super::types::PingResponse;
+use crate::auth::token_manager::TokenManager;
 use crate::models::system::SyncTokenRequest;
 use crate::models::system::TokenState;
 use crate::state::APP_HANDLE;
@@ -47,12 +48,7 @@ pub async fn message(Json(req): Json<MessageRequest>) -> Json<PingResponse> {
 }
 
 pub async fn sync_token(Json(req): Json<SyncTokenRequest>) -> impl IntoResponse {
-    println!(
-        "Tenant {} has token = {}",
-        req.tenant_id,
-        req.token.is_some()
-    );
-    update_token(req);
+    TokenManager::sync(&req.tenant_id, req.token, Some(req.auth));
     Json(serde_json::json!({
         "success": true
     }))
@@ -77,34 +73,4 @@ pub async fn open_tray_page(Json(req): Json<OpenTrayRequest>) -> Json<serde_json
     Json(serde_json::json!({
         "success": true
     }))
-}
-
-pub fn update_token(req: SyncTokenRequest) {
-    let mut state = APP_STATE
-        .get()
-        .expect("APP_STATE not initialized")
-        .lock()
-        .unwrap();
-
-    let tenant = state.tenants.entry(req.tenant_id.clone()).or_default();
-
-    // Luôn cập nhật auth config
-    tenant.auth = Some(req.auth);
-    match req.token {
-        Some(token) => {
-            let should_update = match &tenant.token {
-                Some(current) => token.version > current.version,
-                None => true,
-            };
-
-            if should_update {
-                tenant.token = Some(token);
-            }
-        }
-
-        None => {
-            // Web logout
-            tenant.token = None;
-        }
-    }
 }

@@ -150,6 +150,7 @@ async fn fetch_all_invoices(
 
 async fn fetch_invoice_detail(
     tenant_id: String,
+    org_unit_id: String,
     datas: Vec<Value>,
     token: Option<String>,
     delay: Option<u64>,
@@ -173,7 +174,9 @@ async fn fetch_invoice_detail(
         match crate::api::http::get(&url, token.as_deref(), delay, None, None).await {
             Ok(invoice) => {
                 // 1. Đẩy sang server
-                if let Err(err) = http::post_data(&tenant_id, &serde_json::json!(invoice)).await {
+                if let Err(err) =
+                    http::post_data(&tenant_id, &org_unit_id, &serde_json::json!(invoice)).await
+                {
                     eprintln!("Post invoice failed: {}", err);
                     crate::state::update_sync_emit(&tenant_id, |s| {
                         s.failed += 1;
@@ -208,6 +211,7 @@ async fn fetch_invoice_detail(
 
 pub async fn run_sync_flow(
     tenant_id: String,
+    org_unit_id: String,
     invoice_type: u8,
     from_date: String,
     to_date: String,
@@ -244,11 +248,19 @@ pub async fn run_sync_flow(
         s.total = Some(invoices.len());
     });
     // 2. fetch detail
-    let _details =
-        match fetch_invoice_detail(tenant_id.clone(), invoices, token, delay, cancel).await {
-            Ok(v) => v,
-            Err(_) => vec![],
-        };
+    let _details = match fetch_invoice_detail(
+        tenant_id.clone(),
+        org_unit_id,
+        invoices,
+        token,
+        delay,
+        cancel,
+    )
+    .await
+    {
+        Ok(v) => v,
+        Err(_) => vec![],
+    };
 
     // 3. final state
     crate::state::update_sync_emit(&tenant_id, |s| {

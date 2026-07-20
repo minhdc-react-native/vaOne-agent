@@ -6,7 +6,6 @@ import Input from "../components/Input";
 import { getDelayRequest, useAppStore } from "../stores/app.store";
 import Switch from "../components/Switch";
 import { useLocation } from "react-router-dom";
-import { useLoading } from "../service/loading.service";
 import { dialog } from "../service/dialog.service";
 import { mInvoiceService } from "../api/services/mInvoice.service";
 import { Loading } from "../components/Loading";
@@ -33,6 +32,7 @@ export default function LoginMInvoicePage({ params }: IProgs) {
         const delay = getDelayRequest();
         await invoke("start_m_invoice_sync", {
             tenantId: params.tenantId,
+            orgUnitId: params.orgUnitId,
             invoiceType: params.type,
             fromDate: params.fromDate,
             toDate: params.toDate,

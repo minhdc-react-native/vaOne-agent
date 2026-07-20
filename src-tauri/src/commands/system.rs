@@ -3,10 +3,9 @@ use crate::state::APP_HANDLE;
 use crate::state::CURRENT_ROUTE;
 use crate::state::ONLINE_MENU;
 use crate::window_config;
+use captcha_db::DATABASE_NAME;
 use std::sync::Mutex;
 use tauri::{LogicalPosition, LogicalSize, Manager, Position, Size};
-
-use tauri::menu::MenuItemKind;
 
 #[tauri::command]
 pub fn set_current_route(route: String) {
@@ -78,4 +77,36 @@ pub fn page_ready(name: String, show: Option<bool>) {
             }
         }
     }
+}
+
+#[tauri::command]
+pub fn captcha_train(svg: String, answer: String) -> Result<(), String> {
+    // if std::path::Path::new(DATABASE_NAME).exists() {
+    //     std::fs::remove_file(DATABASE_NAME).map_err(|e| e.to_string())?;
+    // }
+    let mut trainer = captcha_db::Trainer::load(DATABASE_NAME).map_err(|e| e.to_string())?;
+
+    trainer.train(&svg, &answer).map_err(|e| e.to_string())?;
+
+    trainer.save(DATABASE_NAME).map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+use captcha_db::{svg::parse_svg, Database, Matcher};
+
+#[tauri::command]
+pub fn captcha_predict(svg: String) -> Result<String, String> {
+    // Load database
+    let db = Database::load(DATABASE_NAME).map_err(|e| e.to_string())?;
+
+    // Parse SVG
+    let glyphs = parse_svg(&svg).map_err(|e| e.to_string())?;
+
+    // Match
+    let matcher = Matcher::new(db);
+
+    let result = matcher.recognize(&glyphs);
+
+    Ok(result)
 }

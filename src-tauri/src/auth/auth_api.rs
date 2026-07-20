@@ -6,6 +6,7 @@ use std::{
 
 use crate::{
     api::http,
+    auth::token_manager::TokenManager,
     models::system::{AuthConfig, TokenLeader, TokenState},
     state::APP_STATE,
 };
@@ -14,29 +15,9 @@ pub async fn ensure_valid_token(tenant_id: &str) -> Result<TokenState> {
     // ---------------------------------------------------
     // Lấy snapshot hiện tại
     // ---------------------------------------------------
-    let (token, auth) = {
-        let state = APP_STATE
-            .get()
-            .expect("APP_STATE not initialized")
-            .lock()
-            .unwrap();
+    let token = TokenManager::get_token(tenant_id).ok_or_else(|| anyhow!("Token not found"))?;
 
-        let tenant = state
-            .tenants
-            .get(tenant_id)
-            .ok_or_else(|| anyhow!("Tenant not found"))?;
-
-        (
-            tenant
-                .token
-                .clone()
-                .ok_or_else(|| anyhow!("Token not found"))?,
-            tenant
-                .auth
-                .clone()
-                .ok_or_else(|| anyhow!("Auth config not found"))?,
-        )
-    };
+    let auth = TokenManager::get_auth(tenant_id).ok_or_else(|| anyhow!("Auth config not found"))?;
 
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as i64;
 

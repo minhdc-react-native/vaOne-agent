@@ -19,6 +19,8 @@ tauri-build = { version = "2", features = [] }
 # =========================
 pdf-core = { path = "../pdf-core" }
 
+captcha-db = { path = "../captcha-db" }
+
 # =========================
 # Tauri
 # =========================

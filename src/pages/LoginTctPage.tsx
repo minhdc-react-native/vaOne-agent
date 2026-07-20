@@ -26,6 +26,7 @@ export default function LoginTctPage({ params }: IProgs) {
     const [password, setPassword] = useState(
         savePassword?.[params.username] ?? ""
     );
+    const [contentCaptcha, setContentCaptcha] = useState("");
 
     const [captchaImage, setCaptchaImage] = useState("");
     const [loadingCaptcha, setLoadingCaptcha] = useState(false);
@@ -39,6 +40,7 @@ export default function LoginTctPage({ params }: IProgs) {
         const delay = getDelayRequest();
         await invoke("start_invoice_tct_sync", {
             tenantId: params.tenantId,
+            orgUnitId: params.orgUnitId,
             invoiceType: params.type,
             fromDate: params.fromDate,
             toDate: params.toDate,
@@ -51,6 +53,14 @@ export default function LoginTctPage({ params }: IProgs) {
         setLoadingCaptcha(true);
         const res = await tctService.getCaptcha();
         if (res) {
+
+            const captcha = await invoke<string>("captcha_predict", {
+                svg: res.content
+            });
+
+            setCvalue(captcha)
+
+            setContentCaptcha(res.content);
             setCaptchaImage(res.captcha);
             setCkey(res.key);
         }
@@ -76,6 +86,7 @@ export default function LoginTctPage({ params }: IProgs) {
 
     const [loading, setLoading] = useState(false);
     const handleLogin = async () => {
+
         if (!password || !cvalue) {
             await dialog.warning(`Bạn phải nhập ${!password ? 'mật khẩu' : 'captcha'}!`);
             return;
@@ -91,6 +102,12 @@ export default function LoginTctPage({ params }: IProgs) {
         // loading.hide();
         setLoading(false);
         if (!res) return;
+
+        await invoke("captcha_train", {
+            svg: contentCaptcha,
+            answer: cvalue.toUpperCase()
+        });
+
         reConnect.current = false;
         setLogin({
             tenantId: params.tenantId,
@@ -178,6 +195,7 @@ export default function LoginTctPage({ params }: IProgs) {
 
                 <Input
                     placeholder="Nhập mã captcha"
+                    className="font-semibold"
                     value={cvalue}
                     onChange={(e) =>
                         setCvalue(e.target.value)

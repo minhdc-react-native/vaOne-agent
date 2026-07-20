@@ -33,6 +33,7 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
         const delay = getDelayRequest();
         await invoke("start_save_invoice_sync", {
             tenantId: params.tenantId,
+            orgUnitId: params.orgUnitId,
             invoiceType: params.type,
             fromDate: params.fromDate,
             toDate: params.toDate,

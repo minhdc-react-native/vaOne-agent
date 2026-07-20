@@ -52,6 +52,7 @@ export const tctService = {
                 url: "https://hoadondientu.gdt.gov.vn/api/captcha"
             });
             return {
+                content: res.content,
                 captcha: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(res.content)}`,
                 key: res.key ?? ""
             }

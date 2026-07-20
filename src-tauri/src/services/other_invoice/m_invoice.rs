@@ -89,6 +89,7 @@ async fn fetch_m_invoices(
 
 pub async fn run_sync_flow_m_invoice(
     tenant_id: String,
+    org_unit_id: String,
     invoice_type: u8,
     from_date: String,
     to_date: String,
@@ -126,7 +127,7 @@ pub async fn run_sync_flow_m_invoice(
     });
 
     for item in invoices {
-        match crate::api::http::post_data(&tenant_id, &item).await {
+        match crate::api::http::post_data(&tenant_id, &org_unit_id, &item).await {
             Ok(_) => {
                 crate::state::update_sync_emit(&tenant_id, |s| {
                     s.completed += 1;

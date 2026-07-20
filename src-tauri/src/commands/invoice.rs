@@ -11,6 +11,7 @@ pub fn get_sync_state(tenant_id: String) -> Option<SyncState> {
 #[tauri::command]
 pub async fn start_invoice_tct_sync(
     tenant_id: String,
+    org_unit_id: String,
     invoice_type: u8,
     from_date: String,
     to_date: String,
@@ -37,6 +38,7 @@ pub async fn start_invoice_tct_sync(
     tokio::spawn(async move {
         run_sync_flow(
             tenant_id,
+            org_unit_id,
             invoice_type,
             from_date,
             to_date,
@@ -52,6 +54,7 @@ pub async fn start_invoice_tct_sync(
 #[tauri::command]
 pub async fn start_m_invoice_sync(
     tenant_id: String,
+    org_unit_id: String,
     invoice_type: u8,
     from_date: String,
     to_date: String,
@@ -78,6 +81,7 @@ pub async fn start_m_invoice_sync(
     tokio::spawn(async move {
         run_sync_flow_m_invoice(
             tenant_id,
+            org_unit_id,
             invoice_type,
             from_date,
             to_date,
@@ -94,6 +98,7 @@ pub async fn start_m_invoice_sync(
 #[tauri::command]
 pub async fn start_save_invoice_sync(
     tenant_id: String,
+    org_unit_id: String,
     invoice_type: u8,
     from_date: String,
     to_date: String,
@@ -121,6 +126,7 @@ pub async fn start_save_invoice_sync(
     tokio::spawn(async move {
         run_sync_flow_save_invoice(
             tenant_id,
+            org_unit_id,
             invoice_type,
             from_date,
             to_date,

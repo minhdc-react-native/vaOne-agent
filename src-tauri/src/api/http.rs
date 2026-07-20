@@ -4,7 +4,7 @@ use std::{collections::HashMap, time::Duration};
 use url::{form_urlencoded, Url};
 
 use crate::{
-    auth::auth_api::ensure_valid_token,
+    auth::{auth_api::ensure_valid_token, token_manager::TokenManager},
     state::{get_client, APP_STATE},
 };
 
@@ -155,28 +155,15 @@ pub async fn post_form(
     serde_json::from_str(&text).map_err(|e| e.to_string())
 }
 
-pub async fn post_data(tenant_id: &str, body: &Value) -> ApiResult<Value> {
-    // Đảm bảo token còn hạn (tự refresh nếu cần)
+pub async fn post_data(tenant_id: &str, org_unit_id: &str, body: &Value) -> ApiResult<Value> {
     let token = ensure_valid_token(tenant_id)
         .await
         .map_err(|e| e.to_string())?;
 
     // Lấy url từ AuthConfig
-    let post_url = {
-        let state = APP_STATE
-            .get()
-            .expect("APP_STATE not initialized")
-            .lock()
-            .unwrap();
-
-        let auth = state
-            .tenants
-            .get(tenant_id)
-            .and_then(|t| t.auth.as_ref())
-            .ok_or_else(|| "Auth config not found".to_string())?;
-
-        auth.post_data_url.clone()
-    };
+    let post_url = TokenManager::get_auth(tenant_id)
+        .ok_or_else(|| "Auth config not found".to_string())?
+        .post_data_url;
 
     if post_url.trim().is_empty() {
         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
@@ -191,7 +178,8 @@ pub async fn post_data(tenant_id: &str, body: &Value) -> ApiResult<Value> {
     let response = client
         .post(post_url)
         .bearer_auth(&token.access_token)
-        .header("__tenant", &token.tenant_id)
+        .header("__tenant", tenant_id)
+        .header("__orgId", org_unit_id)
         .json(body)
         .send()
         .await

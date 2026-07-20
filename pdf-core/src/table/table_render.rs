@@ -109,10 +109,10 @@ impl TableRenderer {
             Rect::fill(
                 ops,
                 fonts,
-                cell.x + border_width / 2.0,
-                page_height - cell.y - cell.height + border_width / 2.0,
-                cell.width - border_width,
-                cell.height - border_width,
+                cell.x + border_width,
+                page_height - cell.y - cell.height + border_width,
+                cell.width - border_width * 2.0,
+                cell.height - border_width * 2.0,
                 color,
             );
         }
