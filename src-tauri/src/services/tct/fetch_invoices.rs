@@ -1,8 +1,13 @@
 use chrono::{Datelike, Duration, NaiveDate};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::cmp::Ordering as CmpOrdering;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+use crate::api::http;
+use crate::progress_bar;
+use crate::services::update::update_progress;
+use crate::utils::public::navigate_to_route;
 
 fn get_url(invoice_type: u8, from_date: &str, to_date: &str) -> String {
     let size_page = 50;
@@ -15,20 +20,28 @@ fn get_url(invoice_type: u8, from_date: &str, to_date: &str) -> String {
     match invoice_type {
         // 1: Mua vào
         // 3: Mua vào MTT
-        1 | 3 => format!(
+        1 => format!(
             "https://hoadondientu.gdt.gov.vn/api/query/invoices/purchase?sort=tdlap:desc&size={}&search={};ttxly==5",
             size_page,
             search
         ),
-
+        3 => format!(
+            "https://hoadondientu.gdt.gov.vn/api/sco-query/invoices/purchase?sort=tdlap:desc&size={}&search={};ttxly==5",
+            size_page,
+            search
+        ),
         // 2: Bán ra
         // 4: Bán ra MTT
-        2 | 4 => format!(
+        2 => format!(
             "https://hoadondientu.gdt.gov.vn/api/query/invoices/sold?sort=tdlap:desc&size={}&search={}",
             size_page,
             search
         ),
-
+        4 => format!(
+            "https://hoadondientu.gdt.gov.vn/api/sco-query/invoices/sold?sort=tdlap:desc&size={}&search={}",
+            size_page,
+            search
+        ),
         _ => panic!("Invalid invoice type"),
     }
 }
@@ -47,6 +60,14 @@ async fn fetch_all_invoices(
 
     let end = NaiveDate::parse_from_str(&to_date, "%Y-%m-%d").map_err(|e| e.to_string())?;
 
+    let invoice_types = match invoice_type {
+        1 => vec![1],
+        2 => vec![2],
+        3 => vec![3],
+        4 => vec![4],
+        _ => vec![invoice_type],
+    };
+
     while current <= end {
         if cancel.load(Ordering::Relaxed) {
             break;
@@ -64,32 +85,38 @@ async fn fetch_all_invoices(
         let from = current.format("%d/%m/%Y").to_string();
         let to = month_end.format("%d/%m/%Y").to_string();
 
-        // scan hết dữ liệu của tháng này
-        let mut has_more = true;
-        let mut state = None::<String>;
-        let mut url = get_url(invoice_type, &from, &to);
-        while has_more {
-            if cancel.load(Ordering::Relaxed) {
-                break;
+        for current_type in invoice_types.clone() {
+            let url = get_url(current_type, &from, &to);
+            let mut state: Option<String> = None;
+            let mut has_more = true;
+
+            while has_more {
+                if cancel.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                let mut request_url = url.clone();
+
+                if let Some(s) = &state {
+                    request_url.push_str(&format!("&state={}", s));
+                }
+
+                let res: Value =
+                    crate::api::http::get(&request_url, token.as_deref(), delay, None, None)
+                        .await?;
+
+                if let Some(arr) = res["datas"].as_array() {
+                    result.extend(arr.iter().cloned());
+                }
+
+                if res["state"].is_null() {
+                    has_more = false;
+                } else {
+                    state = res["state"].as_str().map(|s| s.to_string());
+                }
+
+                tokio::time::sleep(std::time::Duration::from_millis(delay.unwrap_or(500))).await;
             }
-
-            if let Some(s) = &state {
-                url.push_str(&format!("&state={}", s));
-            }
-
-            let res: Value = crate::api::http::get(&url, token.as_deref(), delay, None).await?;
-
-            if let Some(arr) = res["datas"].as_array() {
-                result.extend(arr.iter().cloned());
-            }
-
-            if res["state"].is_null() {
-                has_more = false;
-            } else {
-                state = Some(res["state"].to_string().replace('"', ""));
-            }
-
-            tokio::time::sleep(std::time::Duration::from_millis(delay.unwrap_or(500))).await;
         }
 
         // sang tháng tiếp theo
@@ -124,18 +151,21 @@ async fn fetch_all_invoices(
 }
 
 async fn fetch_invoice_detail(
+    tenant_id: String,
+    org_unit_id: String,
     datas: Vec<Value>,
     token: Option<String>,
     delay: Option<u64>,
     cancel: Arc<AtomicBool>,
 ) -> Result<Vec<Value>, String> {
     let mut result = vec![];
-
-    for (i, item) in datas.iter().enumerate() {
+    let num_of_invoice: usize = datas.len();
+    let mut completed: usize = 0;
+    for (_i, item) in datas.iter().enumerate() {
         if cancel.load(Ordering::Relaxed) {
             break;
         }
-
+        let tdlap = item["tdlap"].as_str().unwrap_or("");
         let nbmst = item["nbmst"].as_str().unwrap_or("");
         let khhdon = item["khhdon"].as_str().unwrap_or("");
         let shdon = item["shdon"].as_i64().unwrap_or(0);
@@ -145,22 +175,61 @@ async fn fetch_invoice_detail(
             "https://hoadondientu.gdt.gov.vn/api/query/invoices/detail?nbmst={}&khhdon={}&shdon={}&khmshdon={}",
             nbmst, khhdon, shdon, khmshdon
         );
-        match crate::api::http::get(&url, token.as_deref(), delay, None).await {
-            Ok(res) => {
-                println!("SUCCESS: {}", url);
-                result.push(res.clone());
-                crate::state::update_sync_emit(|s| {
-                    s.completed = s.completed + 1;
-                    s.current_invoice = Some(serde_json::json!(res.clone()));
-                    // s.failed = 0;
+        match crate::api::http::get(&url, token.as_deref(), delay, None, None).await {
+            Ok(invoice) => {
+                // 1. Đẩy sang server
+                if let Err(err) =
+                    http::post_data(&tenant_id, &org_unit_id, &serde_json::json!(invoice)).await
+                {
+                    eprintln!("Post invoice failed: {}", err);
+                    completed += 1;
+                    progress_bar(Some(completed), Some(num_of_invoice));
+                    update_progress(None);
+                    crate::state::update_sync_emit(&tenant_id, |s| {
+                        s.completed += 1;
+                        s.failed += 1;
+                        s.message = err;
+                    });
+
+                    continue;
+                }
+                // 2. Thành công
+                result.push(invoice.clone());
+                completed += 1;
+                progress_bar(Some(completed), Some(num_of_invoice));
+                let payload = json!({
+                    "completed":Some(completed),
+                    "invoice":{
+                        "invoiceDate": tdlap,
+                        "invoiceNumber": shdon,
+                        "invoiceSerial": khhdon
+                    }
+                });
+                update_progress(Some(&payload));
+
+                crate::state::update_sync_emit(&tenant_id, |s| {
+                    s.completed += 1;
+                    s.success += 1;
+                    s.current_invoice = Some(invoice);
                 });
             }
             Err(e) => {
                 println!("ERROR: {} => {}", url, e);
-                crate::state::update_sync_emit(|s| {
-                    s.completed = s.completed + 1;
-                    s.current_invoice = Some(serde_json::json!(item.clone()));
-                    s.failed = s.failed + 1;
+                completed += 1;
+                progress_bar(Some(completed), Some(num_of_invoice));
+                let payload = json!({
+                    "completed":Some(completed),
+                    "invoice":{
+                        "invoiceDate": tdlap,
+                        "invoiceNumber": shdon,
+                        "invoiceSerial": khhdon
+                    }
+                });
+                update_progress(Some(&payload));
+                crate::state::update_sync_emit(&tenant_id, |s| {
+                    s.completed += 1;
+                    s.current_invoice = Some(item.clone());
+                    s.failed += 1;
                 });
                 continue;
             }
@@ -172,6 +241,8 @@ async fn fetch_invoice_detail(
 }
 
 pub async fn run_sync_flow(
+    tenant_id: String,
+    org_unit_id: String,
     invoice_type: u8,
     from_date: String,
     to_date: String,
@@ -193,28 +264,45 @@ pub async fn run_sync_flow(
         Ok(v) => v,
         Err(e) => {
             println!("ERROR: {}", e);
-            crate::state::update_sync_emit(|s| {
+            progress_bar(None, None);
+            update_progress(None);
+            crate::state::update_sync_emit(&tenant_id, |s| {
                 s.running = false;
                 s.current_invoice = None;
                 s.is_error_api = true;
             });
+            // re login
+            let _ = navigate_to_route("/login");
             return;
         }
     };
-
-    crate::state::update_sync_emit(|s| {
-        s.total = Some(invoices.len());
+    let payload = json!({
+        "total":Some(invoices.len())
     });
+    update_progress(Some(&payload));
 
+    crate::state::update_sync_emit(&tenant_id, |s| {
+        s.total = Some(invoices.len());
+        progress_bar(Some(0), Some(invoices.len()));
+    });
     // 2. fetch detail
-    let details = match fetch_invoice_detail(invoices, token, delay, cancel).await {
+    let _details = match fetch_invoice_detail(
+        tenant_id.clone(),
+        org_unit_id,
+        invoices,
+        token,
+        delay,
+        cancel,
+    )
+    .await
+    {
         Ok(v) => v,
         Err(_) => vec![],
     };
-
+    progress_bar(None, None);
+    update_progress(None);
     // 3. final state
-    crate::state::update_sync_emit(|s| {
-        s.source = "TCT".to_string();
+    crate::state::update_sync_emit(&tenant_id, |s| {
         s.running = false;
         s.current_invoice = None;
     });

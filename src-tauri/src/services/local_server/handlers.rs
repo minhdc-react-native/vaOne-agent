@@ -1,11 +1,13 @@
 use super::types::MessageRequest;
 use super::types::OpenTrayRequest;
 use super::types::PingResponse;
+use crate::auth::token_manager::TokenManager;
+use crate::models::system::SyncTokenRequest;
 use crate::state::APP_HANDLE;
 use crate::state::CURRENT_ROUTE;
 use crate::utils::notification;
+use axum::response::IntoResponse;
 use axum::Json;
-use serde_json::Value;
 use tauri::{Emitter, Manager};
 
 pub async fn exit_app() -> &'static str {
@@ -43,8 +45,8 @@ pub async fn message(Json(req): Json<MessageRequest>) -> Json<PingResponse> {
     Json(PingResponse { success: true })
 }
 
-pub async fn sync_token(Json(token): Json<Value>) -> Json<serde_json::Value> {
-    // Implementation for syncing token
+pub async fn sync_token(Json(req): Json<SyncTokenRequest>) -> impl IntoResponse {
+    TokenManager::sync(&req.tenant_id, req.token, Some(req.auth));
     Json(serde_json::json!({
         "success": true
     }))

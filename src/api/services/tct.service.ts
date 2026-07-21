@@ -4,7 +4,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { dialog } from "../../service/dialog.service";
 export function formatDate(dateStr?: string): string {
     if (!dateStr) return "";
-    const [year, month, day] = dateStr.split("T")[0].split("-");
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return "";
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = date.getFullYear();
+
     return `${day}/${month}/${year}`;
 }
 interface IInfoLogin {
@@ -52,6 +57,7 @@ export const tctService = {
                 url: "https://hoadondientu.gdt.gov.vn/api/captcha"
             });
             return {
+                content: res.content,
                 captcha: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(res.content)}`,
                 key: res.key ?? ""
             }
@@ -68,7 +74,7 @@ export const tctService = {
             });
             return res as ILoginRequest;
         } catch (e) {
-            let errorMessage = "Đã xảy ra lỗi.";
+            let errorMessage = "Đã xảy ra lỗi. hãy refresh lại mã captcha rồi thử lại!";
             if (axios.isAxiosError(e)) {
                 errorMessage =
                     e.response?.data?.message ??
