@@ -2,7 +2,7 @@ import { Routes, Route, useNavigate } from "react-router-dom";
 import SettingsPage from "./pages/Settings";
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { GetInvoiceTct } from "./pages/GetInvoiceTct";
+import { GetInvoices } from "./pages/GetInvoices";
 import { SplashScreen } from "./pages/Splash";
 import LoginPage from "./pages/LoginPage";
 import { BlankPage } from "./pages/BlankPage";
@@ -33,6 +33,22 @@ function App() {
       unlisten?.();
     };
   }, [navigate]);
+
+  const setSyncProgress = useAppStore(store => store.setSyncProgress);
+  useEffect(() => {
+    const unlisten = listen<{
+      completed: number;
+      total: number;
+      item: any
+    }>("sync-progress", (event) => {
+      console.log(event.payload);
+      setSyncProgress(event.payload);
+    });
+
+    return () => {
+      unlisten.then(fn => fn());
+    };
+  }, []);
 
   // useUpdater();
   const autostartInitialized = useAppStore(store => store.autostartInitialized);
@@ -70,7 +86,7 @@ function App() {
       <Route path="/report" element={<PreviewReport />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/get-invoice-tct" element={<GetInvoiceTct />} />
+      <Route path="/get-invoices" element={<GetInvoices />} />
       <Route path="/update" element={<UpdatePage />} />
       <Route path="/quit" element={<QuitPage />} />
     </Routes>

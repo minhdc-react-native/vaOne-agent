@@ -11,6 +11,7 @@ export default function LoginPage() {
     const login = useAppStore(s => s.login);
     const location = useLocation();
     const params = location.state || login;
+    console.log('login>>', login);
     const source = params?.source;
     switch (source) {
         case "TCT": //TCT

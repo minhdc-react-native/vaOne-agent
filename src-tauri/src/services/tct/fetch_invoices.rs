@@ -1,10 +1,12 @@
 use chrono::{Datelike, Duration, NaiveDate};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::cmp::Ordering as CmpOrdering;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::api::http;
+use crate::progress_bar;
+use crate::services::update::update_progress;
 use crate::utils::public::navigate_to_route;
 
 fn get_url(invoice_type: u8, from_date: &str, to_date: &str) -> String {
@@ -157,11 +159,13 @@ async fn fetch_invoice_detail(
     cancel: Arc<AtomicBool>,
 ) -> Result<Vec<Value>, String> {
     let mut result = vec![];
+    let num_of_invoice: usize = datas.len();
+    let mut completed: usize = 0;
     for (_i, item) in datas.iter().enumerate() {
         if cancel.load(Ordering::Relaxed) {
             break;
         }
-
+        let tdlap = item["tdlap"].as_str().unwrap_or("");
         let nbmst = item["nbmst"].as_str().unwrap_or("");
         let khhdon = item["khhdon"].as_str().unwrap_or("");
         let shdon = item["shdon"].as_i64().unwrap_or(0);
@@ -178,27 +182,54 @@ async fn fetch_invoice_detail(
                     http::post_data(&tenant_id, &org_unit_id, &serde_json::json!(invoice)).await
                 {
                     eprintln!("Post invoice failed: {}", err);
+                    completed += 1;
+                    progress_bar(Some(completed), Some(num_of_invoice));
+                    update_progress(None);
                     crate::state::update_sync_emit(&tenant_id, |s| {
+                        s.completed += 1;
                         s.failed += 1;
                         s.message = err;
                     });
+
                     continue;
                 }
                 // 2. Thành công
                 result.push(invoice.clone());
+                completed += 1;
+                progress_bar(Some(completed), Some(num_of_invoice));
+                let payload = json!({
+                    "completed":Some(completed),
+                    "invoice":{
+                        "invoiceDate": tdlap,
+                        "invoiceNumber": shdon,
+                        "invoiceSerial": khhdon
+                    }
+                });
+                update_progress(Some(&payload));
 
                 crate::state::update_sync_emit(&tenant_id, |s| {
                     s.completed += 1;
                     s.success += 1;
-                    s.current_invoice = Some(serde_json::json!(invoice));
+                    s.current_invoice = Some(invoice);
                 });
             }
             Err(e) => {
                 println!("ERROR: {} => {}", url, e);
+                completed += 1;
+                progress_bar(Some(completed), Some(num_of_invoice));
+                let payload = json!({
+                    "completed":Some(completed),
+                    "invoice":{
+                        "invoiceDate": tdlap,
+                        "invoiceNumber": shdon,
+                        "invoiceSerial": khhdon
+                    }
+                });
+                update_progress(Some(&payload));
                 crate::state::update_sync_emit(&tenant_id, |s| {
-                    s.completed = s.completed + 1;
-                    s.current_invoice = Some(serde_json::json!(item.clone()));
-                    s.failed = s.failed + 1;
+                    s.completed += 1;
+                    s.current_invoice = Some(item.clone());
+                    s.failed += 1;
                 });
                 continue;
             }
@@ -233,6 +264,8 @@ pub async fn run_sync_flow(
         Ok(v) => v,
         Err(e) => {
             println!("ERROR: {}", e);
+            progress_bar(None, None);
+            update_progress(None);
             crate::state::update_sync_emit(&tenant_id, |s| {
                 s.running = false;
                 s.current_invoice = None;
@@ -243,9 +276,14 @@ pub async fn run_sync_flow(
             return;
         }
     };
+    let payload = json!({
+        "total":Some(invoices.len())
+    });
+    update_progress(Some(&payload));
 
     crate::state::update_sync_emit(&tenant_id, |s| {
         s.total = Some(invoices.len());
+        progress_bar(Some(0), Some(invoices.len()));
     });
     // 2. fetch detail
     let _details = match fetch_invoice_detail(
@@ -261,7 +299,8 @@ pub async fn run_sync_flow(
         Ok(v) => v,
         Err(_) => vec![],
     };
-
+    progress_bar(None, None);
+    update_progress(None);
     // 3. final state
     crate::state::update_sync_emit(&tenant_id, |s| {
         s.running = false;

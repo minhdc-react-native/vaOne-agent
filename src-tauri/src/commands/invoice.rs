@@ -1,4 +1,5 @@
 use crate::models::system::SyncState;
+use crate::progress_bar;
 use crate::services::other_invoice::m_invoice::run_sync_flow_m_invoice;
 use crate::services::other_invoice::save_invoice::run_sync_flow_save_invoice;
 use crate::services::tct::fetch_invoices::run_sync_flow;
@@ -91,7 +92,6 @@ pub async fn start_m_invoice_sync(
         )
         .await;
     });
-
     Ok(())
 }
 
@@ -136,6 +136,5 @@ pub async fn start_save_invoice_sync(
         )
         .await;
     });
-
     Ok(())
 }

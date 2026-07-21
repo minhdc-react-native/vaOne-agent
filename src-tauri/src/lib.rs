@@ -8,7 +8,7 @@ mod utils;
 mod window_config;
 use crate::models::system::AppState;
 use crate::services::update::check_update_on_startup;
-use crate::state::APP_STATE;
+use crate::state::{APP_STATE, SYNC_MENU};
 use crate::state::{CURRENT_ROUTE, ONLINE_MENU};
 use crate::utils::public::navigate_to_route;
 use std::sync::Mutex;
@@ -46,6 +46,10 @@ pub fn run() {
             )?;
             let _ = ONLINE_MENU.set(online.clone());
 
+            let sync = MenuItem::with_id(app, "sync", "", false, None::<&str>)?;
+
+            let _ = SYNC_MENU.set(sync.clone());
+
             let check_update =
                 MenuItem::with_id(app, "update", "Kiểm tra phiên bản", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
@@ -56,6 +60,7 @@ pub fn run() {
                 app,
                 &[
                     &online,
+                    &sync,
                     &separator,
                     &settings,
                     &check_update,
@@ -103,6 +108,9 @@ pub fn run() {
             "online" => {
                 let _ = navigate_to_route("/login");
             }
+            "sync" => {
+                let _ = navigate_to_route("/get-invoices");
+            }
             "update" => {
                 let _ = check_update_on_startup(app.clone(), Some(false));
             }
@@ -139,4 +147,31 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+pub fn progress_bar(done: Option<usize>, total: Option<usize>) {
+    if let Some(item) = SYNC_MENU.get() {
+        match (done, total) {
+            (Some(done), Some(total)) => {
+                let width = 10;
+                let filled = if total == 0 { 0 } else { done * width / total };
+                let percent = if total == 0 { 0 } else { done * 100 / total };
+                let text = format!(
+                    "[{}{}] {}/{} ({}%)",
+                    "■".repeat(filled),
+                    "□".repeat(width - filled),
+                    done,
+                    total,
+                    percent
+                );
+                // let text = format!("Tải hóa đơn: {}/{} ({}%)", done, total, percent);
+                let _ = item.set_enabled(true);
+                let _ = item.set_text(&text);
+            }
+            _ => {
+                let _ = item.set_enabled(false);
+                let _ = item.set_text("");
+            }
+        }
+    }
 }

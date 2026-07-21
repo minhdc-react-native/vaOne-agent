@@ -82,7 +82,12 @@ export default function LoginMInvoicePage({ params }: IProgs) {
             password: remember ? password : "",
             token: res.token,
             idAccount: res.id,
-            reConnect: true
+            reConnect: true,
+            info: {
+                invoiceType: params.type,
+                fromDate: params.fromDate,
+                toDate: params.toDate,
+            }
         });
     };
 

@@ -86,7 +86,6 @@ export default function LoginTctPage({ params }: IProgs) {
 
     const [loading, setLoading] = useState(false);
     const handleLogin = async () => {
-
         if (!password || !cvalue) {
             await dialog.warning(`Bạn phải nhập ${!password ? 'mật khẩu' : 'captcha'}!`);
             return;
@@ -102,12 +101,10 @@ export default function LoginTctPage({ params }: IProgs) {
         // loading.hide();
         setLoading(false);
         if (!res) return;
-
         await invoke("captcha_train", {
             svg: contentCaptcha,
             answer: cvalue.toUpperCase()
         });
-
         reConnect.current = false;
         setLogin({
             tenantId: params.tenantId,
@@ -117,7 +114,12 @@ export default function LoginTctPage({ params }: IProgs) {
             password: remember ? password : "",
             token: res.token,
             idAccount: "",
-            reConnect: true
+            reConnect: true,
+            info: {
+                invoiceType: params.type,
+                fromDate: params.fromDate,
+                toDate: params.toDate,
+            }
         });
         // await getInvoiceTCT(res.token);
     };
@@ -161,13 +163,13 @@ export default function LoginTctPage({ params }: IProgs) {
                     checked={remember}
                     onChange={setRemember}
                 />
-                <div className="space-y-2">
+                <div className="flex-1 space-y-2">
 
                     <label className="text-sm font-medium">
                         Mã xác nhận
                     </label>
 
-                    <div className="flex items-center gap-2">
+                    <div className="relative flex items-center gap-2">
 
                         <img
                             src={captchaImage}
@@ -176,7 +178,7 @@ export default function LoginTctPage({ params }: IProgs) {
                                 h-10
                                 flex-1
                                 rounded-lg
-                                border
+                                border border-gray-300 bg-gray-100 p-1
                                 object-contain
                             "
                         />
@@ -186,15 +188,16 @@ export default function LoginTctPage({ params }: IProgs) {
                             variant="secondary"
                             loading={loadingCaptcha}
                             icon={<RotateCw size={16} />}
-                            onClick={loadCaptcha}
+                            onClick={loadCaptcha} className="absolute right-1"
                         />
 
                     </div>
 
                 </div>
-
                 <Input
                     placeholder="Nhập mã captcha"
+                    label="Nhập mã captcha"
+                    labelPosition="left"
                     className="font-semibold"
                     value={cvalue}
                     onChange={(e) =>

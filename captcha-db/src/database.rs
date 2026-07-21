@@ -9,7 +9,7 @@ use anyhow::Result;
 use crate::models::{CaptchaDatabase, GlyphClass, GlyphFeature};
 
 const MAX_SAMPLE: usize = 5;
-const DEFAULT_DB: &str = include_str!("../assets/captcha-db.json");
+const DEFAULT_DB: &str = include_str!("../assets/default-db.json");
 
 pub struct Database {
     pub data: CaptchaDatabase,
@@ -45,7 +45,19 @@ impl Database {
     }
 
     pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        fs::write(path, serde_json::to_string_pretty(&self.data)?)?;
+        let path = path.as_ref();
+
+        let json = serde_json::to_string_pretty(&self.data)?;
+
+        match fs::write(path, json) {
+            Ok(_) => {
+                println!("write ok");
+            }
+            Err(e) => {
+                println!("write err: {:?}", e);
+            }
+        }
+
         Ok(())
     }
 

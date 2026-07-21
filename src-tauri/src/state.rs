@@ -17,6 +17,8 @@ pub static APP_STATE: OnceLock<Mutex<AppState>> = OnceLock::new();
 
 pub static ONLINE_MENU: OnceLock<MenuItem<Wry>> = OnceLock::new();
 
+pub static SYNC_MENU: OnceLock<MenuItem<Wry>> = OnceLock::new();
+
 static HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
 
 pub fn get_client() -> &'static Client {

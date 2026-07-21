@@ -81,14 +81,17 @@ pub fn page_ready(name: String, show: Option<bool>) {
 
 #[tauri::command]
 pub fn captcha_train(svg: String, answer: String) -> Result<(), String> {
-    // if std::path::Path::new(DATABASE_NAME).exists() {
-    //     std::fs::remove_file(DATABASE_NAME).map_err(|e| e.to_string())?;
+    let path = get_path(DATABASE_NAME).map_err(|e| e.to_string())?;
+
+    // if std::path::Path::new(path).exists() {
+    //     std::fs::remove_file(path).map_err(|e| e.to_string())?;
     // }
-    let mut trainer = captcha_db::Trainer::load(DATABASE_NAME).map_err(|e| e.to_string())?;
+
+    let mut trainer = captcha_db::Trainer::load(path.clone()).map_err(|e| e.to_string())?;
 
     trainer.train(&svg, &answer).map_err(|e| e.to_string())?;
 
-    trainer.save(DATABASE_NAME).map_err(|e| e.to_string())?;
+    trainer.save(path).map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -97,8 +100,10 @@ use captcha_db::{svg::parse_svg, Database, Matcher};
 
 #[tauri::command]
 pub fn captcha_predict(svg: String) -> Result<String, String> {
+    let path = get_path(DATABASE_NAME).map_err(|e| e.to_string())?;
+
     // Load database
-    let db = Database::load(DATABASE_NAME).map_err(|e| e.to_string())?;
+    let db = Database::load(path).map_err(|e| e.to_string())?;
 
     // Parse SVG
     let glyphs = parse_svg(&svg).map_err(|e| e.to_string())?;
@@ -109,4 +114,18 @@ pub fn captcha_predict(svg: String) -> Result<String, String> {
     let result = matcher.recognize(&glyphs);
 
     Ok(result)
+}
+
+fn get_path(db_name: &str) -> Result<std::path::PathBuf, String> {
+    let app = APP_HANDLE
+        .get()
+        .ok_or_else(|| "AppHandle chưa được khởi tạo".to_string())?;
+
+    let mut path = app.path().app_data_dir().map_err(|e| e.to_string())?;
+
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+
+    path.push(db_name);
+
+    Ok(path)
 }

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { mInvoiceService } from "../api/services/mInvoice.service";
 interface ILogin {
     tenantId: string,
     source: string;
@@ -9,7 +10,19 @@ interface ILogin {
     reConnect: boolean;
     taxCode: string;
     idAccount: string;
+    info: any
 }
+
+interface ISyncProgress {
+    completed: number;
+    total: number;
+    invoice: {
+        invoiceDate: string;
+        invoiceNumber: number | null;
+        invoiceSerial: string;
+    } | null;
+}
+
 interface IAppState {
     autostartInitialized: boolean,
     setAutostartInitialized: (autostartInitialized: boolean) => void;
@@ -19,8 +32,10 @@ interface IAppState {
     savePassword: Record<string, string>;
     setLogin: (login: ILogin | null) => void;
     login: ILogin | null;
-}
 
+    syncProgress: ISyncProgress | null;
+    setSyncProgress: (payload: Record<string, any>) => void;
+}
 export const useAppStore = create<IAppState>()(
     persist(
         (set) => ({
@@ -41,6 +56,16 @@ export const useAppStore = create<IAppState>()(
                 login: login
             })),
             login: null,
+            syncProgress: null,
+            setSyncProgress: (payload: Record<string, any> | null) => set((state) => ({
+                syncProgress: payload ? {
+                    completed: 0,
+                    total: 0,
+                    invoice: null,
+                    ...(state.syncProgress || {}),
+                    ...payload
+                } : null,
+            }))
         }),
         {
             name: "app-storage",

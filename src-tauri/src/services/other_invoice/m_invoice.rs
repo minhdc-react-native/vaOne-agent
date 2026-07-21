@@ -1,8 +1,12 @@
 use chrono::NaiveDate;
 use serde_json::{json, Value};
+use std::cmp::Ordering as CmpOrdering;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+use crate::progress_bar;
+use crate::services::update::update_progress;
 
 fn format_date(date: &str) -> String {
     NaiveDate::parse_from_str(date, "%Y-%m-%d")
@@ -84,6 +88,30 @@ async fn fetch_m_invoices(
         current_page += 1;
     }
 
+    result.sort_by(|a, b| {
+        let date_a = a["tdlap"].as_str().unwrap_or("");
+        let date_b = b["tdlap"].as_str().unwrap_or("");
+
+        match date_a.cmp(date_b) {
+            CmpOrdering::Equal => {
+                let no_a = a["shdon"]
+                    .as_str()
+                    .unwrap_or("0")
+                    .parse::<u64>()
+                    .unwrap_or(0);
+
+                let no_b = b["shdon"]
+                    .as_str()
+                    .unwrap_or("0")
+                    .parse::<u64>()
+                    .unwrap_or(0);
+
+                no_a.cmp(&no_b)
+            }
+            other => other,
+        }
+    });
+
     Ok(result)
 }
 
@@ -113,6 +141,8 @@ pub async fn run_sync_flow_m_invoice(
         Ok(v) => v,
         Err(e) => {
             println!("ERROR: {}", e);
+            progress_bar(None, None);
+            update_progress(None);
             crate::state::update_sync_emit(&tenant_id, |s| {
                 s.running = false;
                 s.current_invoice = None;
@@ -121,14 +151,35 @@ pub async fn run_sync_flow_m_invoice(
             return;
         }
     };
-
+    let num_of_invoice: usize = invoices.len();
+    let mut completed: usize = 0;
+    progress_bar(Some(completed), Some(num_of_invoice));
+    let payload = json!({
+        "total":Some(num_of_invoice)
+    });
+    update_progress(Some(&payload));
     crate::state::update_sync_emit(&tenant_id, |s| {
-        s.total = Some(invoices.len());
+        s.total = Some(num_of_invoice);
     });
 
     for item in invoices {
+        let tdlap = item["tdlap"].as_str().unwrap_or("");
+        let khhdon = item["khhdon"].as_str().unwrap_or("");
+        let shdon = item["shdon"].as_i64().unwrap_or(0);
+
         match crate::api::http::post_data(&tenant_id, &org_unit_id, &item).await {
             Ok(_) => {
+                completed += 1;
+                progress_bar(Some(completed), Some(num_of_invoice));
+                let payload = json!({
+                    "completed":Some(completed),
+                    "invoice":{
+                        "invoiceDate": tdlap,
+                        "invoiceNumber": shdon,
+                        "invoiceSerial": khhdon
+                    }
+                });
+                update_progress(Some(&payload));
                 crate::state::update_sync_emit(&tenant_id, |s| {
                     s.completed += 1;
                     s.success += 1;
@@ -137,6 +188,17 @@ pub async fn run_sync_flow_m_invoice(
             }
             Err(err) => {
                 eprintln!("Post invoice failed: {}", err);
+                completed += 1;
+                progress_bar(Some(completed), Some(num_of_invoice));
+                let payload = json!({
+                    "completed":Some(completed),
+                    "invoice":{
+                        "invoiceDate": tdlap,
+                        "invoiceNumber": shdon,
+                        "invoiceSerial": khhdon
+                    }
+                });
+                update_progress(Some(&payload));
                 crate::state::update_sync_emit(&tenant_id, |s| {
                     s.completed += 1;
                     s.failed += 1;
@@ -149,6 +211,8 @@ pub async fn run_sync_flow_m_invoice(
     }
 
     // 3. final state
+    progress_bar(None, None);
+    update_progress(None);
     crate::state::update_sync_emit(&tenant_id, |s| {
         s.running = false;
         s.current_invoice = None;
