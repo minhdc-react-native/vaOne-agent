@@ -217,7 +217,6 @@ pub async fn run_sync_flow_save_invoice(
                         "invoiceSerial": khhdon
                     }
                 });
-                println!("payload={:#?}", payload);
                 update_progress(Some(&payload));
                 crate::state::update_sync_emit(&tenant_id, |s| {
                     s.completed += 1;

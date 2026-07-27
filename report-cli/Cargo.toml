@@ -3,6 +3,9 @@ name = "report-cli"
 version = "1.0.0"
 edition = "2021"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 pdf-core = { path = "../pdf-core" }
 

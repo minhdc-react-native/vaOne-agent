@@ -6,9 +6,20 @@ use crate::models::system::SyncTokenRequest;
 use crate::state::APP_HANDLE;
 use crate::state::CURRENT_ROUTE;
 use crate::utils::notification;
+use axum::body::Body;
+use axum::http::HeaderMap;
 use axum::response::IntoResponse;
 use axum::Json;
+use pdf_core::models::PdfTemplate;
+use pdf_core::renderer;
+use reqwest::header::CONTENT_DISPOSITION;
+use reqwest::header::CONTENT_TYPE;
+use reqwest::StatusCode;
+use serde::Deserialize;
+use std::env;
+use std::fs;
 use tauri::{Emitter, Manager};
+use uuid::Uuid;
 
 pub async fn exit_app() -> &'static str {
     if let Some(app) = APP_HANDLE.get() {
@@ -71,4 +82,52 @@ pub async fn open_tray_page(Json(req): Json<OpenTrayRequest>) -> Json<serde_json
     Json(serde_json::json!({
         "success": true
     }))
+}
+
+#[derive(Deserialize)]
+pub struct RenderPdfRequest {
+    pub reports: Vec<PdfTemplate>,
+    pub datas: Vec<serde_json::Value>,
+}
+
+pub async fn render_pdf(
+    Json(req): Json<RenderPdfRequest>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    // Tạo file tạm
+    let output = env::temp_dir().join(format!("{}.pdf", Uuid::new_v4()));
+
+    let output_clone = output.clone();
+
+    // Nếu muốn gửi progress qua websocket thì giữ callback này,
+    // còn không thì để rỗng.
+    let mut progress = |_p: serde_json::Value| {};
+
+    tokio::task::spawn_blocking(move || {
+        renderer::render_page(
+            req.reports,
+            req.datas,
+            output_clone.to_str().unwrap(),
+            &mut progress,
+        )
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
+
+    // Đọc file PDF
+    let bytes =
+        fs::read(&output).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    // Xóa file tạm
+    let _ = fs::remove_file(&output);
+
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, "application/pdf".parse().unwrap());
+    headers.insert(
+        CONTENT_DISPOSITION,
+        "inline; filename=\"invoice.pdf\"".parse().unwrap(),
+    );
+
+    Ok((headers, Body::from(bytes)))
 }

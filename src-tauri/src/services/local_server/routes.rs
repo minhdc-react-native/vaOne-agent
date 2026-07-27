@@ -13,6 +13,7 @@ pub fn router() -> Router {
         .route("/sync_token", post(handlers::sync_token))
         .route("/message", post(handlers::message))
         .route("/open_tray_page", post(handlers::open_tray_page))
+        .route("/render_pdf", post(handlers::render_pdf))
         .route("/exit", post(handlers::exit_app))
         .merge(ws::router::router())
         .layer(CorsLayer::permissive())
