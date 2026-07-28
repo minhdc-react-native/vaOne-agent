@@ -18,6 +18,7 @@ use tauri::{
     tray::TrayIconBuilder,
     Manager,
 };
+const LINE_TEXT: &str = "------------------------------";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -46,7 +47,7 @@ pub fn run() {
             )?;
             let _ = ONLINE_MENU.set(online.clone());
 
-            let sync = MenuItem::with_id(app, "sync", "", false, None::<&str>)?;
+            let sync = MenuItem::with_id(app, "sync", LINE_TEXT, false, None::<&str>)?;
 
             let _ = SYNC_MENU.set(sync.clone());
 
@@ -61,7 +62,7 @@ pub fn run() {
                 &[
                     &online,
                     &sync,
-                    &separator,
+                    // &separator,
                     &settings,
                     &check_update,
                     &separator,
@@ -170,7 +171,7 @@ pub fn progress_bar(done: Option<usize>, total: Option<usize>) {
             }
             _ => {
                 let _ = item.set_enabled(false);
-                let _ = item.set_text("");
+                let _ = item.set_text(LINE_TEXT);
             }
         }
     }

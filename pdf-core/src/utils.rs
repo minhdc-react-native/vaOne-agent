@@ -307,7 +307,12 @@ pub fn draw_watermark(
     page_height: f32,
     text: &str,
 ) {
-    let font_size = 100.0;
+    let target_width = page_width * 0.50;
+
+    let base_font_size = 100.0;
+    let base_width = TextLayout::measure_string(fonts, text, base_font_size, true, false);
+
+    let font_size = base_font_size * target_width / base_width;
 
     let text_width = TextLayout::measure_string(fonts, text, font_size, true, false);
 

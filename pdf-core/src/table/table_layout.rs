@@ -360,7 +360,7 @@ impl TableLayoutEngine {
                     style,
                     row_span,
                     col_span,
-                    is_row: true,
+                    is_row: false,
                 });
 
                 //------------------------------------------
@@ -489,7 +489,7 @@ impl TableLayoutEngine {
                     row_span: 1,
 
                     col_span: 1,
-                    is_row: true,
+                    is_row: false,
                 });
 
                 x += width;
