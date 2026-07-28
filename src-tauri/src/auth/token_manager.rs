@@ -11,6 +11,10 @@ impl TokenManager {
 
     /// Web sync token sang tray
     pub fn sync(tenant_id: &str, token: Option<TokenState>, auth: Option<AuthConfig>) {
+        // println!(
+        //     "Web sync token sang tray tenant_id={},token={:#?},auth={:#?}",
+        //     tenant_id, token, auth
+        // );
         let mut state = APP_STATE
             .get()
             .expect("APP_STATE not initialized")

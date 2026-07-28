@@ -6,6 +6,7 @@ pub struct FormatterContext {
     pub continuous_page: Option<bool>,
 
     pub continuous_page_numbering: bool,
+    pub text_demo: Option<String>,
     pub lang: String,
     pub decimal: DecimalConfig,
     pub currency: CurrencyConfig,
@@ -17,6 +18,7 @@ impl Default for FormatterContext {
             continuous_page: Some(false),
             continuous_page_numbering: true,
             lang: "vi".to_string(),
+            text_demo: None,
             decimal: DecimalConfig::default(),
             currency: CurrencyConfig::default(),
         }

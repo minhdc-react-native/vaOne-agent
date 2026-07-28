@@ -1,5 +1,6 @@
 use crate::pagination::page::PageLayout;
 use crate::pagination::paginator::PageItem;
+use crate::utils::draw_watermark;
 use crate::{
     fonts::PdfFonts,
     image::{render_background_image, render_image},
@@ -40,6 +41,13 @@ impl PageRenderer {
                 page_width,
                 page_height,
             );
+            if let Some(text) = ctx.text_demo.as_deref() {
+                println!(
+                    "text_demo={},width={},height={}",
+                    text, page_width, page_height
+                );
+                let _ = draw_watermark(&mut ops, fonts, page_width, page_height, text);
+            }
             for item in page.items {
                 match item {
                     PageItem::Text { element, layout } => {

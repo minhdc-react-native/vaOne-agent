@@ -1,8 +1,11 @@
 use crate::fonts::{PdfFont, PdfFonts};
+use crate::layout::TextLayout;
 use crate::state::{FONT_BOLD, FONT_BOLD_ITALIC, FONT_ITALIC, FONT_REGULAR};
 use crate::template::models::FormatterContext;
 use anyhow::{anyhow, Result};
-use printpdf::{Color, Mm, Op, ParsedFont, PdfDocument, Pt, Rgb};
+use printpdf::{
+    Color, Greyscale, Mm, Op, ParsedFont, PdfDocument, Point, Pt, Rgb, TextItem, TextMatrix,
+};
 use regex::Regex;
 use serde_json::Value;
 
@@ -295,4 +298,67 @@ pub fn get_formatter_context(data: &Value) -> FormatterContext {
     } else {
         FormatterContext::default()
     }
+}
+
+pub fn draw_watermark(
+    ops: &mut Vec<Op>,
+    fonts: &PdfFonts,
+    page_width: f32,
+    page_height: f32,
+    text: &str,
+) {
+    let font_size = 100.0;
+
+    let text_width = TextLayout::measure_string(fonts, text, font_size, true, false);
+
+    let angle = 54f32.to_radians();
+    let cos = angle.cos();
+    let sin = angle.sin();
+
+    let text_height = font_size;
+
+    let cx = page_width / 2.0;
+    let cy = page_height / 2.0;
+
+    let dx = text_width / 2.0;
+    let dy = text_height / 2.0;
+
+    let x = cx - (dx * cos - dy * sin);
+    let y = cy - (dx * sin + dy * cos);
+
+    ops.push(Op::StartTextSection);
+
+    ops.push(Op::SetTextCursor {
+        pos: Point {
+            x: Unit::px_to_mm(x).into(),
+            y: Unit::px_to_mm(y).into(),
+        },
+    });
+
+    ops.push(Op::SetFillColor {
+        col: Color::Greyscale(Greyscale::new(0.90, None)),
+    });
+
+    ops.push(Op::SetFontSize {
+        font: fonts.bold.id.clone(),
+        size: Pt(font_size),
+    });
+
+    ops.push(Op::SetTextMatrix {
+        matrix: TextMatrix::Raw([
+            cos,
+            sin,
+            -sin,
+            cos,
+            Unit::px_to_mm(x).into_pt().0,
+            Unit::px_to_mm(y).into_pt().0,
+        ]),
+    });
+
+    ops.push(Op::WriteText {
+        items: vec![TextItem::Text(text.to_string())],
+        font: fonts.bold.id.clone(),
+    });
+
+    ops.push(Op::EndTextSection);
 }
