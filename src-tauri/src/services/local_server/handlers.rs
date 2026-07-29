@@ -12,6 +12,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use pdf_core::models::PdfTemplate;
 use pdf_core::renderer;
+use printer_core::PrintOptions;
 use reqwest::header::CONTENT_DISPOSITION;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
@@ -83,11 +84,11 @@ pub async fn open_tray_page(Json(req): Json<OpenTrayRequest>) -> Json<serde_json
         "success": true
     }))
 }
-
 #[derive(Deserialize)]
 pub struct RenderPdfRequest {
     pub reports: Vec<PdfTemplate>,
     pub datas: Vec<serde_json::Value>,
+    pub options: Option<PrintOptions>,
 }
 
 pub async fn render_pdf(
@@ -115,6 +116,19 @@ pub async fn render_pdf(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
+    if let Some(options) = req.options {
+        printer_core::print_pdf(options, output.to_str().unwrap())
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+        // Xóa file tạm
+        let _ = fs::remove_file(&output);
+
+        let mut headers = HeaderMap::new();
+        headers.insert("content-type", "application/json".parse().unwrap());
+
+        return Ok((headers, Body::from(r#"{"success":true,"printed":true}"#)));
+    }
+
     // Đọc file PDF
     let bytes =
         fs::read(&output).map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -130,4 +144,11 @@ pub async fn render_pdf(
     );
 
     Ok((headers, Body::from(bytes)))
+}
+
+pub async fn get_printers() -> impl IntoResponse {
+    match printer_core::get_printers() {
+        Ok(list) => Json(list).into_response(),
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
+    }
 }

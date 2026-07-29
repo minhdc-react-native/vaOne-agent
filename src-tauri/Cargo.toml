@@ -18,7 +18,7 @@ tauri-build = { version = "2", features = [] }
 # Workspace crates
 # =========================
 pdf-core = { path = "../pdf-core" }
-
+printer-core = { path = "../printer-core" }
 captcha-db = { path = "../captcha-db" }
 
 # =========================

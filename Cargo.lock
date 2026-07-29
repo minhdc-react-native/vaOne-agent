@@ -3969,6 +3969,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
 
 [[package]]
+name = "printer-core"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "printpdf"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6671,6 +6680,7 @@ dependencies = [
  "dirs 6.0.0",
  "futures-util",
  "pdf-core",
+ "printer-core",
  "reqwest",
  "serde",
  "serde_json",

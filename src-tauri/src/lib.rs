@@ -138,7 +138,6 @@ pub fn run() {
             commands::api_command::http_post,
             commands::system::page_ready,
             commands::pdf::render_pdf,
-            commands::printer::print_pdf,
             commands::invoice::get_sync_state,
             commands::invoice::start_invoice_tct_sync,
             commands::invoice::start_save_invoice_sync,

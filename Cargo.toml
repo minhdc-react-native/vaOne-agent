@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "src-tauri",
     "pdf-core",
+    "printer-core",
     "report-cli",
     "captcha-db",
 ]

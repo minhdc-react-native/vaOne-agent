@@ -42,10 +42,10 @@ impl PageRenderer {
                 page_height,
             );
             if let Some(text) = ctx.text_demo.as_deref() {
-                println!(
-                    "text_demo={},width={},height={}",
-                    text, page_width, page_height
-                );
+                // println!(
+                //     "text_demo={},width={},height={}",
+                //     text, page_width, page_height
+                // );
                 let _ = draw_watermark(&mut ops, fonts, page_width, page_height, text);
             }
             for item in page.items {
