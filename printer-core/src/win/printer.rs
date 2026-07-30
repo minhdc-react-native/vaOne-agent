@@ -1,4 +1,6 @@
-use crate::{PrinterError, PrinterInfo, Result};
+use crate::{PDFIUM_PATH,PrintOptions,PrinterError, PrinterInfo, Result};
+use super::printer_status::get_printer_status;
+
 use pdfium_render::prelude::*;
 use std::ptr::null_mut;
 
@@ -29,7 +31,7 @@ fn get_default_printer_name() -> Option<String> {
     unsafe {
         let mut needed = 0;
 
-        let _ = GetDefaultPrinterW(PWSTR::null(), &mut needed);
+        let _ = GetDefaultPrinterW(None, &mut needed);
 
         if needed == 0 {
             return None;
@@ -37,7 +39,7 @@ fn get_default_printer_name() -> Option<String> {
 
         let mut buffer = vec![0u16; needed as usize];
 
-        if GetDefaultPrinterW(PWSTR(buffer.as_mut_ptr()), &mut needed).is_ok() {
+        if GetDefaultPrinterW(Some(PWSTR(buffer.as_mut_ptr())), &mut needed).as_bool() {
             Some(String::from_utf16_lossy(
                 &buffer[..needed.saturating_sub(1) as usize],
             ))
@@ -55,7 +57,14 @@ pub fn get_printers() -> Result<Vec<PrinterInfo>> {
         let mut returned = 0u32;
 
         // lấy kích thước buffer
-        EnumPrintersW(flags, None, 2, None, 0, &mut needed, &mut returned);
+        EnumPrintersW(
+            flags,
+            None,
+            2,
+            None,
+            &mut needed,
+            &mut returned,
+        );
 
         if needed == 0 {
             return Ok(Vec::new());
@@ -67,13 +76,10 @@ pub fn get_printers() -> Result<Vec<PrinterInfo>> {
             flags,
             None,
             2,
-            Some(buffer.as_mut_ptr()),
-            needed,
+            Some(buffer.as_mut_slice()),
             &mut needed,
             &mut returned,
-        )
-        .map_err(|e| PrinterError::Message(e.to_string()))?;
-
+        );
         let printers = std::slice::from_raw_parts(
             buffer.as_ptr() as *const PRINTER_INFO_2W,
             returned as usize,
@@ -100,7 +106,32 @@ pub fn get_printers() -> Result<Vec<PrinterInfo>> {
     }
 }
 
-pub fn print_pdf(_options: PrintOptions, pdf_path: &str) -> Result<i32> {
+pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
+
+    let printer_name = options
+        .printer
+        .or_else(get_default_printer_name)
+        .ok_or_else(|| PrinterError::Message("Không tìm thấy máy in".into()))?;
+
+    let status = get_printer_status(&printer_name)?;
+    println!("status printer={:#?} printer_name={}", status,printer_name);
+    // Máy in không nhận job mới
+    if !status.accepting {
+        return Err(PrinterError::Message(
+            "Máy in hiện không nhận lệnh in.".into(),
+        ));
+    }
+
+    // Có lý do lỗi
+    if !status.messages.is_empty() {
+        return Err(PrinterError::Message(status.messages.join(", ")));
+    }
+
+    // Printer bị stop
+    if status.state == 5 {
+        return Err(PrinterError::Message("Máy in đang tạm dừng.".into()));
+    }
+
     let pdfium_path = PDFIUM_PATH.get().ok_or_else(|| {
         PrinterError::Message("PDFium chưa được khởi tạo. Hãy gọi init_pdfium() trước.".into())
     })?;
@@ -126,7 +157,14 @@ pub fn print_pdf(_options: PrintOptions, pdf_path: &str) -> Result<i32> {
             .get(0)
             .map_err(|e| PrinterError::Message(e.to_string()))?;
 
-        let bitmap = page.render_with_config(&PdfRenderConfig::new().set_target_dpi(300.0))?;
+        let width_px = (page.width().value * 300.0 / 72.0).round() as i32;
+        let height_px = (page.height().value * 300.0 / 72.0).round() as i32;
+
+        let bitmap = page.render_with_config(
+            &PdfRenderConfig::new()
+                .set_target_width(width_px)
+                .set_target_height(height_px),
+        ).map_err(|e| PrinterError::Message(e.to_string()))?;
 
         println!("Page 1 rendered: {} x {}", bitmap.width(), bitmap.height());
     }

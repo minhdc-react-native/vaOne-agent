@@ -1,7 +1,6 @@
 use crate::{PrinterError, PrinterStatus, Result};
 
 use std::{ffi::OsStr, iter::once};
-
 use windows::{
     Win32::Graphics::Printing::{
         ClosePrinter, GetPrinterW, OpenPrinterW, PRINTER_ACCESS_USE, PRINTER_DEFAULTSW,
@@ -12,7 +11,7 @@ use windows::{
         PRINTER_STATUS_PROCESSING, PRINTER_STATUS_TONER_LOW, PRINTER_STATUS_USER_INTERVENTION,
         PRINTER_STATUS_WAITING, PRINTER_STATUS_WARMING_UP,
     },
-    core::PCWSTR,
+    core::{PCWSTR,PWSTR,},
 };
 
 fn to_wide(value: &str) -> Vec<u16> {
@@ -26,9 +25,9 @@ pub fn get_printer_status(printer: &str) -> Result<PrinterStatus> {
         let mut handle = Default::default();
 
         let mut defaults = PRINTER_DEFAULTSW {
-            pDatatype: PCWSTR::null(),
+            pDatatype: PWSTR(std::ptr::null_mut()),
             pDevMode: std::ptr::null_mut(),
-            DesiredAccess: PRINTER_ACCESS_USE.0,
+            DesiredAccess: PRINTER_ACCESS_USE,
         };
 
         OpenPrinterW(
@@ -40,16 +39,28 @@ pub fn get_printer_status(printer: &str) -> Result<PrinterStatus> {
 
         let mut needed = 0;
 
-        GetPrinterW(handle, 2, None, 0, &mut needed);
+        GetPrinterW(handle, 2, None, &mut needed);
 
         let mut buffer = vec![0u8; needed as usize];
 
-        GetPrinterW(handle, 2, Some(buffer.as_mut_slice()), needed, &mut needed).map_err(|e| {
+        GetPrinterW(handle, 2, Some(buffer.as_mut_slice()), &mut needed).map_err(|e| {
             ClosePrinter(handle);
             PrinterError::Message(e.to_string())
         })?;
 
         let info = &*(buffer.as_ptr() as *const PRINTER_INFO_2W);
+        
+        let info2 = unsafe {
+            &*(buffer.as_ptr() as *const PRINTER_INFO_2W)
+        };
+        println!("========== PRINTER_INFO_2 ==========");
+        println!("Status      : 0x{:08X}", info2.Status);
+        println!("Attributes  : 0x{:08X}", info2.Attributes);
+        println!("Jobs        : {}", info2.cJobs);
+        println!("AveragePPM  : {}", info2.AveragePPM);
+        println!("Priority    : {}", info2.Priority);
+        println!("DefaultPrio : {}", info2.DefaultPriority);
+        println!("====================================");
 
         let status = info.Status;
 

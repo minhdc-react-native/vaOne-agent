@@ -1,5 +1,2 @@
-use crate::{PrinterInfo, Result};
-
-pub fn get_printers() -> Result<Vec<PrinterInfo>> {
-    Ok(vec![])
-}
+pub mod printer;
+pub use printer::{get_printers};

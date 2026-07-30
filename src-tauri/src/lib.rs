@@ -16,8 +16,9 @@ use std::time::Duration;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    Manager,
+    App,Manager,
 };
+use std::path::PathBuf;
 const LINE_TEXT: &str = "------------------------------";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -37,11 +38,11 @@ pub fn run() {
         .setup(|app| {
             #[cfg(target_os = "windows")]
             {
-                let pdfium_path = app
-                    .path()
-                    .resolve("pdfium/pdfium.dll", tauri::path::BaseDirectory::Resource)?;
+                let pdfium_path = get_pdfium_path(&app)?;
 
-                printer_core::init_pdfium(pdfium_path.to_string_lossy().as_ref())?;
+                println!("PDFium: {}", pdfium_path.display());
+                println!("Exists: {}", pdfium_path.exists());
+                printer_core::init_pdfium(pdfium_path);
             }
             let window = app.get_webview_window("main").unwrap();
             let window_clone = window.clone();
@@ -181,5 +182,21 @@ pub fn progress_bar(done: Option<usize>, total: Option<usize>) {
                 let _ = item.set_text(LINE_TEXT);
             }
         }
+    }
+}
+
+fn get_pdfium_path(app: &App) -> tauri::Result<PathBuf> {
+    #[cfg(debug_assertions)]
+    {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources");
+        path.push("pdfium");
+        path.push("pdfium.dll");
+        Ok(path)
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        app.path().resolve("pdfium/pdfium.dll", tauri::path::BaseDirectory::Resource)
     }
 }

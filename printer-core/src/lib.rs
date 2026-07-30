@@ -3,10 +3,11 @@ mod model;
 mod state;
 pub use error::*;
 pub use model::*;
+pub use state::*;
 pub use state::init_pdfium;
 
 #[cfg(target_os = "windows")]
-mod windows;
+mod win;
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -16,7 +17,7 @@ mod linux;
 pub fn get_printers() -> Result<Vec<PrinterInfo>> {
     #[cfg(target_os = "windows")]
     {
-        return windows::get_printers();
+        return win::get_printers();
     }
 
     #[cfg(target_os = "macos")]
@@ -36,7 +37,7 @@ pub fn get_printers() -> Result<Vec<PrinterInfo>> {
 pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
     #[cfg(target_os = "windows")]
     {
-        return windows::print_pdf(options, pdf_path);
+        return win::print_pdf(options, pdf_path);
     }
 
     #[cfg(target_os = "macos")]

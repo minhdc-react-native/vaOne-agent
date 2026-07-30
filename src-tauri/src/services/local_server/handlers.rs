@@ -126,8 +126,8 @@ pub async fn render_pdf(
                 headers.insert("content-type", "application/json".parse().unwrap());
 
                 let body = serde_json::to_vec(&PrintResponse {
-                    success: false,
-                    printed: false,
+                    success: true,
+                    printed: true,
                     message: None,
                 })
                 .unwrap();
