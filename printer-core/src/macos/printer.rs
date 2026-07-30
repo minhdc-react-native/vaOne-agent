@@ -1,9 +1,6 @@
-use crate::{PrintOptions, PrinterError, PrinterInfo, Result};
-use libc::{c_char, c_int};
-use std::{
-    ffi::{CStr, CString},
-    ptr,
-};
+use crate::{PrintOptions, PrinterError, PrinterInfo, PrinterStatus, Result};
+use libc::{c_char, c_int, c_void};
+use std::ffi::{CStr, CString};
 
 #[repr(C)]
 pub struct cups_option_t {
@@ -22,9 +19,31 @@ pub struct cups_dest_t {
 
 #[link(name = "cups")]
 unsafe extern "C" {
+    fn cupsLastErrorString() -> *const c_char;
+
     fn cupsGetDests(dests: *mut *mut cups_dest_t) -> c_int;
 
     fn cupsFreeDests(num_dests: c_int, dests: *mut cups_dest_t);
+
+    fn cupsGetOption(
+        name: *const c_char,
+        num_options: c_int,
+        options: *const cups_option_t,
+    ) -> *const c_char;
+
+    fn cupsGetNamedDest(
+        http: *mut c_void,
+        name: *const c_char,
+        instance: *const c_char,
+    ) -> *mut cups_dest_t;
+
+    fn cupsPrintFile(
+        printer: *const c_char,
+        filename: *const c_char,
+        title: *const c_char,
+        num_options: c_int,
+        options: *const cups_option_t,
+    ) -> c_int;
 }
 
 pub fn get_printers() -> Result<Vec<PrinterInfo>> {
@@ -64,7 +83,7 @@ pub fn get_printers() -> Result<Vec<PrinterInfo>> {
     }
 }
 
-pub fn get_default_printer_id() -> Result<String> {
+fn get_default_printer_id() -> Result<String> {
     get_printers()?
         .into_iter()
         .find(|p| p.is_default)
@@ -100,28 +119,30 @@ fn get_option(dest: &cups_dest_t, key: &str) -> Option<String> {
     }
 }
 
-#[link(name = "cups")]
-unsafe extern "C" {
-    fn cupsLastErrorString() -> *const c_char;
-}
-
-#[link(name = "cups")]
-unsafe extern "C" {
-    fn cupsPrintFile(
-        printer: *const c_char,
-        filename: *const c_char,
-        title: *const c_char,
-        num_options: c_int,
-        options: *const cups_option_t,
-    ) -> c_int;
-}
-
 pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
     unsafe {
         let printer_name = match options.printer {
             Some(printer) => printer,
             None => get_default_printer_id()?,
         };
+        let status = get_printer_status(&printer_name)?;
+        println!("status printer={:#?}", status);
+        // Máy in không nhận job mới
+        if !status.accepting {
+            return Err(PrinterError::Message(
+                "Máy in hiện không nhận lệnh in.".into(),
+            ));
+        }
+
+        // Có lý do lỗi
+        if !status.messages.is_empty() {
+            return Err(PrinterError::Message(status.messages.join(", ")));
+        }
+
+        // Printer bị stop
+        if status.state == 5 {
+            return Err(PrinterError::Message("Máy in đang tạm dừng.".into()));
+        }
 
         let printer =
             CString::new(printer_name).map_err(|e| PrinterError::Message(e.to_string()))?;
@@ -220,5 +241,80 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
         }
 
         Ok(job_id)
+    }
+}
+
+pub fn get_printer_status(printer: &str) -> Result<PrinterStatus> {
+    unsafe {
+        let printer = CString::new(printer).map_err(|e| PrinterError::Message(e.to_string()))?;
+
+        let dest = cupsGetNamedDest(std::ptr::null_mut(), printer.as_ptr(), std::ptr::null());
+
+        if dest.is_null() {
+            return Err(PrinterError::Message("Printer not found".into()));
+        }
+
+        let dest = &*dest;
+
+        let get = |name: &str| -> Option<String> {
+            let key = CString::new(name).unwrap();
+
+            let value = cupsGetOption(key.as_ptr(), dest.num_options, dest.options);
+
+            if value.is_null() {
+                None
+            } else {
+                Some(CStr::from_ptr(value).to_string_lossy().into_owned())
+            }
+        };
+
+        let state = get("printer-state")
+            .and_then(|s| s.parse::<u32>().ok())
+            .unwrap_or(0);
+
+        let reasons: Vec<String> = get("printer-state-reasons")
+            .unwrap_or_default()
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let accepting = get("printer-is-accepting-jobs")
+            .map(|v| v == "true")
+            .unwrap_or(true);
+
+        let messages: Vec<String> = reasons
+            .iter()
+            .map(|r| translate_reason(r).to_string())
+            .collect();
+
+        Ok(PrinterStatus {
+            state,
+            reasons,
+            messages,
+            accepting,
+        })
+    }
+}
+
+fn translate_reason(reason: &str) -> &'static str {
+    match reason {
+        "offline" => "Máy in đang ngoại tuyến",
+
+        "media-empty" | "media-empty-report" => "Máy in cần giấy",
+
+        "media-jam" | "media-jam-report" => "Máy in bị kẹt giấy",
+
+        "door-open" | "door-open-report" => "Nắp máy in đang mở",
+
+        "paused" => "Máy in đang tạm dừng",
+
+        "toner-low" => "Mực in sắp hết",
+
+        "toner-empty" => "Máy in đã hết mực",
+
+        "marker-supply-empty" | "marker-supply-empty-report" => "Hết mực",
+
+        _ => "Không xác định",
     }
 }

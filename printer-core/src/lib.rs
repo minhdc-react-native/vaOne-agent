@@ -1,8 +1,9 @@
 mod error;
 mod model;
-
+mod state;
 pub use error::*;
 pub use model::*;
+pub use state::init_pdfium;
 
 #[cfg(target_os = "windows")]
 mod windows;
@@ -35,7 +36,7 @@ pub fn get_printers() -> Result<Vec<PrinterInfo>> {
 pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
     #[cfg(target_os = "windows")]
     {
-        return 0.0;
+        return windows::print_pdf(options, pdf_path);
     }
 
     #[cfg(target_os = "macos")]
@@ -45,27 +46,7 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
 
     #[cfg(target_os = "linux")]
     {
-        return 0.0;
-    }
-
-    #[allow(unreachable_code)]
-    Err(PrinterError::Message("Unsupported platform".into()))
-}
-
-pub fn get_default_printer_id() -> Result<String> {
-    #[cfg(target_os = "windows")]
-    {
-        return "";
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        return macos::get_default_printer_id();
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        return "";
+        return linux::print_pdf(options, pdf_path);
     }
 
     #[allow(unreachable_code)]

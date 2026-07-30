@@ -27,3 +27,11 @@ pub struct PrintOptions {
     pub landscape: Option<bool>,
     pub page_ranges: Option<String>,
 }
+
+#[derive(Debug)]
+pub struct PrinterStatus {
+    pub state: u32,
+    pub reasons: Vec<String>,
+    pub messages: Vec<String>,
+    pub accepting: bool,
+}

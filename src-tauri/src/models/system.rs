@@ -94,3 +94,10 @@ impl Default for SyncState {
         }
     }
 }
+
+#[derive(Serialize)]
+pub struct PrintResponse {
+    pub success: bool,
+    pub printed: bool,
+    pub message: Option<String>,
+}

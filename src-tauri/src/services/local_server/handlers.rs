@@ -2,6 +2,7 @@ use super::types::MessageRequest;
 use super::types::OpenTrayRequest;
 use super::types::PingResponse;
 use crate::auth::token_manager::TokenManager;
+use crate::models::system::PrintResponse;
 use crate::models::system::SyncTokenRequest;
 use crate::state::APP_HANDLE;
 use crate::state::CURRENT_ROUTE;
@@ -117,16 +118,38 @@ pub async fn render_pdf(
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
     if let Some(options) = req.options {
-        printer_core::print_pdf(options, output.to_str().unwrap())
-            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+        match printer_core::print_pdf(options, output.to_str().unwrap()) {
+            Ok(_) => {
+                let _ = fs::remove_file(&output);
 
-        // Xóa file tạm
-        let _ = fs::remove_file(&output);
+                let mut headers = HeaderMap::new();
+                headers.insert("content-type", "application/json".parse().unwrap());
 
-        let mut headers = HeaderMap::new();
-        headers.insert("content-type", "application/json".parse().unwrap());
+                let body = serde_json::to_vec(&PrintResponse {
+                    success: false,
+                    printed: false,
+                    message: None,
+                })
+                .unwrap();
 
-        return Ok((headers, Body::from(r#"{"success":true,"printed":true}"#)));
+                return Ok((headers, Body::from(body)));
+            }
+            Err(e) => {
+                let _ = fs::remove_file(&output);
+
+                let mut headers = HeaderMap::new();
+                headers.insert("content-type", "application/json".parse().unwrap());
+
+                let body = serde_json::to_vec(&PrintResponse {
+                    success: false,
+                    printed: false,
+                    message: Some(e.to_string()),
+                })
+                .unwrap();
+
+                return Ok((headers, Body::from(body)));
+            }
+        }
     }
 
     // Đọc file PDF

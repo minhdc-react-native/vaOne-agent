@@ -35,6 +35,14 @@ pub fn run() {
         }))
         // INIT APP
         .setup(|app| {
+            #[cfg(target_os = "windows")]
+            {
+                let pdfium_path = app
+                    .path()
+                    .resolve("pdfium/pdfium.dll", tauri::path::BaseDirectory::Resource)?;
+
+                printer_core::init_pdfium(pdfium_path.to_string_lossy().as_ref())?;
+            }
             let window = app.get_webview_window("main").unwrap();
             let window_clone = window.clone();
             let _ = window_clone.hide();
