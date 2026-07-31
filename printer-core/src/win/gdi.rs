@@ -5,13 +5,52 @@ use pdfium_render::prelude::*;
 use std::{ffi::c_void, mem::size_of};
 
 use windows::{
-    Win32::Graphics::Gdi::{
-        BITMAPINFO, BITMAPINFOHEADER, CreateDCW, DIB_RGB_COLORS, DOCINFOW, DeleteDC, EndDoc,
-        EndPage, GetDeviceCaps, HORZRES, LOGPIXELSX, LOGPIXELSY, SRCCOPY, StartDocW, StartPage,
-        StretchDIBits, VERTRES,
-    },
     core::PCWSTR,
+    Win32::Graphics::Gdi::{
+        CreateDCW,
+        DeleteDC,
+        GetDeviceCaps,
+        StretchDIBits,
+        BITMAPINFO,
+        BITMAPINFOHEADER,
+        DIB_RGB_COLORS,
+        HDC,
+        HORZRES,
+        LOGPIXELSX,
+        LOGPIXELSY,
+        SRCCOPY,
+        VERTRES,
+    },
 };
+
+#[repr(C)]
+struct DOCINFOW {
+    cbSize: i32,
+    lpszDocName: PCWSTR,
+    lpszOutput: PCWSTR,
+    lpszDatatype: PCWSTR,
+    fwType: u32,
+}
+
+#[link(name = "gdi32")]
+unsafe extern "system" {
+    fn StartDocW(
+        hdc: HDC,
+        lpdi: *const DOCINFOW,
+    ) -> i32;
+
+    fn StartPage(
+        hdc: HDC,
+    ) -> i32;
+
+    fn EndPage(
+        hdc: HDC,
+    ) -> i32;
+
+    fn EndDoc(
+        hdc: HDC,
+    ) -> i32;
+}
 
 fn to_wide(value: &str) -> Vec<u16> {
     value.encode_utf16().chain(std::iter::once(0)).collect()
@@ -48,11 +87,11 @@ impl GdiPrinter {
                 )));
             }
 
-            let dpi_x = GetDeviceCaps(hdc, LOGPIXELSX);
-            let dpi_y = GetDeviceCaps(hdc, LOGPIXELSY);
+            let dpi_x = GetDeviceCaps(Some(hdc), LOGPIXELSX);
+            let dpi_y = GetDeviceCaps(Some(hdc), LOGPIXELSY);
 
-            let width = GetDeviceCaps(hdc, HORZRES);
-            let height = GetDeviceCaps(hdc, VERTRES);
+            let width = GetDeviceCaps(Some(hdc), HORZRES);
+            let height = GetDeviceCaps(Some(hdc), VERTRES);
 
             println!("========== GDI PRINTER ==========");
             println!("Printer : {}", printer_name);

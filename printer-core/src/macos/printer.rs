@@ -305,7 +305,7 @@ fn translate_reason(reason: &str) -> &'static str {
     match reason {
         "offline" => "Máy in đang ngoại tuyến",
 
-        "media-empty" | "media-empty-report" => "Máy in cần giấy",
+        "media-empty" | "media-empty-report" => "Máy in hết giấy",
 
         "media-jam" | "media-jam-report" => "Máy in bị kẹt giấy",
 
