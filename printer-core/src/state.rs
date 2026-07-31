@@ -1,11 +1,4 @@
-use std::{
-    path::PathBuf,
-    sync::{Mutex, OnceLock},
-};
-
-use pdfium_render::prelude::*;
-
-use crate::{PrinterError, Result};
+use std::{path::PathBuf, sync::OnceLock};
 
 pub static PDFIUM_PATH: OnceLock<PathBuf> = OnceLock::new();
 

@@ -3,8 +3,8 @@ mod model;
 mod state;
 pub use error::*;
 pub use model::*;
-pub use state::*;
 pub use state::init_pdfium;
+pub use state::*;
 
 #[cfg(target_os = "windows")]
 mod win;

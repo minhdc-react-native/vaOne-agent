@@ -43,7 +43,8 @@ reqwest = { version = "0.13.4", features = [
     "cookies"
 ] }
 url = "2"
-
+base64 = "0.22"
+zstd = { version = "0.13", default-features = false }
 # =========================
 # Serialize
 # =========================

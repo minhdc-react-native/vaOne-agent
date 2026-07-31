@@ -9,9 +9,9 @@ export const SplashScreen = () => {
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white">
             {/* Logo */}
             <img
-                src="/LogoVacom.png"
+                src="/logo-vacom.png"
                 alt="splash"
-                className="w-52 h-14 object-contain"
+                className="w-46 h-11 object-contain"
             />
         </div>
     );

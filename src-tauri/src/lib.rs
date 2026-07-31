@@ -11,14 +11,14 @@ use crate::services::update::check_update_on_startup;
 use crate::state::{APP_STATE, SYNC_MENU};
 use crate::state::{CURRENT_ROUTE, ONLINE_MENU};
 use crate::utils::public::navigate_to_route;
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    App,Manager,
+    App, Manager,
 };
-use std::path::PathBuf;
 const LINE_TEXT: &str = "------------------------------";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -127,7 +127,6 @@ pub fn run() {
             "report" => {
                 let _ = navigate_to_route("/report");
             }
-
             "settings" => {
                 let _ = navigate_to_route("/settings");
             }
@@ -197,6 +196,7 @@ fn get_pdfium_path(app: &App) -> tauri::Result<PathBuf> {
 
     #[cfg(not(debug_assertions))]
     {
-        app.path().resolve("pdfium/pdfium.dll", tauri::path::BaseDirectory::Resource)
+        app.path()
+            .resolve("pdfium/pdfium.dll", tauri::path::BaseDirectory::Resource)
     }
 }

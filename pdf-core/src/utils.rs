@@ -9,18 +9,6 @@ use printpdf::{
 use regex::Regex;
 use serde_json::Value;
 
-use std::io::Read;
-
-pub fn decompress_zstd(bytes: Vec<u8>) -> Result<String, Box<dyn std::error::Error>> {
-    let mut decoder = zstd::Decoder::new(bytes.as_slice())?;
-
-    let mut json = String::new();
-
-    decoder.read_to_string(&mut json)?;
-
-    Ok(json)
-}
-
 pub struct Unit;
 
 impl Unit {

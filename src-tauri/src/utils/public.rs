@@ -1,6 +1,6 @@
-use tauri::Manager;
-
 use crate::state::{APP_HANDLE, CURRENT_ROUTE};
+use std::io::Read;
+use tauri::Manager;
 
 pub fn navigate_to_route(route: &str) {
     if let Some(app) = APP_HANDLE.get() {
@@ -22,4 +22,19 @@ pub fn navigate_to_route(route: &str) {
             }
         }
     }
+}
+
+pub fn decompress_zstd_json<T>(bytes: &[u8]) -> Result<T, String>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let mut decoder = zstd::Decoder::new(bytes).map_err(|e| e.to_string())?;
+
+    let mut json = String::new();
+
+    decoder
+        .read_to_string(&mut json)
+        .map_err(|e| e.to_string())?;
+
+    serde_json::from_str::<T>(&json).map_err(|e| e.to_string())
 }

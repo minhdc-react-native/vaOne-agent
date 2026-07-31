@@ -1,4 +1,7 @@
+use base64::{engine::general_purpose::STANDARD, Engine};
+use reqwest::header::CONTENT_TYPE;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+use reqwest::Client;
 use serde_json::Value;
 use std::{collections::HashMap, time::Duration};
 use url::{form_urlencoded, Url};
@@ -194,4 +197,34 @@ pub async fn post_data(tenant_id: &str, org_unit_id: &str, body: &Value) -> ApiR
     }
 
     serde_json::from_str(&text).map_err(|e| e.to_string())
+}
+
+pub async fn get_image_base64(url: &str) -> Result<String, String> {
+    let client = Client::builder().cookie_store(true).build().unwrap();
+
+    let response = client.get(url).send().await.map_err(|e| e.to_string())?;
+
+    let status = response.status();
+
+    if !status.is_success() {
+        let text = response.text().await.map_err(|e| e.to_string())?;
+
+        return Err(format!("HTTP {}: {}", status, text));
+    }
+
+    let content_type = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream")
+        .split(';')
+        .next()
+        .unwrap_or("application/octet-stream")
+        .to_string();
+
+    let bytes = response.bytes().await.map_err(|e| e.to_string())?;
+
+    let encoded = STANDARD.encode(&bytes);
+
+    Ok(format!("data:{};base64,{}", content_type, encoded))
 }

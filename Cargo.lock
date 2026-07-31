@@ -3729,7 +3729,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.19",
  "ttf-parser 0.25.1",
- "zstd",
 ]
 
 [[package]]
@@ -6775,6 +6774,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "axum",
+ "base64 0.22.1",
  "captcha-db",
  "chrono",
  "dirs 6.0.0",
@@ -6797,6 +6797,7 @@ dependencies = [
  "tower-http",
  "url",
  "uuid",
+ "zstd",
 ]
 
 [[package]]

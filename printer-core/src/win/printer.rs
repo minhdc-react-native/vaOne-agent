@@ -1,5 +1,5 @@
-use crate::{PDFIUM_PATH,PrintOptions,PrinterError, PrinterInfo, Result};
 use super::printer_status::get_printer_status;
+use crate::{PDFIUM_PATH, PrintOptions, PrinterError, PrinterInfo, Result};
 
 use pdfium_render::prelude::*;
 use std::ptr::null_mut;
@@ -57,14 +57,7 @@ pub fn get_printers() -> Result<Vec<PrinterInfo>> {
         let mut returned = 0u32;
 
         // lấy kích thước buffer
-        EnumPrintersW(
-            flags,
-            None,
-            2,
-            None,
-            &mut needed,
-            &mut returned,
-        );
+        EnumPrintersW(flags, None, 2, None, &mut needed, &mut returned);
 
         if needed == 0 {
             return Ok(Vec::new());
@@ -107,14 +100,13 @@ pub fn get_printers() -> Result<Vec<PrinterInfo>> {
 }
 
 pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
-
     let printer_name = options
         .printer
         .or_else(get_default_printer_name)
         .ok_or_else(|| PrinterError::Message("Không tìm thấy máy in".into()))?;
 
     let status = get_printer_status(&printer_name)?;
-    println!("status printer={:#?} printer_name={}", status,printer_name);
+    println!("status printer={:#?} printer_name={}", status, printer_name);
     // Máy in không nhận job mới
     if !status.accepting {
         return Err(PrinterError::Message(
@@ -135,7 +127,6 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
     let pdfium_path = PDFIUM_PATH.get().ok_or_else(|| {
         PrinterError::Message("PDFium chưa được khởi tạo. Hãy gọi init_pdfium() trước.".into())
     })?;
-
     let bindings =
         Pdfium::bind_to_library(pdfium_path).map_err(|e| PrinterError::Message(e.to_string()))?;
 
@@ -160,11 +151,13 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
         let width_px = (page.width().value * 300.0 / 72.0).round() as i32;
         let height_px = (page.height().value * 300.0 / 72.0).round() as i32;
 
-        let bitmap = page.render_with_config(
-            &PdfRenderConfig::new()
-                .set_target_width(width_px)
-                .set_target_height(height_px),
-        ).map_err(|e| PrinterError::Message(e.to_string()))?;
+        let bitmap = page
+            .render_with_config(
+                &PdfRenderConfig::new()
+                    .set_target_width(width_px)
+                    .set_target_height(height_px),
+            )
+            .map_err(|e| PrinterError::Message(e.to_string()))?;
 
         println!("Page 1 rendered: {} x {}", bitmap.width(), bitmap.height());
     }
