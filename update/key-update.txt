@@ -23,10 +23,10 @@ vmdr-mbyy-xohn-cnya
 
 
 xcrun notarytool submit \
-target/release/bundle/dmg/vaone-plugin_1.0.0_aarch64.dmg \
+target/release/bundle/dmg/vaone-plugin.dmg \
 --keychain-profile "tauri-notary" \
 --wait
 
 
 xcrun stapler staple \
-target/release/bundle/dmg/vaone-plugin_1.0.0_aarch64.dmg
+target/release/bundle/dmg/vaone-plugin.dmg
