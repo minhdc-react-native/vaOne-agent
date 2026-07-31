@@ -8,6 +8,7 @@ use printpdf::{
 };
 use regex::Regex;
 use serde_json::Value;
+use ttf_parser::Face;
 
 pub struct Unit;
 
@@ -295,38 +296,82 @@ pub fn draw_watermark(
     page_height: f32,
     text: &str,
 ) {
-    let target_width = page_width * 0.50;
+    let target_width = page_width.min(page_height) * 0.80;
 
-    let base_font_size = 100.0;
+    let base_font_size = 50.0;
+
     let base_width = TextLayout::measure_string(fonts, text, base_font_size, true, false);
+
+    if base_width <= 0.0 {
+        return;
+    }
 
     let font_size = base_font_size * target_width / base_width;
 
-    let text_width = TextLayout::measure_string(fonts, text, font_size, true, false);
+    let face = match Face::parse(fonts.bold.bytes, 0) {
+        Ok(face) => face,
+        Err(_) => return,
+    };
 
-    let angle = 54f32.to_radians();
+    let (text_width, min_y, max_y) = TextLayout::measure_text_bbox(&face, text, font_size);
+
+    let angle = 54.0_f32.to_radians();
+
     let cos = angle.cos();
     let sin = angle.sin();
-
-    let text_height = font_size;
 
     let cx = page_width / 2.0;
     let cy = page_height / 2.0;
 
-    let dx = text_width / 2.0;
-    let dy = text_height / 2.0;
+    /*
+     * Text origin của PDF nằm tại baseline.
+     *
+     * Bounding box:
+     *
+     *       max_y
+     *          |
+     *     ┌───────────┐
+     *     │   TEXT    │
+     *     └───────────┘
+     *          |
+     *       min_y
+     *
+     * Tâm bbox theo Y:
+     */
+    let bbox_center_y = (min_y + max_y) / 2.0;
 
-    let x = cx - (dx * cos - dy * sin);
-    let y = cy - (dx * sin + dy * cos);
+    /*
+     * Tâm bbox theo X.
+     *
+     * Vì width đang tính theo advance width,
+     * dùng 1/2 width.
+     */
+    let bbox_center_x = text_width / 2.0;
+
+    /*
+     * Vector từ text origin tới tâm bbox.
+     */
+    let offset_x = bbox_center_x;
+    let offset_y = bbox_center_y;
+
+    /*
+     * Rotate vector.
+     */
+    let rotated_x = offset_x * cos - offset_y * sin;
+
+    let rotated_y = offset_x * sin + offset_y * cos;
+
+    /*
+     * Đưa tâm bbox vào đúng tâm trang.
+     */
+    let origin_x = cx - rotated_x;
+    let origin_y = cy - rotated_y;
+
+    let x_pt = Unit::px_to_mm(origin_x).into_pt().0;
+
+    let y_pt = Unit::px_to_mm(origin_y).into_pt().0;
 
     ops.push(Op::StartTextSection);
-
-    ops.push(Op::SetTextCursor {
-        pos: Point {
-            x: Unit::px_to_mm(x).into(),
-            y: Unit::px_to_mm(y).into(),
-        },
-    });
 
     ops.push(Op::SetFillColor {
         col: Color::Greyscale(Greyscale::new(0.90, None)),
@@ -334,18 +379,11 @@ pub fn draw_watermark(
 
     ops.push(Op::SetFontSize {
         font: fonts.bold.id.clone(),
-        size: Pt(font_size),
+        size: Unit::px_to_pt(font_size),
     });
 
     ops.push(Op::SetTextMatrix {
-        matrix: TextMatrix::Raw([
-            cos,
-            sin,
-            -sin,
-            cos,
-            Unit::px_to_mm(x).into_pt().0,
-            Unit::px_to_mm(y).into_pt().0,
-        ]),
+        matrix: TextMatrix::Raw([cos, sin, -sin, cos, x_pt, y_pt]),
     });
 
     ops.push(Op::WriteText {

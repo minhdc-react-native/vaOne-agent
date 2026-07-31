@@ -57,6 +57,54 @@ impl TextLayout {
         Self::measure_width(&face, text, font_size_px)
     }
 
+    pub fn measure_text_bbox(face: &Face, text: &str, font_size_px: f32) -> (f32, f32, f32) {
+        let units_per_em = face.units_per_em() as f32;
+
+        let mut width_units = 0.0;
+
+        let mut min_y = f32::MAX;
+        let mut max_y = f32::MIN;
+
+        for ch in text.chars() {
+            let Some(glyph) = face.glyph_index(ch) else {
+                continue;
+            };
+
+            if let Some(advance) = face.glyph_hor_advance(glyph) {
+                width_units += advance as f32;
+            }
+
+            if let Some(bbox) = face.glyph_bounding_box(glyph) {
+                min_y = min_y.min(bbox.y_min as f32);
+                max_y = max_y.max(bbox.y_max as f32);
+            }
+        }
+
+        if min_y == f32::MAX {
+            return (0.0, 0.0, 0.0);
+        }
+
+        /*
+         * Giữ đúng cách convert giống measure_width()
+         */
+        let font_size_pt = Unit::px_to_pt(font_size_px).0;
+
+        let scale = font_size_pt / units_per_em;
+
+        let width_pt = width_units * scale;
+
+        let min_y_pt = min_y * scale;
+        let max_y_pt = max_y * scale;
+
+        let width_px = Unit::pt_to_px(width_pt);
+
+        let min_y_px = Unit::pt_to_px(min_y_pt);
+
+        let max_y_px = Unit::pt_to_px(max_y_pt);
+
+        (width_px, min_y_px, max_y_px)
+    }
+
     /// Đo chiều rộng của TextElement (giữ tương thích code cũ)
     pub fn measure_text(fonts: &PdfFonts, item: &TextElement) -> f32 {
         let font_weight = item.style.as_ref().and_then(|s| s.font_weight.as_deref());
