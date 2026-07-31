@@ -1,6 +1,6 @@
+use super::gdi::GdiPrinter;
 use super::printer_status::get_printer_status;
 use crate::{PDFIUM_PATH, PrintOptions, PrinterError, PrinterInfo, Result};
-
 use pdfium_render::prelude::*;
 use std::ptr::null_mut;
 
@@ -106,27 +106,26 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
         .ok_or_else(|| PrinterError::Message("Không tìm thấy máy in".into()))?;
 
     let status = get_printer_status(&printer_name)?;
+
     println!("status printer={:#?} printer_name={}", status, printer_name);
-    // Máy in không nhận job mới
-    if !status.accepting {
-        return Err(PrinterError::Message(
-            "Máy in hiện không nhận lệnh in.".into(),
-        ));
-    }
 
-    // Có lý do lỗi
-    if !status.messages.is_empty() {
-        return Err(PrinterError::Message(status.messages.join(", ")));
-    }
+    // Máy in đang có lỗi
+    if status.has_error {
+        let message = if !status.messages.is_empty() {
+            status.messages.join(", ")
+        } else if !status.accepting {
+            "Máy in hiện không nhận lệnh in.".to_string()
+        } else {
+            "Máy in đang gặp lỗi.".to_string()
+        };
 
-    // Printer bị stop
-    if status.state == 5 {
-        return Err(PrinterError::Message("Máy in đang tạm dừng.".into()));
+        return Err(PrinterError::Message(message));
     }
 
     let pdfium_path = PDFIUM_PATH.get().ok_or_else(|| {
         PrinterError::Message("PDFium chưa được khởi tạo. Hãy gọi init_pdfium() trước.".into())
     })?;
+
     let bindings =
         Pdfium::bind_to_library(pdfium_path).map_err(|e| PrinterError::Message(e.to_string()))?;
 
@@ -142,25 +141,52 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
     println!("PDF: {}", pdf_path);
     println!("Pages: {}", page_count);
 
-    if page_count > 0 {
+    if page_count == 0 {
+        return Err(PrinterError::Message("PDF không có trang nào.".into()));
+    }
+
+    let mut printer = GdiPrinter::new(&printer_name)?;
+
+    printer.start_document("vaOne Print")?;
+
+    for page_index in 0..page_count {
+        println!("========== PAGE {} ==========", page_index + 1);
+
         let page = document
             .pages()
-            .get(0)
+            .get(page_index)
             .map_err(|e| PrinterError::Message(e.to_string()))?;
 
         let width_px = (page.width().value * 300.0 / 72.0).round() as i32;
+
         let height_px = (page.height().value * 300.0 / 72.0).round() as i32;
+
+        println!("PDF page size: {} x {} px", width_px, height_px);
 
         let bitmap = page
             .render_with_config(
                 &PdfRenderConfig::new()
                     .set_target_width(width_px)
-                    .set_target_height(height_px),
+                    .set_target_height(height_px)
+                    .set_reverse_byte_order(true),
             )
             .map_err(|e| PrinterError::Message(e.to_string()))?;
 
-        println!("Page 1 rendered: {} x {}", bitmap.width(), bitmap.height());
+        println!(
+            "Page {} rendered: {} x {}",
+            page_index + 1,
+            bitmap.width(),
+            bitmap.height()
+        );
+
+        printer.start_page()?;
+
+        printer.print_bitmap(&bitmap)?;
+
+        printer.end_page()?;
     }
+
+    printer.end_document()?;
 
     println!("========================================");
 

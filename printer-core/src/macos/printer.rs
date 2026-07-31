@@ -127,21 +127,16 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
         };
         let status = get_printer_status(&printer_name)?;
         println!("status printer={:#?}", status);
-        // Máy in không nhận job mới
-        if !status.accepting {
-            return Err(PrinterError::Message(
-                "Máy in hiện không nhận lệnh in.".into(),
-            ));
-        }
-
-        // Có lý do lỗi
-        if !status.messages.is_empty() {
-            return Err(PrinterError::Message(status.messages.join(", ")));
-        }
-
-        // Printer bị stop
-        if status.state == 5 {
-            return Err(PrinterError::Message("Máy in đang tạm dừng.".into()));
+        if status.has_error {
+            return Err(PrinterError::Message(if !status.messages.is_empty() {
+                status.messages.join(", ")
+            } else if !status.accepting {
+                "Máy in hiện không nhận lệnh in.".into()
+            } else if status.state == 5 {
+                "Máy in đang tạm dừng.".into()
+            } else {
+                "Máy in đang gặp lỗi.".into()
+            }));
         }
 
         let printer =
@@ -251,7 +246,7 @@ pub fn get_printer_status(printer: &str) -> Result<PrinterStatus> {
         let dest = cupsGetNamedDest(std::ptr::null_mut(), printer.as_ptr(), std::ptr::null());
 
         if dest.is_null() {
-            return Err(PrinterError::Message("Printer not found".into()));
+            return Err(PrinterError::Message("Không tìm thấy máy in.".into()));
         }
 
         let dest = &*dest;
@@ -283,9 +278,17 @@ pub fn get_printer_status(printer: &str) -> Result<PrinterStatus> {
             .map(|v| v == "true")
             .unwrap_or(true);
 
-        let messages: Vec<String> = reasons
+        let error_reasons: Vec<&str> = reasons
             .iter()
-            .map(|r| translate_reason(r).to_string())
+            .map(String::as_str)
+            .filter(|reason| is_error_reason(reason))
+            .collect();
+
+        let has_error = !accepting || state == 5 || !error_reasons.is_empty();
+
+        let messages: Vec<String> = error_reasons
+            .iter()
+            .map(|reason| translate_reason(reason).to_string())
             .collect();
 
         Ok(PrinterStatus {
@@ -293,6 +296,7 @@ pub fn get_printer_status(printer: &str) -> Result<PrinterStatus> {
             reasons,
             messages,
             accepting,
+            has_error,
         })
     }
 }
@@ -311,10 +315,27 @@ fn translate_reason(reason: &str) -> &'static str {
 
         "toner-low" => "Mực in sắp hết",
 
-        "toner-empty" => "Máy in đã hết mực",
+        "toner-empty" | "marker-supply-empty" | "marker-supply-empty-report" => "Máy in đã hết mực",
 
-        "marker-supply-empty" | "marker-supply-empty-report" => "Hết mực",
+        "none" => "Máy in sẵn sàng",
 
         _ => "Không xác định",
     }
+}
+
+fn is_error_reason(reason: &str) -> bool {
+    matches!(
+        reason,
+        "offline"
+            | "media-empty"
+            | "media-empty-report"
+            | "media-jam"
+            | "media-jam-report"
+            | "door-open"
+            | "door-open-report"
+            | "paused"
+            | "toner-empty"
+            | "marker-supply-empty"
+            | "marker-supply-empty-report"
+    )
 }

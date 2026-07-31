@@ -11,7 +11,7 @@ export const SplashScreen = () => {
             <img
                 src="/logo-vacom.png"
                 alt="splash"
-                className="w-46 h-11 object-contain"
+                className="w-52 h-14 object-contain"
             />
         </div>
     );

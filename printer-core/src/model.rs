@@ -34,4 +34,5 @@ pub struct PrinterStatus {
     pub reasons: Vec<String>,
     pub messages: Vec<String>,
     pub accepting: bool,
+    pub has_error: bool,
 }
