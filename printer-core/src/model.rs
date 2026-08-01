@@ -17,6 +17,7 @@ pub struct PrinterInfo {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PrintOptions {
     /// None = máy in mặc định
     pub printer: Option<String>,

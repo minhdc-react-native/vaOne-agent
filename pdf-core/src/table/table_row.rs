@@ -210,7 +210,7 @@ impl TableRow {
             );
 
             // padding trên + dưới
-            let cell_height = layout.height + 6.0;
+            let cell_height = layout.height + 3.0;
 
             max_height = max_height.max(cell_height);
         }
