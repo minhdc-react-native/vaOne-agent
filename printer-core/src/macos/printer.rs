@@ -303,7 +303,7 @@ pub fn get_printer_status(printer: &str) -> Result<PrinterStatus> {
 
 fn translate_reason(reason: &str) -> &'static str {
     match reason {
-        "offline" => "Máy in đang ngoại tuyến",
+        "offline" | "offline-report" => "Máy in đang ngoại tuyến",
 
         "media-empty" | "media-empty-report" => "Máy in hết giấy",
 
@@ -311,11 +311,14 @@ fn translate_reason(reason: &str) -> &'static str {
 
         "door-open" | "door-open-report" => "Nắp máy in đang mở",
 
-        "paused" => "Máy in đang tạm dừng",
+        "paused" | "paused-report" => "Máy in đang tạm dừng",
 
-        "toner-low" => "Mực in sắp hết",
+        "toner-low" | "toner-low-report" => "Mực in sắp hết",
 
-        "toner-empty" | "marker-supply-empty" | "marker-supply-empty-report" => "Máy in đã hết mực",
+        "toner-empty"
+        | "toner-empty-report"
+        | "marker-supply-empty"
+        | "marker-supply-empty-report" => "Máy in đã hết mực",
 
         "none" => "Máy in sẵn sàng",
 
@@ -327,6 +330,7 @@ fn is_error_reason(reason: &str) -> bool {
     matches!(
         reason,
         "offline"
+            | "offline-report"
             | "media-empty"
             | "media-empty-report"
             | "media-jam"
@@ -334,7 +338,9 @@ fn is_error_reason(reason: &str) -> bool {
             | "door-open"
             | "door-open-report"
             | "paused"
+            | "paused-report"
             | "toner-empty"
+            | "toner-empty-report"
             | "marker-supply-empty"
             | "marker-supply-empty-report"
     )
