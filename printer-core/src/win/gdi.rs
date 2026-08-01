@@ -5,26 +5,17 @@ use pdfium_render::prelude::*;
 use std::{ffi::c_void, mem::size_of};
 
 use windows::{
-    core::PCWSTR,
     Win32::Graphics::Gdi::{
-        CreateDCW,
-        DeleteDC,
-        GetDeviceCaps,
-        StretchDIBits,
-        BITMAPINFO,
-        BITMAPINFOHEADER,
-        DIB_RGB_COLORS,
-        HDC,
-        HORZRES,
-        LOGPIXELSX,
-        LOGPIXELSY,
-        PHYSICALHEIGHT,
-        PHYSICALOFFSETX,
-        PHYSICALOFFSETY,
-        PHYSICALWIDTH,
-        SRCCOPY,
-        VERTRES,
+        BITMAPINFO, BITMAPINFOHEADER, CreateDCW, DEVMODEW, DIB_RGB_COLORS, DM_DUPLEX,
+        DMDUP_SIMPLEX, DMDUP_VERTICAL, DeleteDC, GetDeviceCaps, HDC, HORZRES, LOGPIXELSX,
+        LOGPIXELSY, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY, PHYSICALWIDTH, SRCCOPY,
+        StretchDIBits, VERTRES,
     },
+    Win32::Graphics::Printing::{
+        ClosePrinter, DM_OUT_BUFFER, DocumentPropertiesW, OpenPrinterW, PRINTER_ACCESS_USE,
+        PRINTER_DEFAULTSW,
+    },
+    core::PCWSTR,
 };
 
 #[repr(C)]
@@ -38,22 +29,13 @@ struct DOCINFOW {
 
 #[link(name = "gdi32")]
 unsafe extern "system" {
-    fn StartDocW(
-        hdc: HDC,
-        lpdi: *const DOCINFOW,
-    ) -> i32;
+    fn StartDocW(hdc: HDC, lpdi: *const DOCINFOW) -> i32;
 
-    fn StartPage(
-        hdc: HDC,
-    ) -> i32;
+    fn StartPage(hdc: HDC) -> i32;
 
-    fn EndPage(
-        hdc: HDC,
-    ) -> i32;
+    fn EndPage(hdc: HDC) -> i32;
 
-    fn EndDoc(
-        hdc: HDC,
-    ) -> i32;
+    fn EndDoc(hdc: HDC) -> i32;
 }
 
 fn to_wide(value: &str) -> Vec<u16> {
@@ -84,67 +66,87 @@ pub struct GdiPrinter {
 }
 
 impl GdiPrinter {
-    pub fn new(printer_name: &str) -> Result<Self> {
+    pub fn new(printer_name: &str, duplex: Option<bool>) -> Result<Self> {
         unsafe {
             let printer_wide = to_wide(printer_name);
             let driver_wide = to_wide("WINSPOOL");
-    
+
+            let mut devmode = get_printer_devmode(PCWSTR(printer_wide.as_ptr()))?;
+
+            let devmode_ptr = devmode.as_mut_ptr() as *mut DEVMODEW;
+
+            // Duplex
+            if let Some(duplex) = duplex {
+                let devmode_ref = &mut *devmode_ptr;
+
+                if devmode_ref.dmFields & DM_DUPLEX == 0 {
+                    return Err(PrinterError::Message(
+                        "Máy in không hỗ trợ in hai mặt.".into(),
+                    ));
+                }
+
+                devmode_ref.dmFields |= DM_DUPLEX;
+
+                devmode_ref.dmDuplex = if duplex {
+                    DMDUP_VERTICAL
+                } else {
+                    DMDUP_SIMPLEX
+                };
+            }
+
             let hdc = CreateDCW(
                 PCWSTR(driver_wide.as_ptr()),
                 PCWSTR(printer_wide.as_ptr()),
                 PCWSTR::null(),
-                None,
+                Some(&*devmode_ptr),
             );
-    
+
             if hdc.is_invalid() {
                 return Err(PrinterError::Message(format!(
                     "Không thể tạo printer DC cho máy in: {}",
                     printer_name
                 )));
             }
-    
+
             let dpi_x = GetDeviceCaps(Some(hdc), LOGPIXELSX);
             let dpi_y = GetDeviceCaps(Some(hdc), LOGPIXELSY);
-    
-            // Printable area.
+
             let width = GetDeviceCaps(Some(hdc), HORZRES);
             let height = GetDeviceCaps(Some(hdc), VERTRES);
-    
-            // Physical paper.
+
             let physical_width = GetDeviceCaps(Some(hdc), PHYSICALWIDTH);
+
             let physical_height = GetDeviceCaps(Some(hdc), PHYSICALHEIGHT);
-    
-            // Offset from physical paper to printable area.
+
             let offset_x = GetDeviceCaps(Some(hdc), PHYSICALOFFSETX);
+
             let offset_y = GetDeviceCaps(Some(hdc), PHYSICALOFFSETY);
-    
+
             println!("========== GDI PRINTER ==========");
             println!("Printer       : {}", printer_name);
             println!("DPI           : {} x {}", dpi_x, dpi_y);
             println!("Printable     : {} x {}", width, height);
-            println!(
-                "Physical      : {} x {}",
-                physical_width, physical_height
-            );
+            println!("Physical      : {} x {}", physical_width, physical_height);
             println!("Offset        : {} x {}", offset_x, offset_y);
+            println!("Duplex        : {:?}", duplex);
             println!("=================================");
-    
+
             Ok(Self {
                 hdc,
                 printer_name: printer_name.to_string(),
-    
+
                 dpi_x,
                 dpi_y,
-    
+
                 width,
                 height,
-    
+
                 physical_width,
                 physical_height,
-    
+
                 offset_x,
                 offset_y,
-    
+
                 document_started: false,
                 page_started: false,
             })
@@ -209,25 +211,22 @@ impl GdiPrinter {
 
     pub fn print_bitmap(&mut self, bitmap: &PdfBitmap) -> Result<()> {
         if !self.page_started {
-            return Err(PrinterError::Message(
-                "Chưa bắt đầu trang in.".into(),
-            ));
+            return Err(PrinterError::Message("Chưa bắt đầu trang in.".into()));
         }
-    
+
         let width = bitmap.width();
         let height = bitmap.height();
-    
+
         if width <= 0 || height <= 0 {
             return Err(PrinterError::Message(
                 "Kích thước bitmap không hợp lệ.".into(),
             ));
         }
-    
+
         let rgba = bitmap.as_rgba_bytes();
-    
-        let expected_size =
-            width as usize * height as usize * 4;
-    
+
+        let expected_size = width as usize * height as usize * 4;
+
         if rgba.len() < expected_size {
             return Err(PrinterError::Message(format!(
                 "Bitmap không hợp lệ: {} bytes, cần {} bytes.",
@@ -235,47 +234,47 @@ impl GdiPrinter {
                 expected_size
             )));
         }
-    
+
         println!(
             "GDI print bitmap: {} x {} ({} bytes)",
             width,
             height,
             rgba.len()
         );
-    
+
         unsafe {
             let bitmap_info = BITMAPINFO {
                 bmiHeader: BITMAPINFOHEADER {
                     biSize: size_of::<BITMAPINFOHEADER>() as u32,
-    
+
                     // Top-down DIB.
                     biWidth: width,
                     biHeight: -height,
-    
+
                     biPlanes: 1,
                     biBitCount: 32,
-    
+
                     // BI_RGB.
                     biCompression: 0,
-    
+
                     biSizeImage: 0,
                     biXPelsPerMeter: 0,
                     biYPelsPerMeter: 0,
                     biClrUsed: 0,
                     biClrImportant: 0,
                 },
-    
+
                 bmiColors: [Default::default()],
             };
-    
+
             // PDFium: RGBA
             // GDI 32-bit BI_RGB: BGRA/BGRX
             let mut bgra = rgba;
-    
+
             for pixel in bgra.chunks_exact_mut(4) {
                 pixel.swap(0, 2);
             }
-    
+
             /*
              * Bitmap đã được render theo DPI của printer.
              *
@@ -291,10 +290,10 @@ impl GdiPrinter {
              *
              * => destination vẫn là 1748 x 2480.
              */
-    
+
             let dest_width = width;
             let dest_height = height;
-    
+
             /*
              * Tính vị trí theo physical paper.
              *
@@ -304,72 +303,54 @@ impl GdiPrinter {
             // let dest_x =
             //     (self.physical_width - dest_width) / 2
             //         - self.offset_x;
-    
+
             // let dest_y =
             //     (self.physical_height - dest_height) / 2
             //         - self.offset_y;
-            
+
             let dest_x = (self.width - dest_width) / 2;
             let dest_y = 0;
 
             println!(
                 "Physical paper: {} x {}",
-                self.physical_width,
-                self.physical_height
+                self.physical_width, self.physical_height
             );
-    
-            println!(
-                "Printable area: {} x {}",
-                self.width,
-                self.height
-            );
-    
-            println!(
-                "Offset: {} x {}",
-                self.offset_x,
-                self.offset_y
-            );
-    
+
+            println!("Printable area: {} x {}", self.width, self.height);
+
+            println!("Offset: {} x {}", self.offset_x, self.offset_y);
+
             println!(
                 "Print position: x={}, y={}, size={}x{}",
-                dest_x,
-                dest_y,
-                dest_width,
-                dest_height
+                dest_x, dest_y, dest_width, dest_height
             );
-    
+
             let result = StretchDIBits(
                 self.hdc,
-    
                 // Destination.
                 dest_x,
                 dest_y,
                 dest_width,
                 dest_height,
-    
                 // Source.
                 0,
                 0,
                 width,
                 height,
-    
                 Some(bgra.as_ptr() as *const c_void),
                 &bitmap_info,
                 DIB_RGB_COLORS,
                 SRCCOPY,
             );
-    
+
             if result == 0 {
                 return Err(PrinterError::Message(
                     "StretchDIBits không thể in bitmap.".into(),
                 ));
             }
-    
-            println!(
-                "StretchDIBits result: {}",
-                result
-            );
-    
+
+            println!("StretchDIBits result: {}", result);
+
             Ok(())
         }
     }
@@ -431,7 +412,7 @@ impl GdiPrinter {
     pub fn physical_size(&self) -> (i32, i32) {
         (self.physical_width, self.physical_height)
     }
-    
+
     pub fn physical_offset(&self) -> (i32, i32) {
         (self.offset_x, self.offset_y)
     }
@@ -457,4 +438,55 @@ impl Drop for GdiPrinter {
             DeleteDC(self.hdc);
         }
     }
+}
+
+unsafe fn get_printer_devmode(printer_name: PCWSTR) -> Result<Vec<u8>> {
+    let mut printer_handle = Default::default();
+
+    let defaults = PRINTER_DEFAULTSW {
+        pDatatype: PWSTR::null(),
+        pDevMode: std::ptr::null_mut(),
+        DesiredAccess: PRINTER_ACCESS_USE,
+    };
+
+    OpenPrinterW(printer_name, &mut printer_handle, Some(&defaults))
+        .ok()
+        .map_err(|e| PrinterError::Message(format!("Không thể mở máy in: {:?}", e)))?;
+
+    // Lần 1: lấy kích thước DEVMODE đầy đủ
+    let size = DocumentPropertiesW(None, printer_handle, printer_name, None, None, 0);
+
+    if size < 0 {
+        ClosePrinter(printer_handle).ok();
+
+        return Err(PrinterError::Message(
+            "Không thể lấy kích thước DEVMODE.".into(),
+        ));
+    }
+
+    let size = size as usize;
+
+    // DEVMODE có thể chứa private data của driver,
+    // nên phải giữ toàn bộ buffer.
+    let mut buffer = vec![0u8; size];
+
+    // Lần 2: lấy DEVMODE hiện tại của printer
+    let result = DocumentPropertiesW(
+        None,
+        printer_handle,
+        printer_name,
+        Some(buffer.as_mut_ptr() as *mut DEVMODEW),
+        None,
+        DM_OUT_BUFFER,
+    );
+
+    ClosePrinter(printer_handle).ok();
+
+    if result < 0 {
+        return Err(PrinterError::Message(
+            "Không thể lấy DEVMODE của máy in.".into(),
+        ));
+    }
+
+    Ok(buffer)
 }

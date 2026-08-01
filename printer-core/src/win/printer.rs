@@ -145,80 +145,58 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
         return Err(PrinterError::Message("PDF không có trang nào.".into()));
     }
 
-    let mut printer = GdiPrinter::new(&printer_name)?;
+    let mut printer = GdiPrinter::new(&printer_name, options.duplex)?;
 
     let (dpi_x, dpi_y) = printer.dpi();
 
-    println!(
-        "Printer DPI: {} x {}",
-        dpi_x,
-        dpi_y
-    );
+    println!("Printer DPI: {} x {}", dpi_x, dpi_y);
 
     printer.start_document("vaOne Print")?;
 
-    for page_index in 0..page_count {
-        println!(
-            "========== PAGE {} ==========",
-            page_index + 1
-        );
+    let selected_pages = parse_page_ranges(options.page_ranges.as_deref(), page_count)?;
 
-        let page = document
-            .pages()
-            .get(page_index)
-            .map_err(|e| PrinterError::Message(e.to_string()))?;
+    println!(
+        "Selected pages: {:?}",
+        selected_pages.iter().map(|p| p + 1).collect::<Vec<_>>()
+    );
 
-        let page_width_pt = page.width().value;
-        let page_height_pt = page.height().value;
+    let copies = options.copies.unwrap_or(1).max(1);
 
-        println!(
-            "PDF size: {:.2} x {:.2} pt",
-            page_width_pt,
-            page_height_pt
-        );
+    for copy in 0..copies {
+        println!("========== COPY {} / {} ==========", copy + 1, copies);
 
-        /*
-        * 72 pt = 1 inch
-        *
-        * Render theo DPI thực tế của printer.
-        */
-        let width_px =
-            (page_width_pt * dpi_x as f32 / 72.0)
-                .round() as i32;
+        for &page_index in &selected_pages {
+            println!("========== PAGE {} ==========", page_index + 1);
 
-        let height_px =
-            (page_height_pt * dpi_y as f32 / 72.0)
-                .round() as i32;
+            let page = document
+                .pages()
+                .get(page_index)
+                .map_err(|e| PrinterError::Message(e.to_string()))?;
 
-        println!(
-            "Render size: {} x {} px @ {} x {} DPI",
-            width_px,
-            height_px,
-            dpi_x,
-            dpi_y
-        );
+            let page_width_pt = page.width().value;
+            let page_height_pt = page.height().value;
 
-        let bitmap = page
-            .render_with_config(
-                &PdfRenderConfig::new()
-                    .set_target_width(width_px)
-                    .set_target_height(height_px)
-                    .set_reverse_byte_order(true),
-            )
-            .map_err(|e| PrinterError::Message(e.to_string()))?;
+            println!("PDF size: {:.2} x {:.2} pt", page_width_pt, page_height_pt);
 
-        println!(
-            "Page {} rendered: {} x {}",
-            page_index + 1,
-            bitmap.width(),
-            bitmap.height()
-        );
+            let width_px = (page_width_pt * dpi_x as f32 / 72.0).round() as i32;
 
-        printer.start_page()?;
+            let height_px = (page_height_pt * dpi_y as f32 / 72.0).round() as i32;
 
-        printer.print_bitmap(&bitmap)?;
+            let bitmap = page
+                .render_with_config(
+                    &PdfRenderConfig::new()
+                        .set_target_width(width_px)
+                        .set_target_height(height_px)
+                        .set_reverse_byte_order(true),
+                )
+                .map_err(|e| PrinterError::Message(e.to_string()))?;
 
-        printer.end_page()?;
+            printer.start_page()?;
+
+            printer.print_bitmap(&bitmap)?;
+
+            printer.end_page()?;
+        }
     }
 
     printer.end_document()?;
@@ -226,4 +204,72 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
     println!("========================================");
 
     Ok(0)
+}
+
+fn parse_page_ranges(
+    page_ranges: Option<&str>,
+    page_count: usize,
+) -> Result<Vec<usize>, PrinterError> {
+    let Some(page_ranges) = page_ranges else {
+        return Ok((0..page_count).collect());
+    };
+
+    let mut pages = Vec::new();
+
+    for part in page_ranges.split(',') {
+        let part = part.trim();
+
+        if part.is_empty() {
+            continue;
+        }
+
+        if let Some((start, end)) = part.split_once('-') {
+            let start: usize = start
+                .trim()
+                .parse()
+                .map_err(|_| PrinterError::Message(format!("Invalid page range: {}", part)))?;
+
+            let end: usize = end
+                .trim()
+                .parse()
+                .map_err(|_| PrinterError::Message(format!("Invalid page range: {}", part)))?;
+
+            if start == 0 || end == 0 || start > end {
+                return Err(PrinterError::Message(format!(
+                    "Invalid page range: {}",
+                    part
+                )));
+            }
+
+            if start > page_count {
+                continue;
+            }
+
+            let end = end.min(page_count);
+
+            for page in start..=end {
+                pages.push(page - 1);
+            }
+        } else {
+            let page: usize = part
+                .parse()
+                .map_err(|_| PrinterError::Message(format!("Invalid page number: {}", part)))?;
+
+            if page == 0 {
+                return Err(PrinterError::Message(format!(
+                    "Invalid page number: {}",
+                    part
+                )));
+            }
+
+            if page <= page_count {
+                pages.push(page - 1);
+            }
+        }
+    }
+
+    pages.sort_unstable();
+    pages.dedup();
+
+    Ok(pages)
 }

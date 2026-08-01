@@ -5,7 +5,7 @@ use crate::models::{ElementStyle, TextElement, TextLayoutResult, TextStyle};
 use crate::utils::Unit;
 use printpdf::{Op, Point, TextItem};
 pub const FONT_SIZE: f32 = 12.0;
-pub const LINE_HEIGHT: f32 = 1.2;
+pub const LINE_HEIGHT: f32 = 1.5;
 
 pub fn draw_text(
     ops: &mut Vec<Op>,
