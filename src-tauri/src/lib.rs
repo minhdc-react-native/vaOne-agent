@@ -196,7 +196,9 @@ fn get_pdfium_path(app: &App) -> tauri::Result<PathBuf> {
 
     #[cfg(not(debug_assertions))]
     {
-        app.path()
-            .resolve("pdfium/pdfium.dll", tauri::path::BaseDirectory::Resource)
+        app.path().resolve(
+            "resources/pdfium/pdfium.dll",
+            tauri::path::BaseDirectory::Resource,
+        )
     }
 }
