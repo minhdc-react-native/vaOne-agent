@@ -100,13 +100,15 @@ pub fn get_printers() -> Result<Vec<PrinterInfo>> {
 }
 
 pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
+    println!("option={:#?}", options);
+    
     let printer_name = options
         .printer
         .or_else(get_default_printer_name)
         .ok_or_else(|| PrinterError::Message("Không tìm thấy máy in".into()))?;
 
     let status = get_printer_status(&printer_name)?;
-
+    
     println!("status printer={:#?} printer_name={}", status, printer_name);
 
     // Máy in đang có lỗi
@@ -135,7 +137,7 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
         .load_pdf_from_file(pdf_path, None)
         .map_err(|e| PrinterError::Message(e.to_string()))?;
 
-    let page_count = document.pages().len();
+    let page_count = document.pages().len() as usize;
 
     println!("================ PDFIUM ================");
     println!("PDF: {}", pdf_path);
@@ -170,7 +172,7 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
 
             let page = document
                 .pages()
-                .get(page_index)
+                .get(page_index as u16)
                 .map_err(|e| PrinterError::Message(e.to_string()))?;
 
             let page_width_pt = page.width().value;
@@ -209,7 +211,7 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
 fn parse_page_ranges(
     page_ranges: Option<&str>,
     page_count: usize,
-) -> Result<Vec<usize>, PrinterError> {
+) -> Result<Vec<usize>> {
     let Some(page_ranges) = page_ranges else {
         return Ok((0..page_count).collect());
     };

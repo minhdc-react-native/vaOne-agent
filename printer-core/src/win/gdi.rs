@@ -12,10 +12,10 @@ use windows::{
         StretchDIBits, VERTRES,
     },
     Win32::Graphics::Printing::{
-        ClosePrinter, DM_OUT_BUFFER, DocumentPropertiesW, OpenPrinterW, PRINTER_ACCESS_USE,
+        ClosePrinter, DocumentPropertiesW, OpenPrinterW, PRINTER_ACCESS_USE,
         PRINTER_DEFAULTSW,
     },
-    core::PCWSTR,
+    core::{PCWSTR,PWSTR,},
 };
 
 #[repr(C)]
@@ -74,24 +74,29 @@ impl GdiPrinter {
             let mut devmode = get_printer_devmode(PCWSTR(printer_wide.as_ptr()))?;
 
             let devmode_ptr = devmode.as_mut_ptr() as *mut DEVMODEW;
-
+            
             // Duplex
             if let Some(duplex) = duplex {
                 let devmode_ref = &mut *devmode_ptr;
-
-                if devmode_ref.dmFields & DM_DUPLEX == 0 {
-                    return Err(PrinterError::Message(
-                        "Máy in không hỗ trợ in hai mặt.".into(),
-                    ));
-                }
-
-                devmode_ref.dmFields |= DM_DUPLEX;
-
-                devmode_ref.dmDuplex = if duplex {
-                    DMDUP_VERTICAL
+            
+                if duplex {
+                    // Chỉ kiểm tra capability khi thực sự yêu cầu duplex
+                    if !devmode_ref.dmFields.contains(DM_DUPLEX) {
+                        return Err(PrinterError::Message(
+                            "Máy in không hỗ trợ in hai mặt.".into(),
+                        ));
+                    }
+            
+                    devmode_ref.dmFields =
+                        devmode_ref.dmFields | DM_DUPLEX;
+            
+                    devmode_ref.dmDuplex = DMDUP_VERTICAL;
                 } else {
-                    DMDUP_SIMPLEX
-                };
+                    devmode_ref.dmFields =
+                        devmode_ref.dmFields | DM_DUPLEX;
+            
+                    devmode_ref.dmDuplex = DMDUP_SIMPLEX;
+                }
             }
 
             let hdc = CreateDCW(
@@ -440,6 +445,7 @@ impl Drop for GdiPrinter {
     }
 }
 
+const DM_OUT_BUFFER: u32 = 2;
 unsafe fn get_printer_devmode(printer_name: PCWSTR) -> Result<Vec<u8>> {
     let mut printer_handle = Default::default();
 
@@ -449,9 +455,17 @@ unsafe fn get_printer_devmode(printer_name: PCWSTR) -> Result<Vec<u8>> {
         DesiredAccess: PRINTER_ACCESS_USE,
     };
 
-    OpenPrinterW(printer_name, &mut printer_handle, Some(&defaults))
-        .ok()
-        .map_err(|e| PrinterError::Message(format!("Không thể mở máy in: {:?}", e)))?;
+    OpenPrinterW(
+        printer_name,
+        &mut printer_handle,
+        Some(&defaults),
+    )
+    .map_err(|e| {
+        PrinterError::Message(format!(
+            "Không thể mở máy in: {:?}",
+            e
+        ))
+    })?;
 
     // Lần 1: lấy kích thước DEVMODE đầy đủ
     let size = DocumentPropertiesW(None, printer_handle, printer_name, None, None, 0);
