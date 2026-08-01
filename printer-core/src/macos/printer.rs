@@ -120,13 +120,13 @@ fn get_option(dest: &cups_dest_t, key: &str) -> Option<String> {
 }
 
 pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
+    println!("option={:#?}", options);
     unsafe {
         let printer_name = match options.printer {
             Some(printer) => printer,
             None => get_default_printer_id()?,
         };
         let status = get_printer_status(&printer_name)?;
-        println!("option={:#?}", options);
         println!("status printer={:#?}", status);
         if status.has_error {
             return Err(PrinterError::Message(if !status.messages.is_empty() {
