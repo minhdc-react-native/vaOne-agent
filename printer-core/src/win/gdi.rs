@@ -18,6 +18,10 @@ use windows::{
         HORZRES,
         LOGPIXELSX,
         LOGPIXELSY,
+        PHYSICALHEIGHT,
+        PHYSICALOFFSETX,
+        PHYSICALOFFSETY,
+        PHYSICALWIDTH,
         SRCCOPY,
         VERTRES,
     },
@@ -57,12 +61,24 @@ fn to_wide(value: &str) -> Vec<u16> {
 }
 
 pub struct GdiPrinter {
-    hdc: windows::Win32::Graphics::Gdi::HDC,
+    hdc: HDC,
     printer_name: String,
+
     dpi_x: i32,
     dpi_y: i32,
+
+    // Printable area.
     width: i32,
     height: i32,
+
+    // Physical paper.
+    physical_width: i32,
+    physical_height: i32,
+
+    // Non-printable offset.
+    offset_x: i32,
+    offset_y: i32,
+
     document_started: bool,
     page_started: bool,
 }
@@ -72,40 +88,63 @@ impl GdiPrinter {
         unsafe {
             let printer_wide = to_wide(printer_name);
             let driver_wide = to_wide("WINSPOOL");
-
+    
             let hdc = CreateDCW(
                 PCWSTR(driver_wide.as_ptr()),
                 PCWSTR(printer_wide.as_ptr()),
                 PCWSTR::null(),
                 None,
             );
-
+    
             if hdc.is_invalid() {
                 return Err(PrinterError::Message(format!(
                     "Không thể tạo printer DC cho máy in: {}",
                     printer_name
                 )));
             }
-
+    
             let dpi_x = GetDeviceCaps(Some(hdc), LOGPIXELSX);
             let dpi_y = GetDeviceCaps(Some(hdc), LOGPIXELSY);
-
+    
+            // Printable area.
             let width = GetDeviceCaps(Some(hdc), HORZRES);
             let height = GetDeviceCaps(Some(hdc), VERTRES);
-
+    
+            // Physical paper.
+            let physical_width = GetDeviceCaps(Some(hdc), PHYSICALWIDTH);
+            let physical_height = GetDeviceCaps(Some(hdc), PHYSICALHEIGHT);
+    
+            // Offset from physical paper to printable area.
+            let offset_x = GetDeviceCaps(Some(hdc), PHYSICALOFFSETX);
+            let offset_y = GetDeviceCaps(Some(hdc), PHYSICALOFFSETY);
+    
             println!("========== GDI PRINTER ==========");
-            println!("Printer : {}", printer_name);
-            println!("DPI     : {} x {}", dpi_x, dpi_y);
-            println!("Size    : {} x {}", width, height);
+            println!("Printer       : {}", printer_name);
+            println!("DPI           : {} x {}", dpi_x, dpi_y);
+            println!("Printable     : {} x {}", width, height);
+            println!(
+                "Physical      : {} x {}",
+                physical_width, physical_height
+            );
+            println!("Offset        : {} x {}", offset_x, offset_y);
             println!("=================================");
-
+    
             Ok(Self {
                 hdc,
                 printer_name: printer_name.to_string(),
+    
                 dpi_x,
                 dpi_y,
+    
                 width,
                 height,
+    
+                physical_width,
+                physical_height,
+    
+                offset_x,
+                offset_y,
+    
                 document_started: false,
                 page_started: false,
             })
@@ -170,23 +209,25 @@ impl GdiPrinter {
 
     pub fn print_bitmap(&mut self, bitmap: &PdfBitmap) -> Result<()> {
         if !self.page_started {
-            return Err(PrinterError::Message("Chưa bắt đầu trang in.".into()));
+            return Err(PrinterError::Message(
+                "Chưa bắt đầu trang in.".into(),
+            ));
         }
-
+    
         let width = bitmap.width();
         let height = bitmap.height();
-
+    
         if width <= 0 || height <= 0 {
             return Err(PrinterError::Message(
                 "Kích thước bitmap không hợp lệ.".into(),
             ));
         }
-
-        // Chuẩn hóa pixel thành RGBA.
+    
         let rgba = bitmap.as_rgba_bytes();
-
-        let expected_size = width as usize * height as usize * 4;
-
+    
+        let expected_size =
+            width as usize * height as usize * 4;
+    
         if rgba.len() < expected_size {
             return Err(PrinterError::Message(format!(
                 "Bitmap không hợp lệ: {} bytes, cần {} bytes.",
@@ -194,77 +235,141 @@ impl GdiPrinter {
                 expected_size
             )));
         }
-
+    
         println!(
             "GDI print bitmap: {} x {} ({} bytes)",
             width,
             height,
             rgba.len()
         );
-
+    
         unsafe {
             let bitmap_info = BITMAPINFO {
                 bmiHeader: BITMAPINFOHEADER {
                     biSize: size_of::<BITMAPINFOHEADER>() as u32,
-
-                    // DIB top-down.
+    
+                    // Top-down DIB.
                     biWidth: width,
                     biHeight: -height,
-
+    
                     biPlanes: 1,
                     biBitCount: 32,
-
-                    // BI_RGB = uncompressed.
+    
+                    // BI_RGB.
                     biCompression: 0,
-
+    
                     biSizeImage: 0,
                     biXPelsPerMeter: 0,
                     biYPelsPerMeter: 0,
                     biClrUsed: 0,
                     biClrImportant: 0,
                 },
-
+    
                 bmiColors: [Default::default()],
             };
-
-            /*
-             * Pdfium trả RGBA.
-             *
-             * GDI với 32-bit BI_RGB thực tế mong BGRX/BGRA.
-             * Vì vậy cần đổi R <-> B trước khi gửi.
-             */
+    
+            // PDFium: RGBA
+            // GDI 32-bit BI_RGB: BGRA/BGRX
             let mut bgra = rgba;
-
+    
             for pixel in bgra.chunks_exact_mut(4) {
                 pixel.swap(0, 2);
             }
+    
+            /*
+             * Bitmap đã được render theo DPI của printer.
+             *
+             * Vì vậy KHÔNG scale bitmap lên printable area.
+             *
+             * Ví dụ:
+             *
+             * PDF A5 @ 300 DPI
+             * 1748 x 2480
+             *
+             * Printer A4 @ 300 DPI
+             * 2480 x 3508
+             *
+             * => destination vẫn là 1748 x 2480.
+             */
+    
+            let dest_width = width;
+            let dest_height = height;
+    
+            /*
+             * Tính vị trí theo physical paper.
+             *
+             * Sau đó chuyển từ physical coordinate
+             * sang printable-area coordinate bằng offset.
+             */
+            // let dest_x =
+            //     (self.physical_width - dest_width) / 2
+            //         - self.offset_x;
+    
+            // let dest_y =
+            //     (self.physical_height - dest_height) / 2
+            //         - self.offset_y;
+            
+            let dest_x = (self.width - dest_width) / 2;
+            let dest_y = 0;
 
+            println!(
+                "Physical paper: {} x {}",
+                self.physical_width,
+                self.physical_height
+            );
+    
+            println!(
+                "Printable area: {} x {}",
+                self.width,
+                self.height
+            );
+    
+            println!(
+                "Offset: {} x {}",
+                self.offset_x,
+                self.offset_y
+            );
+    
+            println!(
+                "Print position: x={}, y={}, size={}x{}",
+                dest_x,
+                dest_y,
+                dest_width,
+                dest_height
+            );
+    
             let result = StretchDIBits(
                 self.hdc,
+    
                 // Destination.
-                0,
-                0,
-                self.width,
-                self.height,
+                dest_x,
+                dest_y,
+                dest_width,
+                dest_height,
+    
                 // Source.
                 0,
                 0,
                 width,
                 height,
+    
                 Some(bgra.as_ptr() as *const c_void),
                 &bitmap_info,
                 DIB_RGB_COLORS,
                 SRCCOPY,
             );
-
+    
             if result == 0 {
                 return Err(PrinterError::Message(
                     "StretchDIBits không thể in bitmap.".into(),
                 ));
             }
-
-            println!("StretchDIBits result: {}", result);
-
+    
+            println!(
+                "StretchDIBits result: {}",
+                result
+            );
+    
             Ok(())
         }
     }
@@ -321,6 +426,14 @@ impl GdiPrinter {
 
     pub fn printable_size(&self) -> (i32, i32) {
         (self.width, self.height)
+    }
+
+    pub fn physical_size(&self) -> (i32, i32) {
+        (self.physical_width, self.physical_height)
+    }
+    
+    pub fn physical_offset(&self) -> (i32, i32) {
+        (self.offset_x, self.offset_y)
     }
 }
 

@@ -147,21 +147,56 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
 
     let mut printer = GdiPrinter::new(&printer_name)?;
 
+    let (dpi_x, dpi_y) = printer.dpi();
+
+    println!(
+        "Printer DPI: {} x {}",
+        dpi_x,
+        dpi_y
+    );
+
     printer.start_document("vaOne Print")?;
 
     for page_index in 0..page_count {
-        println!("========== PAGE {} ==========", page_index + 1);
+        println!(
+            "========== PAGE {} ==========",
+            page_index + 1
+        );
 
         let page = document
             .pages()
             .get(page_index)
             .map_err(|e| PrinterError::Message(e.to_string()))?;
 
-        let width_px = (page.width().value * 300.0 / 72.0).round() as i32;
+        let page_width_pt = page.width().value;
+        let page_height_pt = page.height().value;
 
-        let height_px = (page.height().value * 300.0 / 72.0).round() as i32;
+        println!(
+            "PDF size: {:.2} x {:.2} pt",
+            page_width_pt,
+            page_height_pt
+        );
 
-        println!("PDF page size: {} x {} px", width_px, height_px);
+        /*
+        * 72 pt = 1 inch
+        *
+        * Render theo DPI thực tế của printer.
+        */
+        let width_px =
+            (page_width_pt * dpi_x as f32 / 72.0)
+                .round() as i32;
+
+        let height_px =
+            (page_height_pt * dpi_y as f32 / 72.0)
+                .round() as i32;
+
+        println!(
+            "Render size: {} x {} px @ {} x {} DPI",
+            width_px,
+            height_px,
+            dpi_x,
+            dpi_y
+        );
 
         let bitmap = page
             .render_with_config(
