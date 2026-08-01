@@ -101,7 +101,7 @@ pub fn get_printers() -> Result<Vec<PrinterInfo>> {
 
 pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
     println!("option={:#?}", options);
-    
+
     let printer_name = options
         .printer
         .or_else(get_default_printer_name)
@@ -147,7 +147,7 @@ pub fn print_pdf(options: PrintOptions, pdf_path: &str) -> Result<i32> {
         return Err(PrinterError::Message("PDF không có trang nào.".into()));
     }
 
-    let mut printer = GdiPrinter::new(&printer_name, options.duplex)?;
+    let mut printer = GdiPrinter::new(&printer_name, options.paper.as_deref(), options.duplex)?;
 
     let (dpi_x, dpi_y) = printer.dpi();
 

@@ -7,6 +7,14 @@ use std::{ffi::c_void, mem::size_of};
 use windows::{
     Win32::Graphics::Gdi::{
         BITMAPINFO, BITMAPINFOHEADER, CreateDCW, DEVMODEW, DIB_RGB_COLORS, DM_DUPLEX,
+        DM_PAPERSIZE,
+        DMPAPER_A2,
+        DMPAPER_A3,
+        DMPAPER_A4,
+        DMPAPER_A5,
+        DMPAPER_A6,
+        DMPAPER_LEGAL,
+        DMPAPER_LETTER,
         DMDUP_SIMPLEX, DMDUP_VERTICAL, DeleteDC, GetDeviceCaps, HDC, HORZRES, LOGPIXELSX,
         LOGPIXELSY, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY, PHYSICALWIDTH, SRCCOPY,
         StretchDIBits, VERTRES,
@@ -66,7 +74,7 @@ pub struct GdiPrinter {
 }
 
 impl GdiPrinter {
-    pub fn new(printer_name: &str, duplex: Option<bool>) -> Result<Self> {
+    pub fn new(printer_name: &str,paper: Option<&str>, duplex: Option<bool>) -> Result<Self> {
         unsafe {
             let printer_wide = to_wide(printer_name);
             let driver_wide = to_wide("WINSPOOL");
@@ -74,7 +82,19 @@ impl GdiPrinter {
             let mut devmode = get_printer_devmode(PCWSTR(printer_wide.as_ptr()))?;
 
             let devmode_ptr = devmode.as_mut_ptr() as *mut DEVMODEW;
+
+            if let Some(paper) = paper {
+                let devmode_ref = &mut *devmode_ptr;
             
+                set_paper(devmode_ref, paper)?;
+            
+                println!(
+                    "Paper requested: {} -> dmPaperSize={}",
+                    paper,
+                    devmode_ref.Anonymous1.Anonymous1.dmPaperSize
+                );
+            }
+
             // Duplex
             if let Some(duplex) = duplex {
                 let devmode_ref = &mut *devmode_ptr;
@@ -313,7 +333,10 @@ impl GdiPrinter {
             //     (self.physical_height - dest_height) / 2
             //         - self.offset_y;
 
-            let dest_x = (self.width - dest_width) / 2;
+            // let dest_x = (self.physical_width - dest_width) / 2 - self.offset_x;
+            // let dest_y = -self.offset_y;
+
+            let dest_x = (self.physical_width - dest_width) / 2;
             let dest_y = 0;
 
             println!(
@@ -503,4 +526,29 @@ unsafe fn get_printer_devmode(printer_name: PCWSTR) -> Result<Vec<u8>> {
     }
 
     Ok(buffer)
+}
+
+fn set_paper(devmode: &mut DEVMODEW, paper: &str) -> Result<()> {
+    let paper_size = match paper {
+        "A2" => DMPAPER_A2,
+        "A3" => DMPAPER_A3,
+        "A4" => DMPAPER_A4,
+        "A5" => DMPAPER_A5,
+        "A6" => DMPAPER_A6,
+        "Letter" => DMPAPER_LETTER,
+        "Legal" => DMPAPER_LEGAL,
+
+        _ => {
+            return Err(PrinterError::Message(format!(
+                "Khổ giấy không được hỗ trợ: {}",
+                paper
+            )));
+        }
+    };
+
+    devmode.dmFields |= DM_PAPERSIZE;
+
+    devmode.Anonymous1.Anonymous1.dmPaperSize = paper_size as i16;
+
+    Ok(())
 }
