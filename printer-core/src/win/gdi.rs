@@ -6,24 +6,16 @@ use std::{ffi::c_void, mem::size_of};
 
 use windows::{
     Win32::Graphics::Gdi::{
-        BITMAPINFO, BITMAPINFOHEADER, CreateDCW, DEVMODEW, DIB_RGB_COLORS, DM_DUPLEX,
-        DM_PAPERSIZE,
-        DMPAPER_A2,
-        DMPAPER_A3,
-        DMPAPER_A4,
-        DMPAPER_A5,
-        DMPAPER_A6,
-        DMPAPER_LEGAL,
-        DMPAPER_LETTER,
-        DMDUP_SIMPLEX, DMDUP_VERTICAL, DeleteDC, GetDeviceCaps, HDC, HORZRES, LOGPIXELSX,
+        BITMAPINFO, BITMAPINFOHEADER, CreateDCW, DEVMODEW, DIB_RGB_COLORS, DM_DUPLEX, DM_PAPERSIZE,
+        DMDUP_SIMPLEX, DMDUP_VERTICAL, DMPAPER_A2, DMPAPER_A3, DMPAPER_A4, DMPAPER_A5, DMPAPER_A6,
+        DMPAPER_LEGAL, DMPAPER_LETTER, DeleteDC, GetDeviceCaps, HDC, HORZRES, LOGPIXELSX,
         LOGPIXELSY, PHYSICALHEIGHT, PHYSICALOFFSETX, PHYSICALOFFSETY, PHYSICALWIDTH, SRCCOPY,
         StretchDIBits, VERTRES,
     },
     Win32::Graphics::Printing::{
-        ClosePrinter, DocumentPropertiesW, OpenPrinterW, PRINTER_ACCESS_USE,
-        PRINTER_DEFAULTSW,
+        ClosePrinter, DocumentPropertiesW, OpenPrinterW, PRINTER_ACCESS_USE, PRINTER_DEFAULTSW,
     },
-    core::{PCWSTR,PWSTR,},
+    core::{PCWSTR, PWSTR},
 };
 
 #[repr(C)]
@@ -74,7 +66,7 @@ pub struct GdiPrinter {
 }
 
 impl GdiPrinter {
-    pub fn new(printer_name: &str,paper: Option<&str>, duplex: Option<bool>) -> Result<Self> {
+    pub fn new(printer_name: &str, paper: Option<&str>, duplex: Option<bool>) -> Result<Self> {
         unsafe {
             let printer_wide = to_wide(printer_name);
             let driver_wide = to_wide("WINSPOOL");
@@ -85,20 +77,19 @@ impl GdiPrinter {
 
             if let Some(paper) = paper {
                 let devmode_ref = &mut *devmode_ptr;
-            
+
                 set_paper(devmode_ref, paper)?;
-            
+
                 println!(
                     "Paper requested: {} -> dmPaperSize={}",
-                    paper,
-                    devmode_ref.Anonymous1.Anonymous1.dmPaperSize
+                    paper, devmode_ref.Anonymous1.Anonymous1.dmPaperSize
                 );
             }
 
             // Duplex
             if let Some(duplex) = duplex {
                 let devmode_ref = &mut *devmode_ptr;
-            
+
                 if duplex {
                     // Chỉ kiểm tra capability khi thực sự yêu cầu duplex
                     if !devmode_ref.dmFields.contains(DM_DUPLEX) {
@@ -106,15 +97,13 @@ impl GdiPrinter {
                             "Máy in không hỗ trợ in hai mặt.".into(),
                         ));
                     }
-            
-                    devmode_ref.dmFields =
-                        devmode_ref.dmFields | DM_DUPLEX;
-            
+
+                    devmode_ref.dmFields = devmode_ref.dmFields | DM_DUPLEX;
+
                     devmode_ref.dmDuplex = DMDUP_VERTICAL;
                 } else {
-                    devmode_ref.dmFields =
-                        devmode_ref.dmFields | DM_DUPLEX;
-            
+                    devmode_ref.dmFields = devmode_ref.dmFields | DM_DUPLEX;
+
                     devmode_ref.dmDuplex = DMDUP_SIMPLEX;
                 }
             }
@@ -336,8 +325,8 @@ impl GdiPrinter {
             // let dest_x = (self.physical_width - dest_width) / 2 - self.offset_x;
             // let dest_y = -self.offset_y;
 
-            let dest_x = 0;
-            let dest_y = 0;
+            let dest_x = (self.physical_width - dest_width) / 2;
+            let dest_y = (self.physical_height - dest_height) / 2;
 
             println!(
                 "Physical paper: {} x {}",
@@ -478,17 +467,8 @@ unsafe fn get_printer_devmode(printer_name: PCWSTR) -> Result<Vec<u8>> {
         DesiredAccess: PRINTER_ACCESS_USE,
     };
 
-    OpenPrinterW(
-        printer_name,
-        &mut printer_handle,
-        Some(&defaults),
-    )
-    .map_err(|e| {
-        PrinterError::Message(format!(
-            "Không thể mở máy in: {:?}",
-            e
-        ))
-    })?;
+    OpenPrinterW(printer_name, &mut printer_handle, Some(&defaults))
+        .map_err(|e| PrinterError::Message(format!("Không thể mở máy in: {:?}", e)))?;
 
     // Lần 1: lấy kích thước DEVMODE đầy đủ
     let size = DocumentPropertiesW(None, printer_handle, printer_name, None, None, 0);

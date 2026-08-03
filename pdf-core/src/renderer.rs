@@ -12,15 +12,80 @@ use crate::pagination::{
     PageRenderer,
 };
 
-// use crate::state::APP_HANDLE;
-// // use tauri::Emitter;
+pub fn render_bytes<F>(
+    docs: Vec<PdfTemplate>,
+    datas: Vec<serde_json::Value>,
+    progress: &mut F,
+) -> anyhow::Result<Vec<u8>>
+where
+    F: FnMut(serde_json::Value),
+{
+    anyhow::ensure!(!docs.is_empty(), "docs is empty");
 
-// fn emit_pdf_progress(progress: serde_json::Value) {
-//     if let Some(app) = APP_HANDLE.get() {
-//         let _ = app.emit("pdf-progress", progress);
-//         std::thread::sleep(std::time::Duration::from_millis(50));
-//     }
-// }
+    let mut pdf = PdfDocument::new("Report");
+    let fonts = load_fonts(&mut pdf)?;
+
+    let mut prepared = Vec::new();
+
+    for (i, data) in datas.into_iter().enumerate() {
+        let doc = docs.get(i).cloned().unwrap_or_else(|| docs[0].clone());
+
+        prepared.push(prepare_report(doc, data, &fonts)?);
+    }
+
+    // Tính tổng số trang
+    let total_pages: usize = prepared.iter().map(|r| r.pages.len()).sum();
+
+    // Render
+    let mut start_page = 1;
+    let total = prepared.len();
+
+    // Page number
+    let mut start_page_number = 1;
+    let mut total_pages_number = total_pages;
+
+    for (index, report) in prepared.into_iter().enumerate() {
+        let continuous_page_numbering = report.ctx.continuous_page_numbering;
+
+        if !continuous_page_numbering {
+            total_pages_number = report.pages.len();
+        }
+
+        progress(json!({
+            "currentReport": index + 1,
+            "totalReport": total,
+        }));
+
+        start_page = render_single(
+            &mut pdf,
+            &fonts,
+            report,
+            start_page,
+            total_pages,
+            start_page_number,
+            total_pages_number,
+            progress,
+        )?;
+
+        start_page_number = start_page;
+
+        if !continuous_page_numbering {
+            start_page_number = 1;
+        }
+    }
+
+    progress(json!({
+        "message": "Đang lưu file pdf...",
+        "current": 0
+    }));
+
+    // Lưu PDF trực tiếp vào bytes
+    let mut warnings = Vec::new();
+
+    let bytes = pdf.save(&PdfSaveOptions::default(), &mut warnings);
+
+    Ok(bytes)
+}
 
 pub fn render_page<F>(
     docs: Vec<PdfTemplate>,
