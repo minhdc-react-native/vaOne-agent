@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { mInvoiceService } from "../api/services/mInvoice.service";
-interface ILogin {
+export interface ILogin {
     tenantId: string,
     source: string;
     username: string;

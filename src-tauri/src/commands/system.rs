@@ -2,8 +2,11 @@ use crate::models::system::AgentInfo;
 use crate::state::APP_HANDLE;
 use crate::state::CURRENT_ROUTE;
 use crate::state::ONLINE_MENU;
+use crate::state::WS_STATE;
 use crate::window_config;
 use captcha_db::DATABASE_NAME;
+use serde::Serialize;
+use serde_json::Value;
 use std::sync::Mutex;
 use tauri::{LogicalPosition, LogicalSize, Manager, Position, Size};
 
@@ -23,6 +26,15 @@ pub fn quit_app(app: tauri::AppHandle) {
     //     s.current_invoice = None;
     // });
     app.exit(0);
+}
+
+#[tauri::command]
+pub fn call_emit_event(event: String, tenant_id: String, data: Value) -> Result<(), String> {
+    if let Some(ws) = WS_STATE.get() {
+        ws.broadcast_json(&event, &tenant_id, &data);
+    }
+
+    Ok(())
 }
 
 #[tauri::command]

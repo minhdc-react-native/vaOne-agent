@@ -3,7 +3,7 @@ import AppWindow, { hideWindow } from "../components/AppWindow";
 import Button from "../components/Button";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Input from "../components/Input";
-import { getDelayRequest, useAppStore } from "../stores/app.store";
+import { getDelayRequest, ILogin, useAppStore } from "../stores/app.store";
 import Switch from "../components/Switch";
 import { useLocation } from "react-router-dom";
 import { dialog } from "../service/dialog.service";
@@ -26,19 +26,28 @@ export default function LoginMInvoicePage({ params }: IProgs) {
         savePassword?.[params.username] ?? ""
     );
 
-    const getInvoice = useCallback(async (token: string, taxCode: string) => {
+    const getInvoice = useCallback(async (login: ILogin) => {
         await hideWindow();
         if (!params.type) return;
         const delay = getDelayRequest();
+        await invoke("call_emit_event", {
+            event: "LOGIN_SOURCE_INVOICE",
+            tenantId: params.tenantId,
+            data: {
+                source: "M-SMI",
+                username: login.username,
+                taxCode: login.taxCode
+            },
+        });
         await invoke("start_m_invoice_sync", {
             tenantId: params.tenantId,
             orgUnitId: params.orgUnitId,
             invoiceType: params.type,
             fromDate: params.fromDate,
             toDate: params.toDate,
-            token,
+            token: login.token,
             delay: 100,
-            taxCode
+            taxCode: login.taxCode,
         });
     }, [params]);
 
@@ -51,7 +60,7 @@ export default function LoginMInvoicePage({ params }: IProgs) {
             invoke("set_current_route", {
                 route: location.pathname,
             });
-            getInvoice(login.token, login.taxCode!);
+            getInvoice(login);
             return;
         }
         invoke("page_ready", { name: 'loginSaveInvoice' });

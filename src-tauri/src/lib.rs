@@ -145,6 +145,7 @@ pub fn run() {
             commands::api_command::http_get,
             commands::api_command::http_post,
             commands::system::page_ready,
+            commands::system::call_emit_event,
             commands::pdf::render_pdf,
             commands::invoice::get_sync_state,
             commands::invoice::start_invoice_tct_sync,

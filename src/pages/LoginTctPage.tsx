@@ -6,7 +6,7 @@ import Button from "../components/Button";
 import Input from "../components/Input";
 
 import { tctService } from "../api/services/tct.service";
-import { getDelayRequest, useAppStore } from "../stores/app.store";
+import { getDelayRequest, ILogin, useAppStore } from "../stores/app.store";
 import Switch from "../components/Switch";
 import { dialog } from "../service/dialog.service";
 import { invoke } from "@tauri-apps/api/core";
@@ -34,17 +34,26 @@ export default function LoginTctPage({ params }: IProgs) {
     const [ckey, setCkey] = useState("");
     const [cvalue, setCvalue] = useState("");
 
-    const getInvoiceTCT = useCallback(async (token: string) => {
+    const getInvoiceTCT = useCallback(async (login: ILogin) => {
         await hideWindow();
         if (!params.type) return;
         const delay = getDelayRequest();
+        await invoke("call_emit_event", {
+            event: "LOGIN_SOURCE_INVOICE",
+            tenantId: params.tenantId,
+            data: {
+                source: "TCT",
+                username: login.username,
+                taxCode: login.taxCode
+            },
+        });
         await invoke("start_invoice_tct_sync", {
             tenantId: params.tenantId,
             orgUnitId: params.orgUnitId,
             invoiceType: params.type,
             fromDate: params.fromDate,
             toDate: params.toDate,
-            token: token,
+            token: login.token,
             delay: delay
         });
     }, [params]);
@@ -77,7 +86,7 @@ export default function LoginTctPage({ params }: IProgs) {
             invoke("set_current_route", {
                 route: location.pathname,
             });
-            getInvoiceTCT(login.token);
+            getInvoiceTCT(login);
             return;
         }
         invoke("page_ready", { name: 'loginTct' });
