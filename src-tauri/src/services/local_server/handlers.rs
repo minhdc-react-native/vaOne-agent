@@ -6,6 +6,7 @@ use crate::auth::token_manager::TokenManager;
 use crate::models::system::PrintResponse;
 use crate::models::system::SyncTokenRequest;
 use crate::state::APP_HANDLE;
+use crate::state::APP_STATE;
 use crate::state::CURRENT_ROUTE;
 use crate::utils::notification;
 use crate::utils::public::decompress_zstd_json;
@@ -63,8 +64,30 @@ pub async fn message(Json(req): Json<MessageRequest>) -> Json<PingResponse> {
 
 pub async fn sync_token(Json(req): Json<SyncTokenRequest>) -> impl IntoResponse {
     TokenManager::sync(&req.tenant_id, req.token, Some(req.auth));
+
+    let (source, username, tax_code) = APP_STATE
+        .get()
+        .and_then(|state| state.lock().ok())
+        .and_then(|state| {
+            state
+                .tenants
+                .get(&req.tenant_id)
+                .and_then(|tenant| tenant.info_login.as_ref())
+                .map(|login| {
+                    (
+                        login.source.clone(),
+                        login.username.clone(),
+                        login.tax_code.clone(),
+                    )
+                })
+        })
+        .unwrap_or_default();
+
     Json(serde_json::json!({
-        "success": true
+        "success": true,
+        "source": source,
+        "username": username,
+        "taxCode": tax_code
     }))
 }
 

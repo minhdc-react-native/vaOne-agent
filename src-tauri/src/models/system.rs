@@ -54,6 +54,7 @@ pub struct TenantState {
     pub sync: SyncState,
     pub web_online: bool,
     pub last_heartbeat: i64,
+    pub info_login: Option<Login>,
 }
 
 #[derive(Debug, Default)]
@@ -100,4 +101,26 @@ pub struct PrintResponse {
     pub success: bool,
     pub printed: bool,
     pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Login {
+    #[serde(rename = "tenantId")]
+    pub tenant_id: String,
+
+    pub source: String,
+    pub username: String,
+    pub password: String,
+    pub token: String,
+
+    #[serde(rename = "reConnect")]
+    pub re_connect: bool,
+
+    #[serde(rename = "taxCode")]
+    pub tax_code: String,
+
+    #[serde(rename = "idAccount")]
+    pub id_account: String,
+
+    pub info: serde_json::Value,
 }

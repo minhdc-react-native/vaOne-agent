@@ -76,7 +76,7 @@ function App() {
   useEffect(() => {
     if (!login) return;
     invoke("connect_invoice", {
-      newLabel: `${login.source}:${login.username}`
+      login,
     });
   }, [login]);
   return (

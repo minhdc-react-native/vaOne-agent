@@ -325,8 +325,11 @@ impl GdiPrinter {
             // let dest_x = (self.physical_width - dest_width) / 2 - self.offset_x;
             // let dest_y = -self.offset_y;
 
-            let dest_x = (self.physical_width - dest_width) / 2;
-            let dest_y = (self.physical_height - dest_height) / 2;
+            // let dest_x = (self.physical_width - dest_width) / 2;
+            // let dest_y = (self.physical_height - dest_height) / 2;
+
+            let dest_x = 0;
+            let dest_y = 0;
 
             println!(
                 "Physical paper: {} x {}",

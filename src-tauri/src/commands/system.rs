@@ -1,5 +1,7 @@
 use crate::models::system::AgentInfo;
+use crate::models::system::Login;
 use crate::state::APP_HANDLE;
+use crate::state::APP_STATE;
 use crate::state::CURRENT_ROUTE;
 use crate::state::ONLINE_MENU;
 use crate::state::WS_STATE;
@@ -38,11 +40,22 @@ pub fn call_emit_event(event: String, tenant_id: String, data: Value) -> Result<
 }
 
 #[tauri::command]
-pub fn connect_invoice(new_label: String) -> Result<(), String> {
+pub fn connect_invoice(login: Login) -> Result<(), String> {
+    let new_label = format!("{}:{}", login.source, login.username);
+
     if let Some(item) = ONLINE_MENU.get() {
         item.set_text(&format!("● {}", new_label))
             .map_err(|e| e.to_string())?;
     }
+
+    let app_state = APP_STATE.get().ok_or("APP_STATE chưa được khởi tạo")?;
+
+    let mut state = app_state.lock().map_err(|e| e.to_string())?;
+
+    let tenant = state.tenants.entry(login.tenant_id.clone()).or_default();
+
+    tenant.info_login = Some(login);
+
     Ok(())
 }
 
