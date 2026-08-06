@@ -28,6 +28,7 @@ impl Default for FormatterContext {
 impl Default for DecimalConfig {
     fn default() -> Self {
         Self {
+            display_zero: "".to_string(),
             thousand_separator: ".".to_string(),
             decimal_separator: ",".to_string(),
 
@@ -65,6 +66,7 @@ impl Default for CurrencyConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DecimalConfig {
+    pub display_zero: String,
     pub thousand_separator: String,
     pub decimal_separator: String,
     pub local_currency_decimal_places: usize,

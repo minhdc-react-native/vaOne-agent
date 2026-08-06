@@ -138,21 +138,28 @@ fn format_number(ctx: &FormatterContext, args: &[Value]) -> Result<String> {
     };
 
     Ok(format_decimal(
-        value,
+        Some(value),
         decimal_places,
+        &ctx.decimal.display_zero,
         &ctx.decimal.thousand_separator,
         &ctx.decimal.decimal_separator,
     ))
 }
 
 fn format_decimal(
-    value: f64,
+    value: Option<f64>,
     decimal_places: usize,
+    display_zero: &str,
     thousand_separator: &str,
     decimal_separator: &str,
 ) -> String {
-    let negative = value < 0.0;
+    let value = match value {
+        None => return display_zero.to_string(),
+        Some(value) if value == 0.0 => return display_zero.to_string(),
+        Some(value) => value,
+    };
 
+    let negative = value < 0.0;
     let value = value.abs();
 
     let text = format!("{:.*}", decimal_places, value);
@@ -162,7 +169,7 @@ fn format_decimal(
     let int_part = parts.next().unwrap_or("0");
     let frac_part = parts.next();
 
-    // format phần nguyên
+    // Format phần nguyên
     let mut int_result = String::new();
 
     for (i, ch) in int_part.chars().rev().enumerate() {
