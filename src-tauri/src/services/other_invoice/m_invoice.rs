@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::progress_bar;
+use crate::services::local_server::types::SourceInvoice;
 use crate::services::update::update_progress;
 
 fn format_date(date: &str) -> String {
@@ -167,7 +168,9 @@ pub async fn run_sync_flow_m_invoice(
         let khhdon = item["khhdon"].as_str().unwrap_or("");
         let shdon = item["shdon"].as_i64().unwrap_or(0);
 
-        match crate::api::http::post_data(&tenant_id, &org_unit_id, &item).await {
+        match crate::api::http::post_data(&tenant_id, &org_unit_id, SourceInvoice::M_Smi, &item)
+            .await
+        {
             Ok(_) => {
                 completed += 1;
                 progress_bar(Some(completed), Some(num_of_invoice));

@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::api::http;
 use crate::progress_bar;
+use crate::services::local_server::types::SourceInvoice;
 use crate::services::update::update_progress;
 use crate::utils::public::navigate_to_route;
 
@@ -178,8 +179,13 @@ async fn fetch_invoice_detail(
         match crate::api::http::get(&url, token.as_deref(), delay, None, None).await {
             Ok(invoice) => {
                 // 1. Đẩy sang server
-                if let Err(err) =
-                    http::post_data(&tenant_id, &org_unit_id, &serde_json::json!(invoice)).await
+                if let Err(err) = http::post_data(
+                    &tenant_id,
+                    &org_unit_id,
+                    SourceInvoice::Tct,
+                    &serde_json::json!(invoice),
+                )
+                .await
                 {
                     eprintln!("Post invoice failed: {}", err);
                     completed += 1;

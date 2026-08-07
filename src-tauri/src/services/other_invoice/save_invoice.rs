@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use crate::progress_bar;
+use crate::services::local_server::types::SourceInvoice;
 use crate::services::update::update_progress;
 
 fn get_url(invoice_type: u8, id_account: &str) -> String {
@@ -205,7 +206,14 @@ pub async fn run_sync_flow_save_invoice(
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
 
-        match crate::api::http::post_data(&tenant_id, &org_unit_id, &item).await {
+        match crate::api::http::post_data(
+            &tenant_id,
+            &org_unit_id,
+            SourceInvoice::SaveInvoice,
+            &item,
+        )
+        .await
+        {
             Ok(_) => {
                 completed += 1;
                 progress_bar(Some(completed), Some(num_of_invoice));

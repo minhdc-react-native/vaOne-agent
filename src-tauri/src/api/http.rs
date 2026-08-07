@@ -6,6 +6,7 @@ use serde_json::Value;
 use std::{collections::HashMap, time::Duration};
 use url::{form_urlencoded, Url};
 
+use crate::services::local_server::types::SourceInvoice;
 use crate::{
     auth::{auth_api::ensure_valid_token, token_manager::TokenManager},
     state::get_client,
@@ -158,7 +159,12 @@ pub async fn post_form(
     serde_json::from_str(&text).map_err(|e| e.to_string())
 }
 
-pub async fn post_data(tenant_id: &str, org_unit_id: &str, body: &Value) -> ApiResult<Value> {
+pub async fn post_data(
+    tenant_id: &str,
+    org_unit_id: &str,
+    source: SourceInvoice,
+    body: &Value,
+) -> ApiResult<Value> {
     let token = ensure_valid_token(tenant_id)
         .await
         .map_err(|e| e.to_string())?;
@@ -178,12 +184,17 @@ pub async fn post_data(tenant_id: &str, org_unit_id: &str, body: &Value) -> ApiR
 
     let client = get_client();
 
+    let new_body = serde_json::json!({
+        "source": source,
+        "data": body,
+    });
+
     let response = client
         .post(post_url)
         .bearer_auth(&token.access_token)
         .header("__tenant", tenant_id)
         .header("__orgId", org_unit_id)
-        .json(body)
+        .json(&new_body)
         .send()
         .await
         .map_err(|e| e.to_string())?;
