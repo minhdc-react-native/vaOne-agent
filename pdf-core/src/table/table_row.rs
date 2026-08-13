@@ -188,13 +188,15 @@ impl TableRow {
                 })
                 .unwrap_or_default();
 
+            let format_string = column.format_string.clone();
+
             let text = TextElement {
                 name: None,
                 x: 0.0,
                 y: 0.0,
                 width: widths[index],
                 height: 0.0,
-                content: value,
+                content: Self::apply_format(ctx.clone(), value, &format_string),
                 field_name: None,
                 style: Some(style),
                 auto_height: Some(true),
