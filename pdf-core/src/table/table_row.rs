@@ -156,7 +156,7 @@ impl TableRow {
                 ],
             ),
             _ => (
-                "dateMonthYear",
+                "formatDate",
                 vec![Value::String(value), Value::String(format.to_string())],
             ),
         };

@@ -80,6 +80,11 @@ impl TableLayoutEngine {
             context,
             ctx,
         );
+        println!("table.columns={:#?}", table.columns);
+        // if let Some(row) = body.clone().get(1) {
+        //     println!("row = {:#?}", row);
+        // }
+
         rows.extend(body);
 
         let height = header_height + rows.iter().map(|r| r.height).sum::<f32>();

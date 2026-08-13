@@ -83,7 +83,10 @@ pub fn resolve_value(data: &Value, path: &str) -> Option<Value> {
         };
     }
 
-    Some(current.clone())
+    match current {
+        Value::Null => Some(Value::String(String::new())),
+        _ => Some(current.clone()),
+    }
 }
 
 pub fn bind_content(template: &str, data: &Value) -> String {

@@ -28,6 +28,9 @@ impl LayoutBuilder {
             match e {
                 Element::Text(element) => {
                     let mut element = element.clone();
+                    if element.content.trim().is_empty() {
+                        element.content = "{value}".to_string();
+                    }
 
                     let context = if let Some(field) = element.field_name.as_deref() {
                         let mut watch = Vec::new();
@@ -39,15 +42,13 @@ impl LayoutBuilder {
                             element.content = dynamic.fn_text;
                         }
 
-                        // if element.name.as_deref() == Some("text_2g5c") {
-                        //     println!("element.content={} watch={:#?}", element.content, watch);
-                        // }
-
                         TextLayout::build_context(data, field, "value", &watch)
                     } else {
                         Value::Object(Default::default())
                     };
-
+                    // if element.name.as_deref() == Some("text_wcjj") {
+                    //     println!("element.content={} context={:#?}", element.content, context);
+                    // }
                     let mut layout: crate::models::TextLayoutResult =
                         TextLayout::layout(fonts, doc.height, &element, &context, ctx.clone());
                     layout.visible = Some(visible);

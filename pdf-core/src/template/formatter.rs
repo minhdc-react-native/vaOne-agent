@@ -58,6 +58,8 @@ fn format_date(_ctx: &FormatterContext, args: &[Value]) -> Result<String> {
         "dd/MM/yyyy".to_string()
     };
 
+    println!("format_date: value={}, format={}", value, format);
+
     let chrono_format = format
         .replace("yyyy", "%Y")
         .replace("MM", "%m")
@@ -66,12 +68,21 @@ fn format_date(_ctx: &FormatterContext, args: &[Value]) -> Result<String> {
         .replace("mm", "%M")
         .replace("ss", "%S");
 
-    // ISO 8601: 2026-03-04T17:00:00Z
+    // RFC3339:
+    // 2026-03-04T17:00:00Z
+    // 2026-03-04T17:00:00+07:00
     if let Ok(dt) = DateTime::parse_from_rfc3339(&value) {
         return Ok(dt.format(&chrono_format).to_string());
     }
 
-    // yyyy-MM-dd
+    // DateTime không có timezone:
+    // 2026-06-18T00:00:00
+    if let Ok(dt) = NaiveDateTime::parse_from_str(&value, "%Y-%m-%dT%H:%M:%S") {
+        return Ok(dt.format(&chrono_format).to_string());
+    }
+
+    // Date:
+    // 2026-06-18
     if let Ok(date) = NaiveDate::parse_from_str(&value, "%Y-%m-%d") {
         return Ok(date.format(&chrono_format).to_string());
     }
