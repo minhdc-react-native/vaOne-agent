@@ -285,10 +285,18 @@ pub fn draw_line(
 }
 
 pub fn get_formatter_context(data: &Value) -> FormatterContext {
-    if let Some(config) = data.get("config") {
-        serde_json::from_value(config.clone()).unwrap_or_default()
-    } else {
-        FormatterContext::default()
+    let Some(config) = data.get("config") else {
+        return FormatterContext::default();
+    };
+
+    match serde_json::from_value::<FormatterContext>(config.clone()) {
+        Ok(ctx) => ctx,
+        Err(err) => {
+            eprintln!("Failed to deserialize FormatterContext: {err}");
+            eprintln!("Config: {config:#?}");
+
+            FormatterContext::default()
+        }
     }
 }
 

@@ -262,7 +262,7 @@ impl Default for ElementStyle {
         Self {
             background_color: Some("transparent".to_string()),
             opacity: Some(1.0),
-            font_size: Some(14.0),
+            font_size: None,
             color: Some("#000000".to_string()),
             text_align: Some("left".to_string()),
             center_y: Some(false),

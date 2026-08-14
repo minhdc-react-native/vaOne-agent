@@ -58,8 +58,6 @@ fn format_date(_ctx: &FormatterContext, args: &[Value]) -> Result<String> {
         "dd/MM/yyyy".to_string()
     };
 
-    println!("format_date: value={}, format={}", value, format);
-
     let chrono_format = format
         .replace("yyyy", "%Y")
         .replace("MM", "%m")
@@ -225,10 +223,9 @@ fn number_to_vietnamese(ctx: &FormatterContext, value: f64) -> String {
 
     let integer = value.trunc() as i64;
 
-    let decimal = if ctx.currency.decimal_conversion_rate > 1 {
-        ((value.fract() * ctx.currency.decimal_conversion_rate as f64).round()) as i64
-    } else {
-        0
+    let decimal = match ctx.currency.decimal_conversion_rate {
+        Some(rate) if rate > 1 => ((value.fract() * rate as f64).round()) as i64,
+        _ => 0,
     };
 
     let mut result = String::new();
@@ -371,10 +368,9 @@ fn number_to_english(ctx: &FormatterContext, value: f64) -> String {
 
     let integer = value.trunc() as i64;
 
-    let decimal = if ctx.currency.decimal_conversion_rate > 1 {
-        ((value.fract() * ctx.currency.decimal_conversion_rate as f64).round()) as i64
-    } else {
-        0
+    let decimal = match ctx.currency.decimal_conversion_rate {
+        Some(rate) if rate > 1 => ((value.fract() * rate as f64).round()) as i64,
+        _ => 0,
     };
 
     let mut result = String::new();

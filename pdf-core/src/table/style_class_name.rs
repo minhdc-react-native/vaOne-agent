@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
-use crate::models::ElementStyle;
+use crate::{models::ElementStyle, text::FONT_SIZE};
 
 static TAILWIND_COLORS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
     HashMap::from([
@@ -84,19 +84,19 @@ pub fn class_name_to_style(class_name: &str, style: &mut ElementStyle) -> Elemen
     // ==========================
     // font size
     // ==========================
-    let size = classes.iter().find_map(|c| match *c {
-        "text-xs" => Some(9.0),
-        "text-sm" => Some(10.0),
-        "text-base" => Some(11.0),
-        "text-lg" => Some(12.0),
-        "text-xl" => Some(14.0),
-        "text-2xl" => Some(16.0),
-        "text-3xl" => Some(18.0),
-        "text-4xl" => Some(22.0),
-        _ => None,
+    style.font_size = style.font_size.or_else(|| {
+        classes.iter().find_map(|c| match *c {
+            "text-xs" => Some(9.0),
+            "text-sm" => Some(10.0),
+            "text-base" => Some(11.0),
+            "text-lg" => Some(12.0),
+            "text-xl" => Some(14.0),
+            "text-2xl" => Some(16.0),
+            "text-3xl" => Some(18.0),
+            "text-4xl" => Some(22.0),
+            _ => Some(FONT_SIZE),
+        })
     });
-
-    style.font_size = size;
 
     // ==========================
     // text color

@@ -80,7 +80,7 @@ impl TableLayoutEngine {
             context,
             ctx,
         );
-        println!("table.columns={:#?}", table.columns);
+        // println!("table.columns={:#?}", table.columns);
         // if let Some(row) = body.clone().get(1) {
         //     println!("row = {:#?}", row);
         // }
@@ -197,55 +197,55 @@ impl TableLayoutEngine {
         element_style: &Option<ElementStyle>,
         cell: &Option<ElementStyle>,
     ) -> ElementStyle {
-        let mut style = element_style.clone().unwrap_or_default();
+        let mut style = cell.clone().unwrap_or_default();
 
-        if let Some(c) = cell {
-            if c.background_color.is_some() {
-                style.background_color = c.background_color.clone();
+        if let Some(e) = element_style {
+            if style.background_color.is_none() {
+                style.background_color = e.background_color.clone();
             }
 
-            if c.color.is_some() {
-                style.color = c.color.clone();
+            if style.color.is_none() {
+                style.color = e.color.clone();
             }
 
-            if c.font_family.is_some() {
-                style.font_family = c.font_family.clone();
+            if style.font_family.is_none() {
+                style.font_family = e.font_family.clone();
             }
 
-            if c.font_size.is_some() {
-                style.font_size = c.font_size;
+            if style.font_size.is_none() {
+                style.font_size = e.font_size;
             }
 
-            if c.font_weight.is_some() {
-                style.font_weight = c.font_weight.clone();
+            if style.font_weight.is_none() {
+                style.font_weight = e.font_weight.clone();
             }
 
-            if c.font_style.is_some() {
-                style.font_style = c.font_style.clone();
+            if style.font_style.is_none() {
+                style.font_style = e.font_style.clone();
             }
 
-            if c.text_align.is_some() {
-                style.text_align = c.text_align.clone();
+            if style.text_align.is_none() {
+                style.text_align = e.text_align.clone();
             }
 
-            if c.border_color.is_some() {
-                style.border_color = c.border_color.clone();
+            if style.border_color.is_none() {
+                style.border_color = e.border_color.clone();
             }
 
-            if c.border_width.is_some() {
-                style.border_width = c.border_width;
+            if style.border_width.is_none() {
+                style.border_width = e.border_width;
             }
 
-            if c.border_style.is_some() {
-                style.border_style = c.border_style.clone();
+            if style.border_style.is_none() {
+                style.border_style = e.border_style.clone();
             }
 
-            if c.padding.is_some() {
-                style.padding = c.padding;
+            if style.padding.is_none() {
+                style.padding = e.padding;
             }
 
-            if c.opacity.is_some() {
-                style.opacity = c.opacity;
+            if style.opacity.is_none() {
+                style.opacity = e.opacity;
             }
         }
 

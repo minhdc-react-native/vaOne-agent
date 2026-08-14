@@ -4,7 +4,7 @@ use crate::layout::TextLayout;
 use crate::models::{ElementStyle, TextElement, TextLayoutResult, TextStyle};
 use crate::utils::Unit;
 use printpdf::{Op, Point, TextItem};
-pub const FONT_SIZE: f32 = 12.0;
+pub const FONT_SIZE: f32 = 11.0;
 pub const LINE_HEIGHT: f32 = 1.5;
 
 pub fn draw_text(
@@ -16,12 +16,15 @@ pub fn draw_text(
 ) {
     let base_style = item.style.clone().unwrap_or_default();
     let align = fonts.text_align(item);
-
+    // if (item.x == 224.83746 && item.y == 287.9776) {
+    //     println!("base_style={:#?}", base_style);
+    // }
     for (index, line) in layout.lines.iter().enumerate() {
         let mut width = 0.0;
 
         for run in &line.runs {
             let style = merge_style(&base_style, &run.style);
+
             width += TextLayout::measure_string(
                 fonts,
                 &run.text,

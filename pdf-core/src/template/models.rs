@@ -58,7 +58,7 @@ impl Default for CurrencyConfig {
             separator_vn: "và".to_string(),
             decimal_name_vn: "xu".to_string(),
 
-            decimal_conversion_rate: 100,
+            decimal_conversion_rate: Some(100),
         }
     }
 }
@@ -101,5 +101,5 @@ pub struct CurrencyConfig {
     #[serde(rename = "decimalNameVN")]
     pub decimal_name_vn: String,
 
-    pub decimal_conversion_rate: i64,
+    pub decimal_conversion_rate: Option<i64>,
 }

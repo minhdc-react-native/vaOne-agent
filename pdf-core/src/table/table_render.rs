@@ -64,6 +64,7 @@ impl TableRenderer {
         //--------------------------------------------------
         // Text
         //--------------------------------------------------
+
         let text = TextElement {
             name: None,
             x: cell.x + 2.0,
@@ -76,7 +77,9 @@ impl TableRenderer {
             auto_height: Some(true),
             visible_if: None,
         };
-
+        // if (text.x == 224.83746 && text.y == 287.9776) {
+        //     println!("text style={:#?}", cell.style);
+        // }
         let context = serde_json::json!({});
         let layout: TextLayoutResult =
             TextLayout::layout(&fonts, page_height, &text, &context, ctx);
