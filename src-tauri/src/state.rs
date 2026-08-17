@@ -169,11 +169,7 @@ impl WsState {
 
 pub fn broadcast_token_updated(tenant_id: &str, token: &TokenState) {
     if let Some(ws) = WS_STATE.get() {
-        let payload = serde_json::json!({
-            "tenantId": tenant_id,
-            "data": token
-        });
-        ws.broadcast_json("TOKEN_UPDATED", tenant_id, payload);
+        ws.broadcast_json("TOKEN_UPDATED", tenant_id, token);
     }
 }
 
