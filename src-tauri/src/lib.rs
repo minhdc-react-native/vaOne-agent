@@ -1,20 +1,25 @@
 mod api;
+mod auth;
 mod commands;
 mod models;
-pub mod pdf;
 mod services;
 mod state;
 mod utils;
 mod window_config;
+use crate::models::system::AppState;
 use crate::services::update::check_update_on_startup;
-use crate::state::CURRENT_ROUTE;
-use crate::state::{AppState, APP_STATE};
+use crate::state::{APP_STATE, SYNC_MENU};
+use crate::state::{CURRENT_ROUTE, ONLINE_MENU};
+use crate::utils::public::navigate_to_route;
+use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    Manager,
+    App, Manager,
 };
+const LINE_TEXT: &str = "------------------------------";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -31,16 +36,48 @@ pub fn run() {
         }))
         // INIT APP
         .setup(|app| {
+            #[cfg(target_os = "windows")]
+            {
+                let pdfium_path = get_pdfium_path(&app)?;
+
+                println!("PDFium: {}", pdfium_path.display());
+                println!("Exists: {}", pdfium_path.exists());
+                printer_core::init_pdfium(pdfium_path);
+            }
             let window = app.get_webview_window("main").unwrap();
             let window_clone = window.clone();
             let _ = window_clone.hide();
+            let online = MenuItem::with_id(
+                app,
+                "online",
+                "○ Chưa kết nối nguồn hóa đơn",
+                true,
+                None::<&str>,
+            )?;
+            let _ = ONLINE_MENU.set(online.clone());
+
+            let sync = MenuItem::with_id(app, "sync", LINE_TEXT, false, None::<&str>)?;
+
+            let _ = SYNC_MENU.set(sync.clone());
+
             let check_update =
                 MenuItem::with_id(app, "update", "Kiểm tra phiên bản", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Thoát ứng dụng", true, None::<&str>)?;
 
-            let menu = Menu::with_items(app, &[&check_update, &settings, &separator, &quit])?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &online,
+                    &sync,
+                    // &separator,
+                    &settings,
+                    &check_update,
+                    &separator,
+                    &quit,
+                ],
+            )?;
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -65,60 +102,36 @@ pub fn run() {
                 services::local_server::start().await;
             });
 
-            check_update_on_startup(app.handle().clone(), Some(true));
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(3000)).await;
+                if let Some(splash) = app_handle.get_webview_window("splash_screen") {
+                    let _ = splash.close();
+                    check_update_on_startup(app_handle, Some(true));
+                }
+            });
 
             Ok(())
         })
         // HANDLE MENU CLICK
         .on_menu_event(|app, event| match event.id.as_ref() {
+            "online" => {
+                let _ = navigate_to_route("/login");
+            }
+            "sync" => {
+                let _ = navigate_to_route("/get-invoices");
+            }
             "update" => {
                 let _ = check_update_on_startup(app.clone(), Some(false));
             }
             "report" => {
-                if let Some(window) = app.get_webview_window("main") {
-                    let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
-                    if current == "/report" {
-                        let _ = window.set_focus();
-                    } else {
-                        let _ = window.hide();
-                        let _ = window.eval(
-                            r#"
-                            window.location.hash = "/report";
-                        "#,
-                        );
-                    }
-                }
+                let _ = navigate_to_route("/report");
             }
-
             "settings" => {
-                if let Some(window) = app.get_webview_window("main") {
-                    let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
-                    if current == "/settings" {
-                        let _ = window.set_focus();
-                    } else {
-                        let _ = window.hide();
-                        let _ = window.eval(
-                            r#"
-                            window.location.hash = "/settings";
-                        "#,
-                        );
-                    }
-                }
+                let _ = navigate_to_route("/settings");
             }
             "quit" => {
-                if let Some(window) = app.get_webview_window("main") {
-                    let current = CURRENT_ROUTE.get().unwrap().lock().unwrap().clone();
-                    if current == "/quit" {
-                        let _ = window.set_focus();
-                    } else {
-                        let _ = window.hide();
-                        let _ = window.eval(
-                            r#"
-                            window.location.hash = "/quit";
-                        "#,
-                        );
-                    }
-                }
+                let _ = navigate_to_route("/quit");
             }
 
             _ => {}
@@ -128,15 +141,65 @@ pub fn run() {
             commands::system::quit_app,
             commands::system::get_agent_info,
             commands::system::set_current_route,
+            commands::system::connect_invoice,
             commands::api_command::http_get,
             commands::api_command::http_post,
             commands::system::page_ready,
+            commands::system::call_emit_event,
             commands::pdf::render_pdf,
-            commands::printer::get_printer_list,
-            commands::printer::print_pdf,
             commands::invoice::get_sync_state,
-            commands::invoice::start_invoice_tct_sync
+            commands::invoice::start_invoice_tct_sync,
+            commands::invoice::start_save_invoice_sync,
+            commands::invoice::start_m_invoice_sync,
+            commands::system::captcha_train,
+            commands::system::captcha_predict,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+pub fn progress_bar(done: Option<usize>, total: Option<usize>) {
+    if let Some(item) = SYNC_MENU.get() {
+        match (done, total) {
+            (Some(done), Some(total)) => {
+                let width = 10;
+                let filled = if total == 0 { 0 } else { done * width / total };
+                let percent = if total == 0 { 0 } else { done * 100 / total };
+                let text = format!(
+                    "[{}{}] {}/{} ({}%)",
+                    "■".repeat(filled),
+                    "□".repeat(width - filled),
+                    done,
+                    total,
+                    percent
+                );
+                // let text = format!("Tải hóa đơn: {}/{} ({}%)", done, total, percent);
+                let _ = item.set_enabled(true);
+                let _ = item.set_text(&text);
+            }
+            _ => {
+                let _ = item.set_enabled(false);
+                let _ = item.set_text(LINE_TEXT);
+            }
+        }
+    }
+}
+
+fn get_pdfium_path(app: &App) -> tauri::Result<PathBuf> {
+    #[cfg(debug_assertions)]
+    {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources");
+        path.push("pdfium");
+        path.push("pdfium.dll");
+        Ok(path)
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        app.path().resolve(
+            "resources/pdfium/pdfium.dll",
+            tauri::path::BaseDirectory::Resource,
+        )
+    }
 }

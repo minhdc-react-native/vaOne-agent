@@ -1,0 +1,21 @@
+[package]
+name = "printer-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+[target.'cfg(target_os = "macos")'.dependencies]
+libc = "0.2"
+once_cell = "1"
+[target.'cfg(windows)'.dependencies]
+pdfium-render = "0.8.34"
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Printing",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+    "Win32_System_SystemServices",
+    "Win32_UI_Shell",
+] }
