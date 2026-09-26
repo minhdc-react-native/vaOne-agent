@@ -169,6 +169,8 @@ where
 {
     let page_count = report.pages.len();
 
+    bind_total_pages(&mut report, fonts, total_pages_number);
+
     if let Some(element) = &report.page_number {
         for (index, page) in report.pages.iter_mut().enumerate() {
             let context = json!({
@@ -202,6 +204,39 @@ where
     )?;
 
     Ok(start_page + page_count)
+}
+
+fn bind_total_pages(report: &mut PreparedReport, fonts: &PdfFonts, total_pages: usize) {
+    let context = json!({
+        "value": format!("{:02}", total_pages),
+    });
+    let page_height = report.height;
+    let formatter_context = report.ctx.clone();
+
+    for page in &mut report.pages {
+        for item in &mut page.items {
+            let PageItem::Text { element, layout } = item else {
+                continue;
+            };
+
+            if element.field_name.as_deref() != Some("totalPages") {
+                continue;
+            }
+
+            let y = layout.y;
+            let visible = layout.visible;
+            let mut updated = TextLayout::layout(
+                fonts,
+                page_height,
+                element,
+                &context,
+                formatter_context.clone(),
+            );
+            updated.y = y;
+            updated.visible = visible;
+            *layout = updated;
+        }
+    }
 }
 
 fn is_continuous_page(width_px: f32, height_px: f32) -> bool {

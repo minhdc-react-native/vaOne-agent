@@ -54,6 +54,9 @@ pub struct TableColumn {
     #[serde(rename = "fieldName")]
     pub field_name: String,
 
+    #[serde(default = "default_col_span", rename = "colSpan")]
+    pub col_span: usize,
+
     pub content: Option<String>,
 
     #[serde(rename = "formatString")]
@@ -69,6 +72,10 @@ pub struct TableColumn {
     #[serde(default)]
     #[serde(rename = "bodyStyle")]
     pub body_style: Option<ElementStyle>,
+}
+
+fn default_col_span() -> usize {
+    1
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

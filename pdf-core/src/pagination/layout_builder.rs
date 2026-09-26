@@ -9,7 +9,7 @@ use crate::{
     table::table_layout::TableLayoutEngine,
     template::models::FormatterContext,
 };
-use serde_json::Value;
+use serde_json::{json, Value};
 pub struct LayoutBuilder;
 
 impl LayoutBuilder {
@@ -33,16 +33,20 @@ impl LayoutBuilder {
                     }
 
                     let context = if let Some(field) = element.field_name.as_deref() {
-                        let mut watch = Vec::new();
+                        if field == "totalPages" {
+                            json!({ "value": "00" })
+                        } else {
+                            let mut watch = Vec::new();
 
-                        if let Ok(dynamic) =
-                            serde_json::from_str::<DynamicContent>(&element.content)
-                        {
-                            watch = dynamic.watch;
-                            element.content = dynamic.fn_text;
+                            if let Ok(dynamic) =
+                                serde_json::from_str::<DynamicContent>(&element.content)
+                            {
+                                watch = dynamic.watch;
+                                element.content = dynamic.fn_text;
+                            }
+
+                            TextLayout::build_context(data, field, "value", &watch)
                         }
-
-                        TextLayout::build_context(data, field, "value", &watch)
                     } else {
                         Value::Object(Default::default())
                     };
