@@ -12,16 +12,20 @@ use pdf_core::renderer::render_bytes;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn render_pdf(
-    report_path: *const c_char,
-    data_path: *const c_char,
+    reports_json: *const c_char,
+    datas_json: *const c_char,
     output_path: *const c_char,
 ) -> c_int {
     let result = (|| -> anyhow::Result<()> {
-        let report = unsafe { CStr::from_ptr(report_path) }.to_str()?;
-        let data = unsafe { CStr::from_ptr(data_path) }.to_str()?;
-        let output = unsafe { CStr::from_ptr(output_path) }.to_str()?;
+        if output_path.is_null() {
+            anyhow::bail!("output_path is null");
+        }
 
-        render(report, data, output)
+        let output = unsafe { CStr::from_ptr(output_path) }.to_str()?;
+        let bytes = render_pdf_internal(reports_json, datas_json, None)?;
+
+        fs::write(output, bytes).with_context(|| format!("Cannot write {}", output))?;
+        Ok(())
     })();
 
     if result.is_ok() {

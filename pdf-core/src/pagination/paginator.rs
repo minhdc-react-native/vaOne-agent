@@ -281,18 +281,25 @@ impl Paginator {
             // Không còn đủ chỗ trên trang hiện tại
             if !continuous
                 && ctx.current_y + next_height > available_height
-                && !table.rows.is_empty()
+                && (!table.rows.is_empty()
+                    || !ctx.current_page.is_empty()
+                    || ctx.current_y > ctx.margin_top)
             {
-                table.recalc_height();
+                // The first product group may already be too tall for the space
+                // below the receipt heading. Move it intact without emitting an
+                // orphan table header on the previous page.
+                if !table.rows.is_empty() {
+                    table.recalc_height();
 
-                let mut table_element = element.clone();
-                table_element.y = table.y;
-                table_element.height = table.height;
+                    let mut table_element = element.clone();
+                    table_element.y = table.y;
+                    table_element.height = table.height;
 
-                ctx.current_page.push(PageItem::Table {
-                    element: table_element,
-                    layout: table,
-                });
+                    ctx.current_page.push(PageItem::Table {
+                        element: table_element,
+                        layout: table,
+                    });
+                }
 
                 // Sang trang mới
                 ctx.new_page();

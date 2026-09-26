@@ -27,21 +27,45 @@ impl TableRow {
     ) -> Vec<TableRowLayout> {
         let mut rows = Vec::new();
 
-        let row_height = DEFAULT_ROW_HEIGHT;
-
         let mut current_y = start_y;
         for item in data {
-            let row = Self::build_row(
-                fonts,
-                page_height,
-                table,
-                item,
-                widths,
-                positions,
-                current_y,
-                row_height,
-                ctx.clone(),
-            );
+            // A fixed-row template describes the physical lines of ONE data item.
+            // Keep them in one logical row so pagination cannot separate the name
+            // from its quantity/price line.
+            let mut row = TableRowLayout {
+                y: current_y,
+                height: 0.0,
+                cells: Vec::new(),
+            };
+            if let Some(fix) = table.fix_row.as_ref().filter(|fix| !fix.data.is_empty()) {
+                for row_config in &fix.data {
+                    let line = Self::build_row(
+                        fonts,
+                        page_height,
+                        table,
+                        &row_config.columns,
+                        item,
+                        widths,
+                        positions,
+                        current_y + row.height,
+                        ctx.clone(),
+                    );
+                    row.height += line.height;
+                    row.cells.extend(line.cells);
+                }
+            } else {
+                row = Self::build_row(
+                    fonts,
+                    page_height,
+                    table,
+                    &table.columns,
+                    item,
+                    widths,
+                    positions,
+                    current_y,
+                    ctx.clone(),
+                );
+            }
             current_y += row.height;
             rows.push(row);
         }
@@ -53,41 +77,41 @@ impl TableRow {
         fonts: &PdfFonts,
         page_height: f32,
         table: &TableElement,
+        columns: &[TableColumn],
         data: &Value,
         widths: &[f32],
         positions: &[f32],
         y: f32,
-        row_height: f32,
         ctx: FormatterContext,
     ) -> TableRowLayout {
         let mut row = TableRowLayout {
             y,
 
-            height: row_height,
+            height: DEFAULT_ROW_HEIGHT,
 
             cells: Vec::new(),
         };
 
-        for (index, column) in table.columns.iter().enumerate() {
-            row.cells.push(Self::build_cell(
+        let mut index = 0;
+        for column in columns {
+            if index >= widths.len() || index >= positions.len() {
+                break;
+            }
+            let span = column.col_span.max(1).min(widths.len() - index);
+            let mut cell = Self::build_cell(
                 column,
                 data,
                 positions[index],
                 y,
-                widths[index],
+                TableLayoutEngine::span_width(widths, index, span),
                 &table.style,
                 ctx.clone(),
-            ));
+            );
+            cell.col_span = span;
+            row.cells.push(cell);
+            index += span;
         }
-        let row_height = Self::measure_row_height(
-            fonts,
-            page_height,
-            &table.columns,
-            data,
-            widths,
-            &table.style,
-            ctx.clone(),
-        );
+        let row_height = Self::measure_row_height(fonts, page_height, &row.cells, ctx.clone());
         for cell in &mut row.cells {
             cell.height = row_height;
         }
@@ -113,15 +137,19 @@ impl TableRow {
             }
         }
 
-        let value = resolve_value(data, &column.field_name)
-            .map(|v| {
-                if v.is_string() {
-                    v.as_str().unwrap().to_string()
-                } else {
-                    v.to_string()
-                }
-            })
-            .unwrap_or_default();
+        let value = if column.field_name.trim().is_empty() {
+            column.content.clone().unwrap_or_default()
+        } else {
+            resolve_value(data, &column.field_name)
+                .map(|v| {
+                    if v.is_string() {
+                        v.as_str().unwrap().to_string()
+                    } else {
+                        v.to_string()
+                    }
+                })
+                .unwrap_or_default()
+        };
 
         let format_string = column.format_string.clone();
 
@@ -146,6 +174,9 @@ impl TableRow {
         let Some(format) = format_string.as_deref() else {
             return value;
         };
+        if format.trim().is_empty() {
+            return value;
+        }
 
         let (formatter, args) = match format {
             "SLG" | "GIA_NT" | "GIA" | "TIEN_NT" | "TIEN" | "EXCHANGE_RATE" | "PT" => (
@@ -167,38 +198,22 @@ impl TableRow {
     fn measure_row_height(
         fonts: &PdfFonts,
         page_height: f32,
-        columns: &[TableColumn],
-        data: &Value,
-        widths: &[f32],
-        table_style: &Option<ElementStyle>,
+        cells: &[TableCellLayout],
         ctx: FormatterContext,
     ) -> f32 {
         let mut max_height = DEFAULT_ROW_HEIGHT;
 
-        for (index, column) in columns.iter().enumerate() {
-            let style = TableLayoutEngine::merge_style(table_style, &column.body_style);
-
-            let value = resolve_value(data, &column.field_name)
-                .map(|v| {
-                    if let Some(s) = v.as_str() {
-                        s.to_string()
-                    } else {
-                        v.to_string()
-                    }
-                })
-                .unwrap_or_default();
-
-            let format_string = column.format_string.clone();
-
+        for cell in cells {
             let text = TextElement {
                 name: None,
                 x: 0.0,
                 y: 0.0,
-                width: widths[index],
+                // Match TableRenderer's horizontal inset when wrapping text.
+                width: (cell.width - 4.0).max(0.0),
                 height: 0.0,
-                content: Self::apply_format(ctx.clone(), value, &format_string),
+                content: cell.content.clone(),
                 field_name: None,
-                style: Some(style),
+                style: Some(cell.style.clone()),
                 auto_height: Some(true),
                 visible_if: None,
             };
