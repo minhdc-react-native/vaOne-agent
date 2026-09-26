@@ -163,7 +163,7 @@ impl TextLayout {
         ctx: FormatterContext,
     ) -> TextLayoutResult {
         let font_size = fonts.font_size(item);
-        let max_width = item.width;
+        let max_width = item.width - 4.0;
 
         let tokens = Tokenizer::tokenize(&item.content);
         // if item.name.as_deref() == Some("text_wcjj") {

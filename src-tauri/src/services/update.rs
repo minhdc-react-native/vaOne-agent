@@ -10,8 +10,6 @@ use crate::state::APP_HANDLE;
 pub fn check_update_on_startup(app: AppHandle, silent: Option<bool>) {
     let silent = silent.unwrap_or(false);
     tauri::async_runtime::spawn(async move {
-        // tokio::time::sleep(Duration::from_secs(3)).await;
-
         let Ok(updater) = app.updater() else {
             return;
         };

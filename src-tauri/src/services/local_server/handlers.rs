@@ -2,6 +2,7 @@ use super::types::MessageRequest;
 use super::types::OpenTrayRequest;
 use super::types::PingResponse;
 use crate::api::http::get_image_base64;
+use crate::api::http::wait;
 use crate::auth::token_manager::TokenManager;
 use crate::models::system::PrintResponse;
 use crate::models::system::SyncTokenRequest;
@@ -32,8 +33,7 @@ pub async fn exit_app() -> &'static str {
         let app = app.clone();
 
         tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
+            wait(Some(100)).await;
             // Dừng các tác vụ nếu cần
             // crate::state::update_sync_emit(|s| {
             //     s.source.clear();

@@ -1,6 +1,6 @@
 use std::sync::{Mutex, OnceLock};
 
-use reqwest::Client;
+use reqwest::{cookie::Jar, Client};
 use tauri::{menu::MenuItem, AppHandle, Wry};
 
 pub static CURRENT_ROUTE: OnceLock<Mutex<String>> = OnceLock::new();
@@ -19,10 +19,20 @@ pub static ONLINE_MENU: OnceLock<MenuItem<Wry>> = OnceLock::new();
 
 pub static SYNC_MENU: OnceLock<MenuItem<Wry>> = OnceLock::new();
 
+static COOKIE_JAR: OnceLock<Arc<Jar>> = OnceLock::new();
 static HTTP_CLIENT: OnceLock<Client> = OnceLock::new();
 
+pub fn get_cookie_jar() -> &'static Arc<Jar> {
+    COOKIE_JAR.get_or_init(|| Arc::new(Jar::default()))
+}
+
 pub fn get_client() -> &'static Client {
-    HTTP_CLIENT.get_or_init(|| Client::builder().cookie_store(true).build().unwrap())
+    HTTP_CLIENT.get_or_init(|| {
+        Client::builder()
+            .cookie_provider(get_cookie_jar().clone())
+            .build()
+            .unwrap()
+    })
 }
 
 // ==========================

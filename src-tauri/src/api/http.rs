@@ -1,17 +1,17 @@
+use crate::services::local_server::types::SourceInvoice;
+use crate::{
+    auth::{auth_api::ensure_valid_token, token_manager::TokenManager},
+    state::get_client,
+};
 use base64::{engine::general_purpose::STANDARD, Engine};
+use rand::RngExt;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::Client;
 use serde_json::Value;
 use std::{collections::HashMap, time::Duration};
 use url::{form_urlencoded, Url};
-
-use crate::services::local_server::types::SourceInvoice;
-use crate::{
-    auth::{auth_api::ensure_valid_token, token_manager::TokenManager},
-    state::get_client,
-};
-
+use uuid::Uuid;
 pub type ApiResult<T> = Result<T, String>;
 
 fn build_headers(
@@ -29,8 +29,14 @@ fn build_headers(
         }
     }
 
+    let mut has_request_id = false;
+
     if let Some(headers) = headers {
         for (k, v) in headers {
+            if k.eq_ignore_ascii_case("request-id") {
+                has_request_id = true;
+            }
+
             header_map.insert(
                 HeaderName::from_bytes(k.as_bytes()).map_err(|e| e.to_string())?,
                 HeaderValue::from_str(&v).map_err(|e| e.to_string())?,
@@ -38,15 +44,23 @@ fn build_headers(
         }
     }
 
+    // Tự tạo Request-Id nếu caller chưa truyền
+    if !has_request_id {
+        header_map.insert(
+            HeaderName::from_static("request-id"),
+            HeaderValue::from_str(&Uuid::new_v4().to_string()).map_err(|e| e.to_string())?,
+        );
+    }
+
     Ok(header_map)
 }
 
-async fn wait(delay: Option<u64>) {
-    if let Some(ms) = delay {
-        if ms > 0 {
-            tokio::time::sleep(Duration::from_millis(ms)).await;
-        }
-    }
+pub async fn wait(delay: Option<u64>) {
+    let base = delay.unwrap_or(500);
+
+    let duration = rand::rng().random_range(base.saturating_sub(100)..=base.saturating_add(100));
+
+    tokio::time::sleep(std::time::Duration::from_millis(duration)).await;
 }
 
 pub async fn get(
@@ -105,13 +119,16 @@ pub async fn post(
 
     let client = get_client();
 
-    let response = client
+    let request_headers = build_headers(token, headers)?;
+
+    let request = client
         .post(url)
-        .headers(build_headers(token, headers)?)
+        .headers(request_headers)
         .json(body)
-        .send()
-        .await
+        .build()
         .map_err(|e| e.to_string())?;
+
+    let response = client.execute(request).await.map_err(|e| e.to_string())?;
 
     let status = response.status();
 
@@ -175,7 +192,7 @@ pub async fn post_data(
         .post_data_url;
 
     if post_url.trim().is_empty() {
-        tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+        wait(Some(1000)).await;
         return Ok(serde_json::json!({
             "success": true,
             "mock": true

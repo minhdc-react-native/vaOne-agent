@@ -6781,6 +6781,7 @@ dependencies = [
  "futures-util",
  "pdf-core",
  "printer-core",
+ "rand 0.10.2",
  "reqwest",
  "serde",
  "serde_json",

@@ -6,6 +6,7 @@ mod services;
 mod state;
 mod utils;
 mod window_config;
+use crate::api::http::wait;
 use crate::models::system::AppState;
 use crate::services::update::check_update_on_startup;
 use crate::state::{APP_STATE, SYNC_MENU};
@@ -104,7 +105,7 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(3000)).await;
+                wait(Some(3000)).await;
                 if let Some(splash) = app_handle.get_webview_window("splash_screen") {
                     let _ = splash.close();
                     check_update_on_startup(app_handle, Some(true));

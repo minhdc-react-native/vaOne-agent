@@ -57,8 +57,10 @@ export default function LoginTctPage({ params }: IProgs) {
             delay: delay
         });
     }, [params]);
-
+    const isLoadingCaptcha = useRef(false);
     const loadCaptcha = useCallback(async () => {
+        if (isLoadingCaptcha.current) return;
+        isLoadingCaptcha.current = true;
         setLoadingCaptcha(true);
         const res = await tctService.getCaptcha();
         if (res) {
@@ -75,6 +77,7 @@ export default function LoginTctPage({ params }: IProgs) {
         }
 
         setLoadingCaptcha(false);
+        isLoadingCaptcha.current = false;
     }, []);
     const reConnect = useRef(params.reConnect);
 

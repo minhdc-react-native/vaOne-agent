@@ -4,7 +4,7 @@ use std::cmp::Ordering as CmpOrdering;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use crate::api::http;
+use crate::api::http::{self, wait};
 use crate::progress_bar;
 use crate::services::local_server::types::SourceInvoice;
 use crate::services::update::update_progress;
@@ -115,8 +115,7 @@ async fn fetch_all_invoices(
                 } else {
                     state = res["state"].as_str().map(|s| s.to_string());
                 }
-
-                tokio::time::sleep(std::time::Duration::from_millis(delay.unwrap_or(500))).await;
+                wait(Some(delay.unwrap_or(500))).await;
             }
         }
 
@@ -240,7 +239,7 @@ async fn fetch_invoice_detail(
                 continue;
             }
         }
-        tokio::time::sleep(std::time::Duration::from_millis(delay.unwrap_or(1000))).await;
+        wait(Some(delay.unwrap_or(500))).await;
     }
 
     Ok(result)
