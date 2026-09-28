@@ -255,8 +255,16 @@ pub struct ElementStyle {
     #[serde(default)]
     #[serde(rename = "marginLeft")]
     pub margin_left: Option<f32>,
+
+    #[serde(rename = "fixPosition")]
+    pub fix_position: Option<bool>,
 }
 
+impl ElementStyle {
+    pub fn fix_position(&self) -> bool {
+        self.fix_position.unwrap_or(false)
+    }
+}
 impl Default for ElementStyle {
     fn default() -> Self {
         Self {
@@ -279,6 +287,7 @@ impl Default for ElementStyle {
             margin_right: None,
             margin_left: None,
             margin_bottom: None,
+            fix_position: None,
         }
     }
 }

@@ -135,6 +135,39 @@ impl PageItem {
         }
     }
 
+    pub fn fix_position(&self) -> bool {
+        match self {
+            Self::Text { element, .. } => element
+                .style
+                .as_ref()
+                .map_or(false, ElementStyle::fix_position),
+            Self::Table { element, .. } => element
+                .style
+                .as_ref()
+                .map_or(false, ElementStyle::fix_position),
+            Self::Line { element, .. } => element
+                .style
+                .as_ref()
+                .map_or(false, ElementStyle::fix_position),
+            Self::Rect { element, .. } => element
+                .style
+                .as_ref()
+                .map_or(false, ElementStyle::fix_position),
+            Self::Circle { element, .. } => element
+                .style
+                .as_ref()
+                .map_or(false, ElementStyle::fix_position),
+            Self::Image { element, .. } => element
+                .style
+                .as_ref()
+                .map_or(false, ElementStyle::fix_position),
+            Self::Grid { element, .. } => element
+                .style
+                .as_ref()
+                .map_or(false, ElementStyle::fix_position),
+        }
+    }
+
     pub fn set_y(&mut self, y: f32) {
         match self {
             Self::Text { element: _, layout } => layout.y = y,
@@ -199,25 +232,33 @@ impl Paginator {
                 }
 
                 mut item => {
-                    let spacing = item.design_y() - ctx.previous_design_bottom;
-                    ctx.current_y += spacing;
+                    let fix_position = item.fix_position();
 
-                    let next_height = item.height();
-                    let available_height = ctx.page_height - ctx.margin_bottom;
+                    if fix_position {
+                        // Không thay đổi vị trí của item
+                        ctx.current_y = item.bottom();
+                    } else {
+                        let spacing = item.design_y() - ctx.previous_design_bottom;
+                        ctx.current_y += spacing;
 
-                    if !continuous
-                        && ctx.current_y + next_height > available_height
-                        && !ctx.current_page.is_empty()
-                    {
-                        ctx.new_page();
+                        let next_height = item.height();
+                        let available_height = ctx.page_height - ctx.margin_bottom;
+
+                        if !continuous
+                            && ctx.current_y + next_height > available_height
+                            && !ctx.current_page.is_empty()
+                        {
+                            ctx.new_page();
+                        }
+
+                        let diff = ctx.current_y - item.y();
+
+                        item.translate_y(diff);
+
+                        ctx.current_y = item.bottom();
                     }
 
-                    let diff = ctx.current_y - item.y();
-
-                    item.translate_y(diff);
-                    ctx.current_y = item.bottom();
                     ctx.previous_design_bottom = item.design_bottom();
-
                     ctx.current_page.push(item);
                 }
             }
