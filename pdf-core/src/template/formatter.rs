@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Write};
 
 pub type FormatterFn = fn(&FormatterContext, &[Value]) -> Result<String>;
 use chrono::{DateTime, Datelike, NaiveDate, NaiveDateTime};
@@ -65,24 +65,35 @@ fn format_date(_ctx: &FormatterContext, args: &[Value]) -> Result<String> {
         .replace("HH", "%H")
         .replace("mm", "%M")
         .replace("ss", "%S");
-
-    // RFC3339:
-    // 2026-03-04T17:00:00Z
-    // 2026-03-04T17:00:00+07:00
+    println!(
+        "[format_date] value={:?}, format={:?}, chrono_format={:?}",
+        value, format, chrono_format
+    );
     if let Ok(dt) = DateTime::parse_from_rfc3339(&value) {
-        return Ok(dt.format(&chrono_format).to_string());
+        let mut output = String::new();
+
+        write!(&mut output, "{}", dt.format(&chrono_format))
+            .map_err(|e| anyhow!("Invalid date format '{}': {}", format, e))?;
+
+        return Ok(output);
     }
 
-    // DateTime không có timezone:
-    // 2026-06-18T00:00:00
     if let Ok(dt) = NaiveDateTime::parse_from_str(&value, "%Y-%m-%dT%H:%M:%S") {
-        return Ok(dt.format(&chrono_format).to_string());
+        let mut output = String::new();
+
+        write!(&mut output, "{}", dt.format(&chrono_format))
+            .map_err(|e| anyhow!("Invalid date format '{}': {}", format, e))?;
+
+        return Ok(output);
     }
 
-    // Date:
-    // 2026-06-18
     if let Ok(date) = NaiveDate::parse_from_str(&value, "%Y-%m-%d") {
-        return Ok(date.format(&chrono_format).to_string());
+        let mut output = String::new();
+
+        write!(&mut output, "{}", date.format(&chrono_format))
+            .map_err(|e| anyhow!("Invalid date format '{}': {}", format, e))?;
+
+        return Ok(output);
     }
 
     Err(anyhow!("Invalid date: {}", value))
