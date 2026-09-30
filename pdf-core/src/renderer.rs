@@ -172,7 +172,7 @@ where
 {
     let page_count = report.pages.len();
 
-    bind_total_pages(&mut report, fonts, total_pages_number);
+    bind_total_pages(&mut report, fonts, start_page_number, total_pages_number);
 
     if let Some(element) = &report.page_number {
         for (index, page) in report.pages.iter_mut().enumerate() {
@@ -209,12 +209,18 @@ where
     Ok(start_page + page_count)
 }
 
-fn bind_total_pages(report: &mut PreparedReport, fonts: &PdfFonts, total_pages: usize) {
-    let mut context = build_system_context(total_pages);
+fn bind_total_pages(
+    report: &mut PreparedReport,
+    fonts: &PdfFonts,
+    start_page: usize,
+    total_pages: usize,
+) {
     let page_height = report.height;
     let formatter_context = report.ctx.clone();
 
-    for page in &mut report.pages {
+    for (index, page) in report.pages.iter_mut().enumerate() {
+        let current_page = start_page + index;
+        let context = build_system_context(current_page, total_pages);
         for item in &mut page.items {
             let PageItem::Text { element, layout } = item else {
                 continue;
@@ -308,7 +314,7 @@ fn prepare_report(
     })
 }
 
-fn build_system_context(total_pages: usize) -> Value {
+fn build_system_context(current_page: usize, total_pages: usize) -> Value {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -338,6 +344,7 @@ fn build_system_context(total_pages: usize) -> Value {
 
     json!({
         "value": format!("{:02}", total_pages),
+        "currentPage":format!("{:02}", current_page),
         "totalPages":format!("{:02}", total_pages),
         "date": format!("{:02}/{:02}/{:04}", d, m, year),
         "time": format!("{:02}:{:02}:{:02}", hours, minutes, seconds),
