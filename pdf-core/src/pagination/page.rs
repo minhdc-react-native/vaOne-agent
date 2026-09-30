@@ -28,7 +28,7 @@ impl PageLayout {
         self.items.len()
     }
 }
-
+#[derive(Debug)]
 pub struct PreparedReport {
     pub pages: Vec<PageLayout>,
     pub ctx: FormatterContext,

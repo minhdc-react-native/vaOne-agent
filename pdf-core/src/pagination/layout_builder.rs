@@ -31,10 +31,16 @@ impl LayoutBuilder {
                     if element.content.trim().is_empty() {
                         element.content = "{value}".to_string();
                     }
-
                     let context = if let Some(field) = element.field_name.as_deref() {
                         if field == "totalPages" {
                             json!({ "value": "00" })
+                        } else if field.starts_with("pageInfo") {
+                            // Xử lý riêng cho pageInfo...
+                            json!({ 
+                                "totalPage": 99,
+                                "date":"01/01/0000",
+                                "time":"01:00",
+                                "dateTime":"01/01/0000 01:00" })
                         } else {
                             let mut watch = Vec::new();
 
@@ -50,7 +56,7 @@ impl LayoutBuilder {
                     } else {
                         Value::Object(Default::default())
                     };
-                    // if element.name.as_deref() == Some("text_wcjj") {
+                    // if element.name.as_deref() == Some("pageInfo02") {
                     //     println!("element.content={} context={:#?}", element.content, context);
                     // }
                     let mut layout: crate::models::TextLayoutResult =

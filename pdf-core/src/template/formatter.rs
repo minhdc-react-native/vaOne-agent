@@ -65,10 +65,10 @@ fn format_date(_ctx: &FormatterContext, args: &[Value]) -> Result<String> {
         .replace("HH", "%H")
         .replace("mm", "%M")
         .replace("ss", "%S");
-    println!(
-        "[format_date] value={:?}, format={:?}, chrono_format={:?}",
-        value, format, chrono_format
-    );
+    // println!(
+    //     "[format_date] value={:?}, format={:?}, chrono_format={:?}",
+    //     value, format, chrono_format
+    // );
     if let Ok(dt) = DateTime::parse_from_rfc3339(&value) {
         let mut output = String::new();
 

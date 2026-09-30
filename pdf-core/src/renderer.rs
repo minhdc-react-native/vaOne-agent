@@ -1,9 +1,12 @@
+use crate::binder::DynamicContent;
 use crate::fonts::PdfFonts;
 use crate::pagination::page::PreparedReport;
 use crate::utils::{get_formatter_context, Unit};
 use crate::{layout::TextLayout, models::*, utils::load_fonts};
 use printpdf::{PdfDocument, PdfSaveOptions};
 use serde_json::{json, Value};
+
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::models::ElementVecExt;
 use crate::pagination::{
@@ -108,7 +111,7 @@ where
 
         prepared.push(prepare_report(doc, data, &fonts)?);
     }
-
+    // println!("prepared {:#?}", prepared);
     // Tính tổng số trang
     let total_pages: usize = prepared.iter().map(|r| r.pages.len()).sum();
 
@@ -207,9 +210,7 @@ where
 }
 
 fn bind_total_pages(report: &mut PreparedReport, fonts: &PdfFonts, total_pages: usize) {
-    let context = json!({
-        "value": format!("{:02}", total_pages),
-    });
+    let mut context = build_system_context(total_pages);
     let page_height = report.height;
     let formatter_context = report.ctx.clone();
 
@@ -219,9 +220,23 @@ fn bind_total_pages(report: &mut PreparedReport, fonts: &PdfFonts, total_pages: 
                 continue;
             };
 
-            if element.field_name.as_deref() != Some("totalPages") {
+            let name = element.name.as_deref();
+
+            let is_total_pages = name == Some("totalPages");
+            let is_page_info = name.is_some_and(|name| name.starts_with("pageInfo"));
+
+            if !is_total_pages && !is_page_info {
                 continue;
             }
+
+            // let mut watch = Vec::new();
+
+            // if let Ok(dynamic) = serde_json::from_str::<DynamicContent>(&element.content) {
+            //     watch = dynamic.watch;
+            //     element.content = dynamic.fn_text;
+            // }
+
+            // context = TextLayout::build_context(&context, "", "value", &watch);
 
             let y = layout.y;
             let visible = layout.visible;
@@ -290,5 +305,50 @@ fn prepare_report(
         width: doc.width,
         height,
         background_image: doc.background_image,
+    })
+}
+
+fn build_system_context(total_pages: usize) -> Value {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Việt Nam = UTC+7
+    let timestamp = now + 7 * 60 * 60;
+
+    let seconds = timestamp % 60;
+    let minutes = (timestamp / 60) % 60;
+    let hours = (timestamp / 3600) % 24;
+
+    // Tính ngày theo Unix timestamp
+    let days = timestamp / 86400;
+
+    // Thuật toán chuyển số ngày Unix thành ngày/tháng/năm
+    let z = days as i64 + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = mp + if mp < 10 { 3 } else { -9 };
+    let year = y + if m <= 2 { 1 } else { 0 };
+
+    json!({
+        "value": format!("{:02}", total_pages),
+        "totalPages":format!("{:02}", total_pages),
+        "date": format!("{:02}/{:02}/{:04}", d, m, year),
+        "time": format!("{:02}:{:02}:{:02}", hours, minutes, seconds),
+        "dateTime": format!(
+            "{:02}/{:02}/{:04} {:02}:{:02}:{:02}",
+            d, m, year,
+            hours, minutes, seconds
+        ),
+
+        "year": format!("{:04}", year),
+        "month": format!("{:02}", m),
+        "day": format!("{:02}", d),
     })
 }
