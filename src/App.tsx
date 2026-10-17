@@ -15,6 +15,8 @@ import {
 } from "@tauri-apps/plugin-autostart";
 import { useAppStore } from "./stores/app.store";
 import { invoke } from "@tauri-apps/api/core";
+import { TaxConfig } from "./pages/TaxConfig";
+import { HistoryInvoice } from "./pages/HistoryInvoice";
 
 function App() {
   const navigate = useNavigate();
@@ -85,6 +87,8 @@ function App() {
       <Route path="/blank" element={<BlankPage />} />
       <Route path="/report" element={<PreviewReport />} />
       <Route path="/settings" element={<SettingsPage />} />
+      <Route path="/tax-config" element={<TaxConfig />} />
+      <Route path="/history-invoice/:taxCode" element={<HistoryInvoice />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/get-invoices" element={<GetInvoices />} />
       <Route path="/update" element={<UpdatePage />} />

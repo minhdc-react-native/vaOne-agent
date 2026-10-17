@@ -20,6 +20,7 @@ tauri-build = { version = "2", features = [] }
 pdf-core = { path = "../pdf-core" }
 printer-core = { path = "../printer-core" }
 captcha-db = { path = "../captcha-db" }
+vaone-tax-sync = { path = "../vaone-tax-sync" }
 
 # =========================
 # Tauri
@@ -63,3 +64,5 @@ rand = "0.10.2"
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 tauri-plugin-single-instance = "2"
+keyring = "3"
+async-trait = "0.1"

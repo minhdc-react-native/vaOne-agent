@@ -53,7 +53,7 @@ const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
                     disabled={disabled}
                     onClick={() => onChange(!checked)}
                     className={cn(
-                        "relative inline-flex h-4 w-11 shrink-0 rounded-full",
+                        "relative inline-flex h-4 w-7 shrink-0 rounded-full",
                         "transition-colors duration-200",
                         "focus:outline-none focus:ring-2 focus:ring-(--primary) focus:ring-offset-2",
                         disabled && "cursor-not-allowed opacity-50",
@@ -67,7 +67,7 @@ const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
                             "absolute top-0.5 left-0.5",
                             "h-3 w-3 rounded-full bg-white shadow",
                             "transition-transform duration-200",
-                            checked && "translate-x-7"
+                            checked && "translate-x-3"
                         )}
                     />
                 </button>

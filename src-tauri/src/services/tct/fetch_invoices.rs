@@ -146,7 +146,7 @@ async fn fetch_all_invoices(
             other => other,
         }
     });
-
+    // println!("invoice>> {:#?}", result[0]);
     Ok(result)
 }
 

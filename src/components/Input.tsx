@@ -16,6 +16,7 @@ export interface InputProps
     error?: string;
     icon?: ReactNode;
     password?: boolean;
+    sizeInput?: 'sm' | 'xs';
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -29,6 +30,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             className,
             type,
             disabled,
+            sizeInput = 'sm',
+            required,
             ...props
         },
         ref
@@ -48,24 +51,27 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
         const labelClass =
             labelPosition === "top"
-                ? "text-sm font-medium"
-                : "text-sm font-medium whitespace-nowrap";
+                ? "font-normal"
+                : "font-medium whitespace-nowrap";
 
         return (
-            <div className={cn("w-full", wrapperClass)}>
+            <div className={cn("w-full", wrapperClass,
+                sizeInput === "sm" ? "text-sm" : "text-xs"
+            )}>
                 {label && (
                     <label className={labelClass}>
-                        {label}
+                        {label} {required && <span className="text-red-500">*</span>}
                     </label>
                 )}
 
                 <div
                     className={cn(
-                        "flex h-9 w-full min-w-0 items-center rounded-lg border bg-white px-3",
+                        "flex w-full min-w-0 items-center border bg-white px-3",
                         "transition-colors",
                         "focus-within:border-(--primary)",
                         error ? "border-red-500" : "border-(--border)",
-                        disabled && "opacity-60"
+                        disabled && "opacity-60",
+                        sizeInput === "sm" ? "rounded-md h-9" : "rounded-sm h-7"
                     )}
                 >
                     {icon && (
@@ -79,7 +85,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                         type={inputType}
                         disabled={disabled}
                         className={cn(
-                            "flex-1 min-w-0 bg-transparent text-sm outline-none",
+                            "flex-1 min-w-0 bg-transparent outline-none",
                             "appearance-none",
                             "placeholder:text-gray-400",
                             className

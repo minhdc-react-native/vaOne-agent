@@ -8,18 +8,23 @@ mod utils;
 mod window_config;
 use crate::api::http::wait;
 use crate::models::system::AppState;
+use crate::services::tct::tax_sync_adapter::{
+    ConsoleSyncObserver, LocalCaptchaSolver, MacOsPasswordProvider,
+};
 use crate::services::update::check_update_on_startup;
 use crate::state::{APP_STATE, SYNC_MENU};
 use crate::state::{CURRENT_ROUTE, ONLINE_MENU};
 use crate::utils::public::navigate_to_route;
 use std::path::PathBuf;
-use std::sync::Mutex;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     App, Manager,
 };
+use vaone_tax_sync::database::Database;
+use vaone_tax_sync::worker::TaxSyncWorkerConfig;
+use vaone_tax_sync::TaxSyncWorker;
 const LINE_TEXT: &str = "------------------------------";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -63,6 +68,16 @@ pub fn run() {
 
             let check_update =
                 MenuItem::with_id(app, "update", "Kiểm tra phiên bản", true, None::<&str>)?;
+
+            // Menu Tổng cục thuế
+            let tax_menu = MenuItem::with_id(
+                app,
+                "tax_config",
+                "Cấu hình kết nối mã số thuế",
+                true,
+                None::<&str>,
+            )?;
+
             let settings = MenuItem::with_id(app, "settings", "Cài đặt", true, None::<&str>)?;
             let separator = PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Thoát ứng dụng", true, None::<&str>)?;
@@ -72,6 +87,7 @@ pub fn run() {
                 &[
                     &online,
                     &sync,
+                    &tax_menu,
                     // &separator,
                     &settings,
                     &check_update,
@@ -112,6 +128,32 @@ pub fn run() {
                 }
             });
 
+            // khởi tạo dữ liệu SQLite
+            let app_data_dir = app.path().app_data_dir()?;
+
+            std::fs::create_dir_all(&app_data_dir)?;
+
+            let db_path = app_data_dir.join("tax-sync.sqlite3");
+            println!("Tax sync database: {}", db_path.display());
+            let db = Database::new(db_path).map_err(|e| std::io::Error::other(e.to_string()))?;
+
+            app.manage(db.clone());
+
+            let captcha_solver = Arc::new(LocalCaptchaSolver);
+
+            let sync_observer = Arc::new(ConsoleSyncObserver);
+
+            let worker = TaxSyncWorker::new(
+                db.clone(),
+                captcha_solver,
+                sync_observer,
+                TaxSyncWorkerConfig::new(),
+            )?;
+
+            tauri::async_runtime::spawn(async move {
+                worker.run().await;
+            });
+
             Ok(())
         })
         // HANDLE MENU CLICK
@@ -128,13 +170,15 @@ pub fn run() {
             "report" => {
                 let _ = navigate_to_route("/report");
             }
+            "tax_config" => {
+                let _ = navigate_to_route("/tax-config");
+            }
             "settings" => {
                 let _ = navigate_to_route("/settings");
             }
             "quit" => {
                 let _ = navigate_to_route("/quit");
             }
-
             _ => {}
         })
         // REGISTER COMMAND
@@ -154,6 +198,11 @@ pub fn run() {
             commands::invoice::start_m_invoice_sync,
             commands::system::captcha_train,
             commands::system::captcha_predict,
+            commands::tax_accounts::get_tax_accounts,
+            commands::tax_accounts::create_tax_account,
+            commands::tax_accounts::update_tax_account,
+            commands::tax_accounts::delete_tax_account,
+            commands::tax_accounts::check_tax_application_login
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

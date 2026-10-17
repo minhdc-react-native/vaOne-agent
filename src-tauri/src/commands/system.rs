@@ -91,7 +91,7 @@ pub fn page_ready(name: String, show: Option<bool>) {
 
                     let _ = window.set_position(Position::Logical(LogicalPosition { x, y }));
                 }
-                let can_resize = matches!(name.as_str(), "report" | "***");
+                let can_resize = matches!(name.as_str(), "report" | "historyInvoice");
                 let _ = window.set_resizable(can_resize);
 
                 let _ = window.show();
@@ -125,20 +125,16 @@ use captcha_db::{svg::parse_svg, Database, Matcher};
 
 #[tauri::command]
 pub fn captcha_predict(svg: String) -> Result<String, String> {
+    predict_captcha(&svg)
+}
+
+pub fn predict_captcha(svg: &str) -> Result<String, String> {
     let path = get_path(DATABASE_NAME).map_err(|e| e.to_string())?;
-
-    // Load database
     let db = Database::load(path).map_err(|e| e.to_string())?;
-
-    // Parse SVG
-    let glyphs = parse_svg(&svg).map_err(|e| e.to_string())?;
-
-    // Match
+    let glyphs = parse_svg(svg).map_err(|e| e.to_string())?;
     let matcher = Matcher::new(db);
 
-    let result = matcher.recognize(&glyphs);
-
-    Ok(result)
+    Ok(matcher.recognize(&glyphs))
 }
 
 fn get_path(db_name: &str) -> Result<std::path::PathBuf, String> {
