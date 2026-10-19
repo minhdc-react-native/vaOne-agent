@@ -151,7 +151,7 @@ pub fn run() {
             )?;
 
             tauri::async_runtime::spawn(async move {
-                worker.run().await;
+                worker.run_workers().await;
             });
 
             Ok(())
@@ -202,7 +202,10 @@ pub fn run() {
             commands::tax_accounts::create_tax_account,
             commands::tax_accounts::update_tax_account,
             commands::tax_accounts::delete_tax_account,
-            commands::tax_accounts::check_tax_application_login
+            commands::tax_accounts::check_tax_application_login,
+            commands::sync_invoices::get_invoice_stats,
+            commands::sync_invoices::get_sync_days,
+            commands::sync_invoices::get_sync_invoices
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

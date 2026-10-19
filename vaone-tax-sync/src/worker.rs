@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Duration as ChronoDuration, NaiveDate, NaiveDateTime, Utc};
 use serde::Deserialize;
+use serde_json::Value;
 use std::{
     collections::HashSet,
     sync::{
@@ -11,7 +12,7 @@ use std::{
 };
 
 use crate::{
-    auth::{ApplicationLoginResponse, TaxAuthService},
+    auth::{get_current_year, ApplicationLoginResponse, TaxAuthService, TypeApp},
     client::request_delay,
     database::Database,
     error::TaxSyncError,
@@ -136,13 +137,30 @@ impl TaxSyncWorker {
         })
     }
 
-    /// Yêu cầu worker dừng sau khi hoàn thành bước đang chạy.
+    pub fn start(self: Arc<Self>) {
+        // Không khởi chạy nếu worker đang chạy.
+        if self.cancel.swap(false, Ordering::SeqCst) {
+            return;
+        }
+
+        // Reset cờ dừng trước khi chạy.
+        self.cancel.store(false, Ordering::SeqCst);
+    }
+
     pub fn stop(&self) {
-        self.cancel.store(true, Ordering::Relaxed);
+        if self.cancel.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
+        self.cancel.store(true, Ordering::SeqCst);
+    }
+
+    pub async fn run_workers(&self) {
+        tokio::join!(self.run(), self.run_upload(),);
     }
 
     /// Chạy liên tục cho đến khi được yêu cầu dừng hoặc runtime kết thúc.
-    pub async fn run(&self) {
+    async fn run(&self) {
         loop {
             if self.cancel.load(Ordering::Relaxed) {
                 break;
@@ -160,6 +178,55 @@ impl TaxSyncWorker {
         }
     }
 
+    async fn run_upload(&self) {
+        loop {
+            if self.cancel.load(Ordering::Relaxed) {
+                break;
+            }
+
+            if let Err(error) = self.upload_once().await {
+                eprintln!("[tax-sync] Upload iteration failed: {error:#}");
+            }
+
+            if self.cancel.load(Ordering::Relaxed) {
+                break;
+            }
+
+            sleep(Duration::from_secs(30)).await;
+        }
+    }
+    async fn upload_once(&self) -> Result<()> {
+        let accounts = self.db.get_enabled_tax_accounts()?;
+        for account in accounts {
+            if self.cancel.load(Ordering::Relaxed) {
+                break;
+            }
+
+            if account.auto_sync {
+                match self.ensure_valid_app_token(&account).await {
+                    Ok(Some(token)) => {
+                        let type_app = TypeApp::try_from(account.type_app.as_str())?;
+                        let _ = self
+                            .invoices_pending_upload(&account.tax_code, &token, &type_app)
+                            .await?;
+                        eprintln!(
+                            "[tax-sync] App token ready: tax_code={}, app={}",
+                            account.tax_code, account.type_app
+                        );
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        eprintln!(
+                            "[tax-sync] App authentication failed: tax_code={}, error={:#}",
+                            account.tax_code, error
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
     /// Một lượt quét toàn bộ tài khoản thuế đang bật.
     pub async fn run_once(&self) -> Result<()> {
         let accounts = self.db.get_enabled_tax_accounts()?;
@@ -185,24 +252,6 @@ impl TaxSyncWorker {
 
         if invoice_types.is_empty() {
             return Ok(());
-        }
-
-        if account.auto_sync {
-            match self.ensure_valid_app_token(account).await {
-                Ok(Some(_app_token)) => {
-                    eprintln!(
-                        "[tax-sync] App token ready: tax_code={}, app={}",
-                        account.tax_code, account.type_app
-                    );
-                }
-                Ok(None) => {}
-                Err(error) => {
-                    eprintln!(
-                        "[tax-sync] App authentication failed: tax_code={}, error={:#}",
-                        account.tax_code, error
-                    );
-                }
-            }
         }
 
         let token = self.ensure_valid_token(account).await?;
@@ -358,7 +407,10 @@ impl TaxSyncWorker {
         Ok(login.token)
     }
 
-    async fn ensure_valid_app_token(&self, account: &TaxAccount) -> Result<Option<String>> {
+    async fn ensure_valid_app_token(
+        &self,
+        account: &TaxAccount,
+    ) -> Result<Option<ApplicationLoginResponse>> {
         // Chỉ xử lý token ứng dụng khi bật đồng bộ lên ERP.
         if !account.auto_sync {
             return Ok(None);
@@ -370,10 +422,22 @@ impl TaxSyncWorker {
             account.app_token_expires_at.as_deref(),
         ) {
             if !token.trim().is_empty() && token_is_valid(expires_at) {
-                return Ok(Some(token.to_string()));
+                return Ok(Some(ApplicationLoginResponse {
+                    org_unit: account.org_unit.clone(),
+                    year: Some(get_current_year()),
+                    lang: Some("vi".to_string()),
+                    org_unit_id: account.org_unit_id.clone(),
+                    tenant_id: account.tenant_id.clone(),
+                    access_token: token.to_string(),
+                    expires_in: None,
+                    refresh_token: account.app_refresh_token.clone(),
+                    token_type: account
+                        .app_token_type
+                        .clone()
+                        .unwrap_or_else(|| "Bearer".to_string()),
+                }));
             }
         }
-
         let store = SecretStore::new();
 
         let password_key = account
@@ -395,30 +459,36 @@ impl TaxSyncWorker {
         })?;
 
         // Thử refresh token trước nếu là vaOne.
-        let login = if account.type_app == "vaOne" {
-            if let Some(refresh_token) = account
-                .app_refresh_token
-                .as_deref()
-                .filter(|token| !token.trim().is_empty())
-            {
-                match self.auth.refresh_vaone_token(refresh_token).await {
-                    Ok(token) => token,
-                    Err(error) => {
-                        eprintln!(
-                            "[tax-sync] Refresh app token failed, will login again: \
+        let login: ApplicationLoginResponse =
+            if matches!(account.type_app.as_str(), "vaOne" | "vaShop") {
+                if let Some(refresh_token) = account
+                    .app_refresh_token
+                    .as_deref()
+                    .filter(|token| !token.trim().is_empty())
+                {
+                    let type_app = TypeApp::try_from(account.type_app.as_str())?;
+                    match self
+                        .auth
+                        .refresh_vaone_token(refresh_token, &type_app)
+                        .await
+                    {
+                        Ok(token) => token,
+                        Err(error) => {
+                            eprintln!(
+                                "[tax-sync] Refresh app token failed, will login again: \
                          tax_code={}, error={:#}",
-                            account.tax_code, error
-                        );
+                                account.tax_code, error
+                            );
 
-                        self.login_application(account, &password).await?
+                            self.login_application(account, &password).await?
+                        }
                     }
+                } else {
+                    self.login_application(account, &password).await?
                 }
             } else {
                 self.login_application(account, &password).await?
-            }
-        } else {
-            self.login_application(account, &password).await?
-        };
+            };
 
         // vaOnline không trả expires_in nên cần thời hạn mặc định phù hợp
         // với chính sách token thực tế của API vaOnline.
@@ -434,9 +504,11 @@ impl TaxSyncWorker {
             login.refresh_token.as_deref(),
             &login.token_type,
             &expires_at,
+            login.org_unit_id.as_deref(),
+            login.tenant_id.as_deref(),
         )?;
 
-        Ok(Some(login.access_token))
+        Ok(Some(login))
     }
 
     async fn login_application(
@@ -444,19 +516,11 @@ impl TaxSyncWorker {
         account: &TaxAccount,
         password: &str,
     ) -> Result<ApplicationLoginResponse> {
-        match account.type_app.as_str() {
-            "vaOnline" => self
-                .auth
-                .check_vaonline_login(account, password)
-                .await
-                .map_err(Into::into),
-            "vaOne" => self
-                .auth
-                .check_vaone_login(account, password)
-                .await
-                .map_err(Into::into),
-            other => Err(anyhow!("Loại ứng dụng không được hỗ trợ: {other}")),
-        }
+        let type_app = TypeApp::try_from(account.type_app.as_str())?;
+        self.auth
+            .check_application_login(account, password, &type_app)
+            .await
+            .map_err(Into::into)
     }
 
     async fn sync_one_day(
@@ -489,6 +553,43 @@ impl TaxSyncWorker {
             .map_err(|error| anyhow!(error.to_string()))?;
 
         Ok(())
+    }
+
+    async fn invoices_pending_upload(
+        &self,
+        tax_code: &str,
+        token: &ApplicationLoginResponse,
+        type_app: &TypeApp,
+    ) -> Result<Value> {
+        // Lấy danh sách hóa đơn cần upload
+        let invoices = self.db.get_invoices_pending_upload(tax_code)?;
+        let mut results = Vec::new();
+        // Lần lượt gửi từng hóa đơn
+        for invoice in &invoices {
+            match self.auth.post_data(&invoice.invoice, token, type_app).await {
+                Ok(result) => {
+                    let _ = self.db.set_upload_completed(
+                        &tax_code,
+                        invoice.invoice_type,
+                        &invoice.invoice_key,
+                    );
+                    results.push(result.clone());
+                    println!("Upload thành công: {:?}", result);
+                }
+                Err(e) => {
+                    let _ = self.db.set_upload_failed(
+                        &tax_code,
+                        invoice.invoice_type,
+                        &invoice.invoice_key,
+                        &e.to_string(),
+                    );
+                    eprintln!("Upload hóa đơn thất bại [{}]: {}", invoice.invoice_key, e);
+                }
+            }
+            request_delay(self.config.delay_ms).await;
+        }
+
+        Ok(Value::Array(results))
     }
 }
 

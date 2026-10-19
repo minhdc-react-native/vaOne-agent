@@ -1,7 +1,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-export type TypeApp = "vaOnline" | "vaOne";
+export type TypeApp = "vaOnline" | "vaOne" | "vaShop";
 
 export type AuthStatus =
     | "pending"

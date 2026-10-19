@@ -47,7 +47,10 @@ impl Database {
                     last_sync_status,
                     last_sync_error,
                     created_at,
-                    updated_at
+                    updated_at,
+                    org_unit_id,
+                    tenant_id,
+                    app_token_type
                 FROM tax_accounts
                 ORDER BY tax_code
                 ",
@@ -82,6 +85,9 @@ impl Database {
                     last_sync_error: row.get(22)?,
                     created_at: row.get(23)?,
                     updated_at: row.get(24)?,
+                    org_unit_id: row.get(25)?,
+                    tenant_id: row.get(26)?,
+                    app_token_type: row.get(27)?,
                 })
             })
             .map_err(|e| TaxSyncError::Database(e.to_string()))?;
@@ -338,9 +344,26 @@ impl Database {
             ));
         }
 
-        let conn = self.connect()?;
+        let mut conn = self.connect()?;
 
-        let changed = conn
+        let tx = conn.transaction().map_err(db_error)?;
+
+        // 1. Xóa dữ liệu đồng bộ hóa đơn
+        tx.execute(
+            "DELETE FROM sync_invoices WHERE tax_code = ?1",
+            params![tax_code],
+        )
+        .map_err(db_error)?;
+
+        // 2. Xóa trạng thái đồng bộ theo ngày
+        tx.execute(
+            "DELETE FROM sync_days WHERE tax_code = ?1",
+            params![tax_code],
+        )
+        .map_err(db_error)?;
+
+        // 3. Xóa tài khoản thuế
+        let changed = tx
             .execute(
                 "DELETE FROM tax_accounts WHERE tax_code = ?1",
                 params![tax_code],
@@ -352,6 +375,9 @@ impl Database {
                 "Không tìm thấy tài khoản mã số thuế: {tax_code}"
             )));
         }
+
+        // Xác nhận toàn bộ thao tác xóa
+        tx.commit().map_err(db_error)?;
 
         Ok(())
     }
@@ -387,7 +413,10 @@ impl Database {
                 last_sync_status,    -- 21
                 last_sync_error,     -- 22
                 created_at,          -- 23
-                updated_at           -- 24
+                updated_at,          -- 24
+                org_unit_id,          -- 25
+                tenant_id,           -- 26
+                app_token_type           -- 27
             FROM tax_accounts
             WHERE tax_code = ?1
             ",
@@ -421,6 +450,9 @@ impl Database {
                         last_sync_error: row.get(22)?,
                         created_at: row.get(23)?,
                         updated_at: row.get(24)?,
+                        org_unit_id: row.get(25)?,
+                        tenant_id: row.get(26)?,
+                        app_token_type: row.get(27)?,
                     })
                 },
             )
@@ -480,7 +512,10 @@ impl Database {
                 last_sync_status,
                 last_sync_error,
                 created_at,
-                updated_at
+                updated_at,
+                org_unit_id,
+                tenant_id,
+                app_token_type
             FROM tax_accounts
             WHERE enabled = 1
             ORDER BY tax_code
@@ -516,6 +551,9 @@ impl Database {
                     last_sync_error: row.get(22)?,
                     created_at: row.get(23)?,
                     updated_at: row.get(24)?,
+                    org_unit_id: row.get(25)?,
+                    tenant_id: row.get(26)?,
+                    app_token_type: row.get(27)?,
                 })
             })
             .map_err(db_error)?;

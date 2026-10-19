@@ -3,6 +3,7 @@ import { IconLucide } from "../IconLucide";
 import Input from "../Input";
 import PopupPosition from "../PopupPosition";
 import Calendar from "./Calendar";
+import clsx from "clsx";
 
 interface DateInputProps {
     name?: string;
@@ -22,6 +23,7 @@ interface DateInputProps {
     minuteStep?: 1 | 5 | 10;
     sizeInput?: 'sm' | 'xs';
     isError?: boolean;
+    className?: string;
 }
 export const DateInput = forwardRef<
     HTMLInputElement | HTMLTextAreaElement,
@@ -39,7 +41,8 @@ export const DateInput = forwardRef<
         autoFocus,
         mode = "date",
         width,
-        sizeInput = "sm"
+        sizeInput = "sm",
+        className
     } = props;
 
     const mergedRef = useCallback(
@@ -161,8 +164,11 @@ export const DateInput = forwardRef<
     }, [open, openTime]);
 
     return (
-        <div ref={wrapperRef} className="relative flex flex-row">
-            <div className="relative flex-1">
+        <div
+            ref={wrapperRef}
+            className={clsx("relative flex w-full min-w-0 flex-row", className)}
+        >
+            <div className="relative w-full min-w-0 flex-1">
                 <Input
                     ref={mergedRef}
                     label={label}

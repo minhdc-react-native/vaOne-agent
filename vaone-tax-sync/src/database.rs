@@ -126,7 +126,10 @@ impl Database {
 
                 -- Thời gian tạo và cập nhật.
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+                org_unit_id TEXT,
+                tenant_id TEXT
             );
 
             CREATE TABLE IF NOT EXISTS sync_days (
@@ -250,6 +253,22 @@ impl Database {
             -- Tìm tài khoản được bật để worker tự động xử lý.
             CREATE INDEX IF NOT EXISTS idx_tax_accounts_enabled
                 ON tax_accounts(enabled, auth_status);
+
+            CREATE INDEX IF NOT EXISTS idx_sync_days_tax_type_date
+                ON sync_days (tax_code, invoice_type, sync_date DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_sync_invoices_tax_date
+                ON sync_invoices (tax_code, invoice_date DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_sync_invoices_tax_type_date
+                ON sync_invoices (tax_code, invoice_type, invoice_date DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_sync_invoices_tax_detail_status
+                ON sync_invoices (tax_code, detail_status);
+
+            CREATE INDEX IF NOT EXISTS idx_sync_invoices_tax_upload_status
+                ON sync_invoices (tax_code, upload_status);
+
             ",
         )
         .map_err(|e| TaxSyncError::Database(e.to_string()))?;
@@ -310,6 +329,8 @@ impl Database {
         refresh_token: Option<&str>,
         token_type: &str,
         expires_at: &str,
+        org_unit_id: Option<&str>,
+        tenant_id: Option<&str>,
     ) -> Result<()> {
         let conn = self.connect()?;
 
@@ -320,6 +341,8 @@ impl Database {
             app_refresh_token = ?3,
             app_token_type = ?4,
             app_token_expires_at = ?5,
+            org_unit_id = COALESCE(?6, org_unit_id),
+            tenant_id = COALESCE(?7, tenant_id),
             updated_at = CURRENT_TIMESTAMP
         WHERE tax_code = ?1
         ",
@@ -328,7 +351,9 @@ impl Database {
                 access_token,
                 refresh_token,
                 token_type,
-                expires_at
+                expires_at,
+                org_unit_id,
+                tenant_id
             ],
         )
         .map_err(db_error)?;

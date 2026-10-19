@@ -28,7 +28,6 @@ import { Tooltip } from "../components/Tooltip/Tooltip";
 import { showNotification } from "../lib/notification";
 import { useNavigate } from "react-router-dom";
 
-type TypeApp = "vaOnline" | "vaOne";
 type AuthStatus = "pending" | "authenticated" | "failed";
 type SyncStatus = "pending" | "running" | "completed" | "failed";
 
@@ -383,6 +382,7 @@ export default function TaxAccountManager() {
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <Input
                                     label="Mã số thuế"
+                                    disabled={isEdit}
                                     sizeInput="xs"
                                     autoFocus
                                     required
@@ -394,6 +394,7 @@ export default function TaxAccountManager() {
 
                                 <DateInput
                                     label="Ngày bắt đầu"
+                                    disabled={isEdit}
                                     sizeInput="xs"
                                     required
                                     value={form.start_date ?? ""}
@@ -404,6 +405,7 @@ export default function TaxAccountManager() {
 
                                 {/* <Input
                                     label="Tên đăng nhập"
+                                    disabled={isEdit}
                                     sizeInput="xs"
                                     required
                                     value={form.username}
@@ -414,6 +416,7 @@ export default function TaxAccountManager() {
 
                                 <Input
                                     label="Mật khẩu thuế"
+                                    disabled={isEdit}
                                     password
                                     sizeInput="xs"
                                     required={!isEdit}
@@ -452,18 +455,21 @@ export default function TaxAccountManager() {
                         {form.auto_sync && <div className="space-y-3">
 
                             <Field label="Ứng dụng đích" required>
-                                <div className="grid grid-cols-2 border border-gray-300 rounded">
-                                    {(["vaOnline", "vaOne"] as const).map((app, idx) => (
+                                <div className="grid grid-cols-3 border border-gray-300 rounded">
+                                    {(["vaOnline", "vaOne", "vaShop"] as const).map((app, idx) => (
                                         <button
                                             key={app}
                                             type="button"
-                                            onClick={() => updateField("type_app", app)}
+                                            onClick={() => {
+                                                if (app === "vaShop") updateField("org_unit", "VP");
+                                                updateField("type_app", app);
+                                            }}
                                             className={`flex h-7 items-center justify-center
                                                 gap-2 text-sm font-medium
                                                 transition-colors ${form.type_app === app
                                                     ? "border-[#e11c2a] bg-[#e11c2a]/5 text-[#e11c2a]"
                                                     : "hover:bg-muted"
-                                                } ${idx === 0 ? ' border-r border-gray-300' : ''}`}
+                                                } ${idx !== 2 ? ' border-r border-gray-300' : ''}`}
                                         >
                                             {form.type_app === app && <Check size={15} />}
                                             {app}
@@ -483,14 +489,14 @@ export default function TaxAccountManager() {
                                     }
                                 />
 
-                                <Input
+                                {["vaOnline", "vaOne"].includes(form.type_app) ? <Input
                                     label="Mã đơn vị"
                                     sizeInput="xs"
                                     value={form.org_unit ?? ""}
                                     onChange={(e) =>
                                         updateField("org_unit", e.target.value)
                                     }
-                                />
+                                /> : <div />}
 
                                 <Input
                                     label="Tài khoản ứng dụng"

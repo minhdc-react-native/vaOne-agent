@@ -95,6 +95,10 @@ pub struct TaxAccount {
 
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
+
+    pub org_unit_id: Option<String>,
+    pub tenant_id: Option<String>,
+    pub app_token_type: Option<String>,
 }
 
 /// Dữ liệu do UI gửi khi thêm mới hoặc sửa tài khoản.
@@ -113,4 +117,86 @@ pub struct TaxAccountInput {
     pub user_app: Option<String>,
     pub pass_app_key: Option<String>,
     pub org_unit: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct InvoiceStats {
+    pub tax_code: String,
+    pub total: i64,
+    pub groups: Vec<InvoiceStatsGroup>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct InvoiceStatsGroup {
+    pub invoice_type: i64,
+    pub detail_status: String,
+    pub upload_status: String,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SyncDay {
+    pub tax_code: String,
+    pub invoice_type: i64,
+    pub sync_date: String,
+    pub list_status: String,
+    pub status: String,
+    pub last_error: Option<String>,
+    pub attempt_count: i64,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+    pub updated_at: String,
+}
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SyncInvoiceFilters {
+    pub tax_code: Option<String>,
+    pub invoice_type: Option<i64>,
+    pub from_date: Option<String>,
+    pub to_date: Option<String>,
+    pub detail_status: Option<String>,
+    pub upload_status: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SyncInvoice {
+    pub tax_code: String,
+    pub invoice_type: i64,
+    pub invoice_key: String,
+    pub dvtte: Option<String>,
+    pub tgia: Option<f64>,
+    pub nbmst: Option<String>,
+    pub khhdon: Option<String>,
+    pub shdon: Option<i64>,
+    pub khmshdon: Option<i64>,
+    pub invoice_date: String,
+    pub tgtcthue: Option<f64>,
+    pub tgtthue: Option<f64>,
+    pub tgtttbso: Option<f64>,
+    pub tthai: Option<i64>,
+    pub ttxly: Option<i64>,
+    pub detail_status: String,
+    pub upload_status: String,
+    pub detail_attempt_count: i64,
+    pub upload_attempt_count: i64,
+    pub detail_error: Option<String>,
+    pub upload_error: Option<String>,
+    pub updated_at: String,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SyncInvoicePage {
+    pub items: Vec<SyncInvoice>,
+    pub total: i64,
+    pub page: u32,
+    pub page_size: u32,
+    pub total_pages: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct InvoiceUpload {
+    pub tax_code: String,
+    pub invoice_key: String,
+    pub invoice_type: u8,
+    pub invoice: Value,
 }

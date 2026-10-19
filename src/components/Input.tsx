@@ -51,7 +51,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
         const labelClass =
             labelPosition === "top"
-                ? "font-normal"
+                ? "font-medium"
                 : "font-medium whitespace-nowrap";
 
         return (
@@ -71,7 +71,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                         "focus-within:border-(--primary)",
                         error ? "border-red-500" : "border-(--border)",
                         disabled && "opacity-60",
-                        sizeInput === "sm" ? "rounded-md h-9" : "rounded-sm h-7"
+                        sizeInput === "sm" ? "rounded-sm h-7" : "rounded-sm h-7"
                     )}
                 >
                     {icon && (

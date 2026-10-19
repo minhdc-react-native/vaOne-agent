@@ -9,7 +9,7 @@ import { IconLucide, IconName } from "./IconLucide";
 
 interface AppWindowProps {
     icon?: IconName,
-    title: string;
+    title?: string;
     children: ReactNode;
     content?: ReactNode;
     disableClose?: boolean;
@@ -60,12 +60,12 @@ export default function AppWindow({
                 {icon && <IconLucide
                     name={icon}
                 />}
-                <span
+                {title && <span
                     data-tauri-drag-region
                     className="cursor-pointer flex-1 text-sm font-semibold text-gray-800"
                 >
                     {title}
-                </span>
+                </span>}
                 {content}
                 {!disableClose && <Button
                     // disabled={disableClose}

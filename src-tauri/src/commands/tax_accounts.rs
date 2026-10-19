@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use tauri::State;
 use vaone_tax_sync::{
-    auth::TaxAuthService,
+    auth::{TaxAuthService, TypeApp},
     database::Database,
     error::TaxSyncError,
     models::{TaxAccount, TaxAccountInput},
@@ -94,9 +94,9 @@ pub async fn check_tax_application_login(input: CheckTaxLoginInput) -> Result<()
                 })?
             }
         };
-
+        let type_app = TypeApp::try_from(account.type_app.as_str()).map_err(|e| e.to_string())?;
         // 4. Kiểm tra đăng nhập vaOnline hoặc vaOne.
-        auth.check_application_login(account, &app_password)
+        auth.check_application_login(account, &app_password, &type_app)
             .await
             .map_err(|e| format!("Đăng nhập ứng dụng thất bại: {e}"))?;
     }

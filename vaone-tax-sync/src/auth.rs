@@ -1,6 +1,7 @@
 use std::future::Future;
 use std::time::Duration;
 
+use chrono::Datelike;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -13,11 +14,38 @@ use crate::{
 const CAPTCHA_URL: &str = "https://hoadondientu.gdt.gov.vn/api/captcha";
 const LOGIN_URL: &str = "https://hoadondientu.gdt.gov.vn/api/security-taxpayer/authenticate";
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TypeApp {
+    VaOnline,
+    VaOne,
+    VaShop,
+}
+impl TryFrom<&str> for TypeApp {
+    type Error = TaxSyncError;
+
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        match value {
+            "vaOne" => Ok(Self::VaOne),
+            "vaShop" => Ok(Self::VaShop),
+            "vaOnline" => Ok(Self::VaOnline),
+            _ => Err(TaxSyncError::InvalidConfig(format!(
+                "type_app không hợp lệ: {}",
+                value
+            ))),
+        }
+    }
+}
+
 /// Thời hạn token do ứng dụng quy ước: 24 giờ.
 pub const TOKEN_EXPIRES_IN_SECS: u64 = 24 * 60 * 60;
 
 #[derive(Debug, Clone)]
 pub struct ApplicationLoginResponse {
+    pub org_unit: Option<String>,
+    pub year: Option<String>,
+    pub lang: Option<String>,
+    pub org_unit_id: Option<String>,
+    pub tenant_id: Option<String>,
     pub access_token: String,
     pub expires_in: Option<u64>,
     pub refresh_token: Option<String>,
@@ -28,6 +56,12 @@ pub struct ApplicationLoginResponse {
 struct VaOnlineOrgUnit {
     id: String,
     value: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct VaOnlineLogin {
+    ok: bool,
+    token: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -47,6 +81,7 @@ struct VaOneTokenResponse {
 
 #[derive(Debug, Deserialize)]
 struct VaOneOrgUnit {
+    id: String,
     code: String,
     #[serde(rename = "taxCode")]
     tax_code: String,
@@ -188,10 +223,11 @@ impl TaxAuthService {
         &self,
         account: &TaxAccount,
         password: &str,
+        type_app: &TypeApp,
     ) -> Result<ApplicationLoginResponse> {
         match account.type_app.as_str() {
             "vaOnline" => self.check_vaonline_login(account, password).await,
-            "vaOne" => self.check_vaone_login(account, password).await,
+            "vaOne" => self.check_vaone_login(account, password, type_app).await,
             _ => Err(TaxSyncError::Authentication(
                 "Loại ứng dụng không được hỗ trợ".to_string(),
             )),
@@ -199,7 +235,7 @@ impl TaxAuthService {
     }
 
     //Kiểm tra vaOnline
-    pub async fn check_vaonline_login(
+    async fn check_vaonline_login(
         &self,
         account: &TaxAccount,
         password: &str,
@@ -235,18 +271,26 @@ impl TaxAuthService {
             })?;
 
         let status = response.status();
-        let body = response.text().await.map_err(|e| {
-            TaxSyncError::Authentication(format!("Không thể đọc response đăng nhập vaOnline: {e}"))
-        })?;
 
         if !status.is_success() {
             return Err(TaxSyncError::Authentication(format!(
-                "Đăng nhập vaOnline thất bại, HTTP {status}: {}",
-                truncate_body(&body)
+                "Đăng nhập vaOnline thất bại, HTTP {status}"
             )));
         }
 
-        let token = parse_token(&body)?;
+        let login: VaOnlineLogin = response.json().await.map_err(|e| {
+            TaxSyncError::Authentication(format!("Dữ liệu vaOnline không hợp lệ: {e}"))
+        })?;
+
+        if !login.ok {
+            return Err(TaxSyncError::Authentication(
+                "Sai thông tin truy cập vaOnline".to_string(),
+            ));
+        }
+
+        let token = login.token.ok_or_else(|| {
+            TaxSyncError::Authentication("vaOnline không trả về token".to_string())
+        })?;
 
         // 2. Lấy danh sách đơn vị.
         let org_url = format!("https://{}.vaonline.vn/api/User/GetListDvcs", access_code);
@@ -279,13 +323,21 @@ impl TaxAuthService {
         })?;
 
         // 3. Kiểm tra mã đơn vị.
-        if !units.iter().any(|unit| unit.id == org_unit) {
-            return Err(TaxSyncError::Authentication(format!(
-                "Không tìm thấy đơn vị vaOnline có mã: {org_unit}"
-            )));
-        }
+        let unit = units
+            .iter()
+            .find(|unit| unit.id == org_unit)
+            .ok_or_else(|| {
+                TaxSyncError::Authentication(format!(
+                    "Không tìm thấy đơn vị vaOnline có mã: {org_unit}"
+                ))
+            })?;
 
         Ok(ApplicationLoginResponse {
+            org_unit: Some(org_unit.to_string()),
+            year: Some(get_current_year()),
+            lang: Some("vi".to_string()),
+            org_unit_id: Some(unit.id.to_string()),
+            tenant_id: Some(access_code.to_string()),
             access_token: token,
             expires_in: None,
             refresh_token: None,
@@ -294,13 +346,27 @@ impl TaxAuthService {
     }
 
     //check vaOne online
-    pub async fn check_vaone_login(
+    async fn check_vaone_login(
         &self,
         account: &TaxAccount,
         password: &str,
+        type_app: &TypeApp,
     ) -> Result<ApplicationLoginResponse> {
-        const BASE_URL: &str = "http://10.8.0.146:30334";
-        const CLIENT_ID: &str = "VaOneApi_Web";
+        let base_url: &str = match type_app {
+            TypeApp::VaOnline => "https://demoketoan.vaonline.vn",
+            TypeApp::VaOne => "http://10.8.0.146:30334",
+            TypeApp::VaShop => "https://web.vashop.vn",
+        };
+        let client_id: &str = match type_app {
+            TypeApp::VaOnline => "VaOnlineApi_App",
+            TypeApp::VaOne => "VaOneApi_Web",
+            TypeApp::VaShop => "VacomMartApi_App",
+        };
+        let scope: &str = match type_app {
+            TypeApp::VaOnline => "VaOnlineApi offline_access",
+            TypeApp::VaOne => "VaOneApi offline_access",
+            TypeApp::VaShop => "VacomMartApi offline_access",
+        };
         const CLIENT_SECRET: &str = "1q2w3e*";
 
         let access_code = account.access_code.as_deref().unwrap_or("").trim();
@@ -319,7 +385,7 @@ impl TaxAuthService {
 
         // 1. Kiểm tra tenant.
         let tenant_url = format!(
-            "{BASE_URL}/api/abp/multi-tenancy/tenants/by-name/{}",
+            "{base_url}/api/abp/multi-tenancy/tenants/by-name/{}",
             access_code
         );
 
@@ -352,19 +418,19 @@ impl TaxAuthService {
         }
 
         // 2. Đăng nhập lấy access_token và refresh_token.
-        let token_url = format!("{BASE_URL}/connect/token");
+        let token_url = format!("{base_url}/connect/token");
 
         let response = self
             .http
             .post(&token_url)
             .header("Accept", "application/json")
             .form(&[
-                ("client_id", CLIENT_ID),
+                ("client_id", client_id),
                 ("client_secret", CLIENT_SECRET),
                 ("grant_type", "password"),
                 ("username", username),
                 ("password", password),
-                ("scope", "VaOneApi offline_access"),
+                ("scope", scope),
             ])
             .send()
             .await
@@ -392,46 +458,55 @@ impl TaxAuthService {
             ));
         }
 
-        // 3. Lấy danh sách đơn vị bằng access_token.
-        let units_url = format!("{BASE_URL}/api/app/org-unit/my-list");
+        let org_unit_id = match type_app {
+            TypeApp::VaOne | TypeApp::VaShop => {
+                let base_url = match type_app {
+                    TypeApp::VaOne => "http://10.8.0.146:30334",
+                    _ => unreachable!(),
+                };
 
-        let response = self
-            .http
-            .get(&units_url)
-            .header("Accept", "application/json")
-            .bearer_auth(&token.access_token)
-            .send()
-            .await
-            .map_err(|e| {
-                TaxSyncError::Authentication(format!("Không thể lấy danh sách đơn vị vaOne: {e}"))
-            })?;
+                let units_url = format!("{base_url}/api/app/org-unit/my-list");
 
-        let status = response.status();
+                let response = self
+                    .http
+                    .get(&units_url)
+                    .header("Accept", "application/json")
+                    .bearer_auth(&token.access_token)
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        TaxSyncError::Authentication(format!("Không thể lấy danh sách đơn vị: {e}"))
+                    })?;
 
-        if !status.is_success() {
-            return Err(TaxSyncError::Authentication(format!(
-                "Lấy danh sách đơn vị vaOne thất bại, HTTP {status}"
-            )));
-        }
+                let status = response.status();
 
-        let units: Vec<VaOneOrgUnit> = response.json().await.map_err(|e| {
-            TaxSyncError::Authentication(format!(
-                "Dữ liệu danh sách đơn vị vaOne không hợp lệ: {e}"
-            ))
-        })?;
+                if !status.is_success() {
+                    return Err(TaxSyncError::Authentication(format!(
+                        "Lấy danh sách đơn vị thất bại, HTTP {status}"
+                    )));
+                }
 
-        // 4. Đơn vị phải khớp cả mã đơn vị và mã số thuế.
-        let matched = units
-            .iter()
-            .any(|unit| unit.code == org_unit && unit.tax_code == tax_code);
+                let units: Vec<VaOneOrgUnit> = response.json().await.map_err(|e| {
+                    TaxSyncError::Authentication(format!(
+                        "Dữ liệu danh sách đơn vị không hợp lệ: {e}"
+                    ))
+                })?;
 
-        if !matched {
-            return Err(TaxSyncError::Authentication(format!(
-                "Không tìm thấy đơn vị '{org_unit}' thuộc mã số thuế '{tax_code}'"
-            )));
-        }
+                units
+                    .iter()
+                    .find(|unit| unit.code == org_unit)
+                    .map(|unit| unit.id.to_string())
+            }
+
+            _ => None,
+        };
 
         Ok(ApplicationLoginResponse {
+            org_unit: Some(org_unit.to_string()),
+            year: Some(get_current_year()),
+            lang: Some("vi".to_string()),
+            org_unit_id,
+            tenant_id: Some(tenant.tenant_id.as_deref().unwrap_or("").to_string()),
             access_token: token.access_token,
             expires_in: Some(token.expires_in),
             refresh_token: token.refresh_token,
@@ -442,9 +517,18 @@ impl TaxAuthService {
     pub async fn refresh_vaone_token(
         &self,
         refresh_token: &str,
+        type_app: &TypeApp,
     ) -> Result<ApplicationLoginResponse> {
-        const BASE_URL: &str = "http://10.8.0.146:30334";
-        const CLIENT_ID: &str = "VaOneApi_Web";
+        let base_url: &str = match type_app {
+            TypeApp::VaOnline => "https://demoketoan.vaonline.vn",
+            TypeApp::VaOne => "http://10.8.0.146:30334",
+            TypeApp::VaShop => "https://web.vashop.vn",
+        };
+        let client_id: &str = match type_app {
+            TypeApp::VaOnline => "VaOnlineApi_App",
+            TypeApp::VaOne => "VaOneApi_Web",
+            TypeApp::VaShop => "VacomMartApi_App",
+        };
         const CLIENT_SECRET: &str = "1q2w3e*";
 
         let refresh_token = refresh_token.trim();
@@ -456,14 +540,14 @@ impl TaxAuthService {
             .into());
         }
 
-        let url = format!("{BASE_URL}/connect/token");
+        let url = format!("{base_url}/connect/token");
 
         let response = self
             .http
             .post(&url)
             .header("Accept", "application/json")
             .form(&[
-                ("client_id", CLIENT_ID),
+                ("client_id", client_id),
                 ("client_secret", CLIENT_SECRET),
                 ("grant_type", "refresh_token"),
                 ("refresh_token", refresh_token),
@@ -497,6 +581,11 @@ impl TaxAuthService {
         }
 
         Ok(ApplicationLoginResponse {
+            org_unit: None,
+            year: None,
+            lang: Some("vi".to_string()),
+            org_unit_id: None,
+            tenant_id: None,
             access_token: token.access_token,
             expires_in: Some(token.expires_in),
 
@@ -513,6 +602,80 @@ impl TaxAuthService {
                 token.token_type
             },
         })
+    }
+
+    pub async fn post_data(
+        &self,
+        invoice: &Value,
+        token: &ApplicationLoginResponse,
+        type_app: &TypeApp,
+    ) -> Result<Value> {
+        let url = match type_app {
+            TypeApp::VaOnline => "https://demoketoan.vaonline.vn/api/app/upload",
+            TypeApp::VaOne => "http://10.8.0.146:30334/api/app/upload",
+            TypeApp::VaShop => "https://web.vashop.vn/api/app/upload",
+        };
+
+        let mut request = self.http.post(url).json(invoice);
+
+        match type_app {
+            TypeApp::VaOnline => {
+                let access_token = format!(
+                    "{};{:?};{};{}",
+                    token.access_token,
+                    token.org_unit,
+                    get_current_year(),
+                    "vi"
+                );
+                request = request.bearer_auth(access_token);
+
+                if let Some(tenant_id) = &token.tenant_id {
+                    request = request.header("x-tenant-name", tenant_id);
+                }
+            }
+            TypeApp::VaOne => {
+                request = request.bearer_auth(&token.access_token);
+                if let Some(org_unit_id) = &token.org_unit_id {
+                    request = request.header("__orgid", org_unit_id);
+                }
+
+                if let Some(tenant_id) = &token.tenant_id {
+                    request = request.header("__tenant", tenant_id);
+                }
+            }
+            TypeApp::VaShop => {
+                request = request.bearer_auth(&token.access_token);
+                if let Some(tenant_id) = &token.tenant_id {
+                    request = request.header("__tenant", tenant_id);
+                }
+            }
+        }
+
+        let response = request.send().await?;
+
+        let status = response.status();
+        let body = response.text().await?;
+
+        if !status.is_success() {
+            return Err(TaxSyncError::Authentication(format!(
+                "Gửi dữ liệu hóa đơn thất bại ({}): {}",
+                status.as_u16(),
+                body
+            ))
+            .into());
+        }
+
+        let result = if body.trim().is_empty() {
+            Value::Null
+        } else {
+            serde_json::from_str(&body).map_err(|e| {
+                TaxSyncError::Authentication(format!(
+                    "API trả về JSON không hợp lệ: {e}. Nội dung: {body}"
+                ))
+            })?
+        };
+
+        Ok(result)
     }
 }
 
@@ -556,4 +719,8 @@ fn truncate_body(body: &str) -> String {
     } else {
         truncated
     }
+}
+
+pub fn get_current_year() -> String {
+    chrono::Local::now().year().to_string()
 }
