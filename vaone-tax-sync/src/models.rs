@@ -99,6 +99,15 @@ pub struct TaxAccount {
     pub org_unit_id: Option<String>,
     pub tenant_id: Option<String>,
     pub app_token_type: Option<String>,
+
+    pub note: Option<String>,
+    pub url_api: Option<String>,
+    pub auth_blocked: bool,
+
+    pub app_auth_status: String,
+    pub app_auth_blocked: bool,
+    pub last_app_login_at: Option<String>,
+    pub last_app_auth_error: Option<String>,
 }
 
 /// Dữ liệu do UI gửi khi thêm mới hoặc sửa tài khoản.
@@ -117,6 +126,8 @@ pub struct TaxAccountInput {
     pub user_app: Option<String>,
     pub pass_app_key: Option<String>,
     pub org_unit: Option<String>,
+    pub note: Option<String>,
+    pub url_api: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -199,4 +210,5 @@ pub struct InvoiceUpload {
     pub invoice_key: String,
     pub invoice_type: u8,
     pub invoice: Value,
+    pub xml_data: Option<String>,
 }

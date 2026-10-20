@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use chrono::{DateTime, Duration as ChronoDuration, NaiveDate, NaiveDateTime, Utc};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::{
     collections::HashSet,
     sync::{
@@ -388,10 +389,19 @@ impl TaxSyncWorker {
             })
             .await
             .map_err(|error| {
-                anyhow!(
+                let message = format!(
                     "Đăng nhập cơ quan thuế thất bại cho {}: {error}",
                     account.tax_code
-                )
+                );
+
+                if let Err(db_error) = self.db.set_auth_failure(&account.tax_code, &message) {
+                    eprintln!(
+                        "Không thể cập nhật trạng thái đăng nhập thất bại cho {}: {}",
+                        account.tax_code, db_error
+                    );
+                }
+
+                anyhow!("{}", message)
             })?;
 
         let lifetime = login
@@ -435,6 +445,7 @@ impl TaxSyncWorker {
                         .app_token_type
                         .clone()
                         .unwrap_or_else(|| "Bearer".to_string()),
+                    url_api: account.url_api.clone(),
                 }));
             }
         }
@@ -469,7 +480,7 @@ impl TaxSyncWorker {
                     let type_app = TypeApp::try_from(account.type_app.as_str())?;
                     match self
                         .auth
-                        .refresh_vaone_token(refresh_token, &type_app)
+                        .refresh_vaone_token(refresh_token, &type_app, &account.url_api)
                         .await
                     {
                         Ok(token) => token,
@@ -520,7 +531,21 @@ impl TaxSyncWorker {
         self.auth
             .check_application_login(account, password, &type_app)
             .await
-            .map_err(Into::into)
+            .map_err(|error| {
+                let message = format!(
+                    "Đăng nhập ứng dụng {} thất bại cho {}: {error}",
+                    account.type_app, account.tax_code
+                );
+
+                if let Err(db_error) = self.db.set_app_auth_failure(&account.tax_code, &message) {
+                    eprintln!(
+                        "Không thể cập nhật trạng thái đăng nhập ứng dụng cho {}: {}",
+                        account.tax_code, db_error
+                    );
+                }
+
+                anyhow::anyhow!("{}", message)
+            })
     }
 
     async fn sync_one_day(
@@ -561,31 +586,71 @@ impl TaxSyncWorker {
         token: &ApplicationLoginResponse,
         type_app: &TypeApp,
     ) -> Result<Value> {
-        // Lấy danh sách hóa đơn cần upload
         let invoices = self.db.get_invoices_pending_upload(tax_code)?;
+
         let mut results = Vec::new();
-        // Lần lượt gửi từng hóa đơn
-        for invoice in &invoices {
-            match self.auth.post_data(&invoice.invoice, token, type_app).await {
+        const BATCH_SIZE: usize = 10; // upload 10 hóa đơn 1 lần.
+
+        for batch in invoices.chunks(BATCH_SIZE) {
+            // Bổ sung outOrIn vào từng hóa đơn
+            let datas: Vec<Value> = batch
+                .iter()
+                .map(|item| {
+                    let mut invoice = item.invoice.clone();
+
+                    if let Value::Object(ref mut map) = invoice {
+                        map.insert("outOrIn".to_string(), Value::from(item.invoice_type));
+                        map.insert("xml".to_string(), Value::from(item.xml_data.clone()));
+                    }
+
+                    invoice
+                })
+                .collect();
+
+            // Payload gửi lên API
+            let payload = serde_json::json!({
+                "datas": datas
+            });
+
+            match self.auth.post_data(&payload, token, type_app).await {
                 Ok(result) => {
-                    let _ = self.db.set_upload_completed(
-                        &tax_code,
-                        invoice.invoice_type,
-                        &invoice.invoice_key,
-                    );
-                    results.push(result.clone());
-                    println!("Upload thành công: {:?}", result);
+                    for invoice in batch {
+                        if let Err(err) = self.db.set_upload_completed(
+                            tax_code,
+                            invoice.invoice_type,
+                            &invoice.invoice_key,
+                        ) {
+                            eprintln!(
+                                "[tax-sync] Mark upload completed failed: key={}, error={}",
+                                invoice.invoice_key, err
+                            );
+                        }
+                    }
+
+                    println!("[tax-sync] Upload thành công: count={}", batch.len());
+
+                    results.push(result);
                 }
-                Err(e) => {
-                    let _ = self.db.set_upload_failed(
-                        &tax_code,
-                        invoice.invoice_type,
-                        &invoice.invoice_key,
-                        &e.to_string(),
+                Err(err) => {
+                    let message = err.to_string();
+
+                    for invoice in batch {
+                        let _ = self.db.set_upload_failed(
+                            tax_code,
+                            invoice.invoice_type,
+                            &invoice.invoice_key,
+                            &message,
+                        );
+                    }
+
+                    eprintln!(
+                        "[tax-sync] Upload thất bại: count={}, error={}",
+                        batch.len(),
+                        message
                     );
-                    eprintln!("Upload hóa đơn thất bại [{}]: {}", invoice.invoice_key, e);
                 }
             }
+
             request_delay(self.config.delay_ms).await;
         }
 

@@ -1,5 +1,5 @@
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Building2,
     Check,
@@ -8,6 +8,7 @@ import {
     History,
     KeyRound,
     List,
+    MessageCircleMore,
     Pencil,
     Plus,
     RefreshCw,
@@ -27,7 +28,8 @@ import InvoiceTypeCheckbox from "./InvoiceTypeCheckbox";
 import { Tooltip } from "../components/Tooltip/Tooltip";
 import { showNotification } from "../lib/notification";
 import { useNavigate } from "react-router-dom";
-
+import { useVirtualized } from "../hook/useVirtualized";
+const ROW_HEIGHT = 180;
 type AuthStatus = "pending" | "authenticated" | "failed";
 type SyncStatus = "pending" | "running" | "completed" | "failed";
 
@@ -56,6 +58,16 @@ const createEmptyAccount = (): ITaxAccount => ({
 
     created_at: null,
     updated_at: null,
+
+    note: null,
+    url_api: null,
+    auth_fail_count: 0,
+    auth_blocked: false,
+    app_auth_status: "",
+    app_auth_fail_count: 0,
+    app_auth_blocked: false,
+    last_app_login_at: null,
+    last_app_auth_error: null
 });
 const authLabels: Record<AuthStatus, string> = {
     pending: "Chưa xác thực",
@@ -123,12 +135,6 @@ function authVariant(status: AuthStatus) {
     return "warning";
 }
 
-function syncVariant(status: SyncStatus) {
-    if (status === "completed") return "success";
-    if (status === "failed") return "danger";
-    if (status === "running") return "info";
-    return "neutral";
-}
 
 export default function TaxAccountManager() {
     const {
@@ -201,13 +207,21 @@ export default function TaxAccountManager() {
         setLocalError("");
     };
 
+    useEffect(() => {
+        const displayError = localError || error;
+        if (displayError) dialog.info(
+            displayError,
+            "Thông tin lỗi",
+        );
+    }, [localError, error]);
+
     const handleSave = async () => {
 
         const taxCode = form.tax_code.trim();
-        console.log('form>>', form);
+
         if (!taxCode || !form.start_date) {
             setLocalError(
-                "Vui lòng nhập mã số thuế và ngày bắt đầu. abc",
+                "Vui lòng nhập mã số thuế và ngày bắt đầu.",
             );
             return;
         }
@@ -270,6 +284,8 @@ export default function TaxAccountManager() {
             user_app: nextAccount.user_app,
             pass_app_key: nextAccount.pass_app_key,
             org_unit: nextAccount.org_unit,
+            note: nextAccount.note,
+            url_api: nextAccount.url_api,
         };
 
         try {
@@ -288,7 +304,8 @@ export default function TaxAccountManager() {
                 },
             };
 
-            await checkLogin(checkData);
+            const response = await checkLogin(checkData);
+            input.note = response.name;
 
             setLocalError("");
 
@@ -346,10 +363,23 @@ export default function TaxAccountManager() {
         }
     };
     // Ưu tiên lỗi kiểm tra form, sau đó đến lỗi từ hook.
-    const displayError = localError || error;
+
+
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const {
+        visibleData,
+        offsetTop,
+        offsetBottom,
+        startIndex,
+    } = useVirtualized({
+        data: filteredAccounts,
+        rowHeight: ROW_HEIGHT,
+        containerRef,
+    });
 
     return (
-        <div className="flex h-full min-h-0 flex-col bg-background text-foreground p-2 w-200" >
+        <div className="flex h-full min-h-0 flex-col bg-background text-foreground p-2 w-225" >
             <div
                 className="grid min-h-0 flex-1
                 grid-cols-2 gap-1
@@ -394,7 +424,6 @@ export default function TaxAccountManager() {
 
                                 <DateInput
                                     label="Ngày bắt đầu"
-                                    disabled={isEdit}
                                     sizeInput="xs"
                                     required
                                     value={form.start_date ?? ""}
@@ -415,9 +444,13 @@ export default function TaxAccountManager() {
                                 /> */}
 
                                 <Input
-                                    label="Mật khẩu thuế"
+                                    label={<div className="flex gap-1 items-center">
+                                        <span>Mật khẩu thuế</span>
+                                        <Tooltip title="Nhập để cập nhật mật khẩu" subTitle={isEdit ? "(nếu để trắng thì hệ thống giữ nguyên mật khẩu cũ))" : undefined}> <MessageCircleMore size={12} className="text-blue-500" /></Tooltip>
+                                    </div>}
                                     disabled={isEdit}
                                     password
+                                    // placeholder="Mật khẩu truy cập..."
                                     sizeInput="xs"
                                     required={!isEdit}
                                     value={form.password_key}
@@ -436,6 +469,15 @@ export default function TaxAccountManager() {
                                     />
                                 </div>
                             </div>
+                            <Input
+                                label="Công ty"
+                                disabled={true}
+                                sizeInput="xs"
+                                value={form.note ?? ""}
+                                onChange={(e) =>
+                                    updateField("note", e.target.value)
+                                }
+                            />
                             <InvoiceTypeCheckbox
                                 value={form.invoice_type}
                                 onChange={(value) => updateField("invoice_type", value)}
@@ -509,25 +551,39 @@ export default function TaxAccountManager() {
                                 />
 
                                 <Input
-                                    label="Mật khẩu ứng dụng"
+                                    label={<div className="flex gap-1 items-center">
+                                        <span>Mật khẩu ứng dụng</span>
+                                        <Tooltip title="Nhập để cập nhật mật khẩu" subTitle={isEdit ? "(nếu để trắng thì hệ thống giữ nguyên mật khẩu cũ))" : undefined}> <MessageCircleMore size={12} className="text-blue-500" /></Tooltip>
+                                    </div>}
                                     password
                                     sizeInput="xs"
                                     value={form.pass_app_key ?? ""}
-                                    placeholder="Keychain reference"
+                                    // placeholder="Mật khẩu áp dụng..."
                                     onChange={(e) =>
                                         updateField("pass_app_key", e.target.value)
                                     }
                                 />
                             </div>
+
+                            <Input
+                                label="Đường dẫn truy cập (cài riêng mới phải nhập)"
+                                placeholder={"ví dụ: http://192.168.1.123:9999"}
+                                sizeInput="xs"
+                                value={form.url_api ?? ""}
+                                onChange={(e) =>
+                                    updateField("url_api", e.target.value)
+                                }
+                            />
                         </div>}
+
                         {/* Error */}
-                        {displayError && (
+                        {/* {displayError && (
                             <div className="flex items-start gap-2 rounded border
                                 border-red-200 bg-red-50 p-3 text-sm text-red-700">
                                 <CircleAlert size={16} className="mt-0.5 shrink-0" />
                                 <span>{displayError}</span>
                             </div>
-                        )}
+                        )} */}
                     </div>
 
                     {/* Form actions */}
@@ -563,7 +619,7 @@ export default function TaxAccountManager() {
                         </div>
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto p-3 bg-gray-100">
-                        {filteredAccounts.length === 0 ? (
+                        {visibleData.length === 0 ? (
                             <div className="flex h-full min-h-48 flex-col
                                 items-center justify-center gap-3 text-center">
                                 <div className="flex size-12 items-center
@@ -597,11 +653,11 @@ export default function TaxAccountManager() {
                                 )}
                             </div>
                         ) : (
-                            <div className="space-y-2">
-                                {filteredAccounts.map((account, index) => {
+                            <div className="space-y-2" ref={containerRef}>
+                                <div style={{ height: offsetTop }} />
+                                {visibleData.map((account, index) => {
                                     const selected =
                                         selectedTaxCode === account.tax_code;
-
                                     return (
                                         <button
                                             type="button"
@@ -612,6 +668,7 @@ export default function TaxAccountManager() {
                                                     ? "border-[#e11c2a] bg-[#e11c2a]/[0.035]"
                                                     : "hover:border-border hover:bg-muted/40 bg-white"
                                                 }`}
+                                            style={{ height: ROW_HEIGHT }}
                                         >
                                             <div className="flex items-start gap-3">
                                                 <div className={`flex flex-col size-10 shrink-0
@@ -623,7 +680,6 @@ export default function TaxAccountManager() {
                                                     <span className="text-xs">{index + 1}</span>
                                                     <Building2 size={18} />
                                                 </div>
-
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-start
                                                         justify-between gap-2">
@@ -664,7 +720,7 @@ export default function TaxAccountManager() {
                                                             />
                                                         </Tooltip>
                                                     </div>
-
+                                                    <span className="text-xs truncate">{account.note}</span>
                                                     <div className="mt-3 flex flex-wrap
                                                         items-center gap-1.5">
                                                         <StatusBadge
@@ -746,6 +802,7 @@ export default function TaxAccountManager() {
                                         </button>
                                     );
                                 })}
+                                <div style={{ height: offsetBottom }} />
                             </div>
                         )}
                     </div>

@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use tauri::State;
 use vaone_tax_sync::{
-    auth::{TaxAuthService, TypeApp},
+    auth::{LoginResponse, TaxAuthService, TypeApp},
     database::Database,
     error::TaxSyncError,
     models::{TaxAccount, TaxAccountInput},
@@ -51,7 +51,9 @@ pub fn delete_tax_account(db: State<'_, Database>, tax_code: String) -> Result<(
 }
 
 #[tauri::command]
-pub async fn check_tax_application_login(input: CheckTaxLoginInput) -> Result<(), String> {
+pub async fn check_tax_application_login(
+    input: CheckTaxLoginInput,
+) -> Result<LoginResponse, String> {
     let store = SecretStore::new();
     let auth = TaxAuthService::new().map_err(|e| e.to_string())?;
     let account = &input.account;
@@ -66,13 +68,14 @@ pub async fn check_tax_application_login(input: CheckTaxLoginInput) -> Result<()
     };
 
     // 2. Đăng nhập cơ quan thuế, tự nhận diện captcha.
-    auth.login(account, &tax_password, |captcha_content| {
-        let content = captcha_content.to_string();
+    let token = auth
+        .login(account, &tax_password, |captcha_content| {
+            let content = captcha_content.to_string();
 
-        async move { predict_captcha(&content).map_err(TaxSyncError::Authentication) }
-    })
-    .await
-    .map_err(|e| format!("Đăng nhập cơ quan thuế thất bại: {e}"))?;
+            async move { predict_captcha(&content).map_err(TaxSyncError::Authentication) }
+        })
+        .await
+        .map_err(|e| format!("Đăng nhập cơ quan thuế thất bại: {e}"))?;
 
     // 3. Chỉ kiểm tra đăng nhập ứng dụng khi bật auto_sync.
     if account.auto_sync {
@@ -100,5 +103,5 @@ pub async fn check_tax_application_login(input: CheckTaxLoginInput) -> Result<()
             .await
             .map_err(|e| format!("Đăng nhập ứng dụng thất bại: {e}"))?;
     }
-    Ok(())
+    Ok(token)
 }

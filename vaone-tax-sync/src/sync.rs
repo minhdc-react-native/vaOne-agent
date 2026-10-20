@@ -137,35 +137,12 @@ impl TaxSyncService {
                     summary.completed += 1;
 
                     // Bước 2: Tải chi tiết hóa đơn.
-                    let detail_result = self.client.fetch_detail(item, &request.token).await;
-
-                    // Bước 3: Cập nhật detail_json hoặc đánh dấu lỗi.
-                    match detail_result {
-                        Ok(detail) => {
-                            if let Err(err) = self.db.save_invoice_detail(
-                                &request.tax_code,
-                                request.invoice_type,
-                                &invoice_key,
-                                &detail,
-                            ) {
-                                let message = err.to_string();
-
-                                let _ = self.db.set_detail_failed(
-                                    &request.tax_code,
-                                    request.invoice_type,
-                                    &invoice_key,
-                                    &message,
-                                );
-
-                                eprintln!(
-                            "[tax-sync] Save detail failed: tax_code={}, type={}, key={}: {}",
-                            request.tax_code,
-                            request.invoice_type,
-                            invoice_key,
-                            message
-                        );
-                            }
-                        }
+                    let (detail, xml) = match self
+                        .client
+                        .fetch_detail_and_xml(&item, &request.token)
+                        .await
+                    {
+                        Ok(result) => result,
                         Err(err) => {
                             let message = err.to_string();
 
@@ -177,10 +154,39 @@ impl TaxSyncService {
                             );
 
                             eprintln!(
-                                "[tax-sync] Fetch detail failed: tax_code={}, type={}, key={}: {}",
-                                request.tax_code, request.invoice_type, invoice_key, message
+                                "[tax-sync] Fetch detail/XML failed: tax_code={}, type={}, key={}: {}",
+                                request.tax_code,
+                                request.invoice_type,
+                                invoice_key,
+                                message
                             );
+
+                            continue;
                         }
+                    };
+
+                    if let Err(err) = self.db.save_invoice_detail(
+                        &request.tax_code,
+                        request.invoice_type,
+                        &invoice_key,
+                        &detail,
+                        &xml,
+                    ) {
+                        let message = err.to_string();
+
+                        let _ = self.db.set_detail_failed(
+                            &request.tax_code,
+                            request.invoice_type,
+                            &invoice_key,
+                            &message,
+                        );
+
+                        eprintln!(
+                            "[tax-sync] Save detail failed: tax_code={}, type={}, key={}: {}",
+                            request.tax_code, request.invoice_type, invoice_key, message
+                        );
+
+                        continue;
                     }
 
                     // Bước 4: Báo tiến trình.
@@ -277,13 +283,14 @@ impl TaxSyncService {
             has_requested = true;
 
             let result = async {
-                let detail = self
+                let (detail, xml) = self
                     .client
-                    .fetch_detail_by_key(
+                    .fetch_detail_and_xml_by_key(
                         &invoice.nbmst,
                         &invoice.khhdon,
                         invoice.shdon,
                         invoice.khmshdon,
+                        invoice_type,
                         token,
                     )
                     .await?;
@@ -293,6 +300,7 @@ impl TaxSyncService {
                     invoice_type,
                     &invoice.invoice_key,
                     &detail,
+                    &xml,
                 )?;
 
                 Ok::<(), anyhow::Error>(())

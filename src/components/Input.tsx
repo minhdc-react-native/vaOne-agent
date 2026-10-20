@@ -11,7 +11,7 @@ import { cn } from "../lib/utils";
 
 export interface InputProps
     extends InputHTMLAttributes<HTMLInputElement> {
-    label?: string;
+    label?: ReactNode;
     labelPosition?: "top" | "left" | "right";
     error?: string;
     icon?: ReactNode;
@@ -51,8 +51,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
         const labelClass =
             labelPosition === "top"
-                ? "font-medium"
-                : "font-medium whitespace-nowrap";
+                ? "flex gap-1 items-center font-medium"
+                : "flex gap-1 items-center font-medium whitespace-nowrap";
 
         return (
             <div className={cn("w-full", wrapperClass,

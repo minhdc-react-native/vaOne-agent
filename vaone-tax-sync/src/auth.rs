@@ -13,7 +13,7 @@ use crate::{
 
 const CAPTCHA_URL: &str = "https://hoadondientu.gdt.gov.vn/api/captcha";
 const LOGIN_URL: &str = "https://hoadondientu.gdt.gov.vn/api/security-taxpayer/authenticate";
-
+const PROFILE_URL: &str = "https://hoadondientu.gdt.gov.vn/api/security-taxpayer/profile";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TypeApp {
     VaOnline,
@@ -50,6 +50,7 @@ pub struct ApplicationLoginResponse {
     pub expires_in: Option<u64>,
     pub refresh_token: Option<String>,
     pub token_type: String,
+    pub url_api: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,10 +102,11 @@ struct LoginRequest<'a> {
     cvalue: &'a str,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct LoginResponse {
     pub token: String,
     pub expires_in: Option<u64>,
+    pub name: String,
 }
 
 pub struct TaxAuthService {
@@ -213,8 +215,35 @@ impl TaxAuthService {
         let token = parse_token(&body)?;
 
         // 5. API không trả expires_in, nên dùng mặc định 24 giờ.
+        let profile = self
+            .http
+            .get(PROFILE_URL)
+            .bearer_auth(&token)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .header("request-id", uuid::Uuid::new_v4().to_string())
+            .send()
+            .await
+            .map_err(|e| {
+                TaxSyncError::Authentication(format!("Không thể lấy thông tin profile: {e}"))
+            })?
+            .error_for_status()
+            .map_err(|e| TaxSyncError::Authentication(format!("Lấy profile thất bại: {e}")))?;
+
+        let profile_json: serde_json::Value = profile.json().await.map_err(|e| {
+            TaxSyncError::Authentication(format!("Không thể đọc dữ liệu profile: {e}"))
+        })?;
+
+        let name = profile_json
+            .get("name")
+            .and_then(|value| value.as_str())
+            .ok_or_else(|| {
+                TaxSyncError::Authentication("Profile không có trường name hợp lệ".to_string())
+            })?;
+
         Ok(LoginResponse {
             token,
+            name: name.to_string(),
             expires_in: Some(TOKEN_EXPIRES_IN_SECS),
         })
     }
@@ -342,6 +371,7 @@ impl TaxAuthService {
             expires_in: None,
             refresh_token: None,
             token_type: "Bearer".to_string(),
+            url_api: account.url_api.clone(),
         })
     }
 
@@ -352,11 +382,17 @@ impl TaxAuthService {
         password: &str,
         type_app: &TypeApp,
     ) -> Result<ApplicationLoginResponse> {
-        let base_url: &str = match type_app {
-            TypeApp::VaOnline => "https://demoketoan.vaonline.vn",
+        let default_url: &str = match type_app {
             TypeApp::VaOne => "http://10.8.0.146:30334",
             TypeApp::VaShop => "https://web.vashop.vn",
+            _ => unreachable!(),
         };
+        let base_url = account
+            .url_api
+            .as_deref()
+            .filter(|url| !url.trim().is_empty())
+            .unwrap_or(default_url);
+
         let client_id: &str = match type_app {
             TypeApp::VaOnline => "VaOnlineApi_App",
             TypeApp::VaOne => "VaOneApi_Web",
@@ -459,11 +495,16 @@ impl TaxAuthService {
         }
 
         let org_unit_id = match type_app {
-            TypeApp::VaOne | TypeApp::VaShop => {
-                let base_url = match type_app {
+            TypeApp::VaOne => {
+                let default_url: &str = match type_app {
                     TypeApp::VaOne => "http://10.8.0.146:30334",
                     _ => unreachable!(),
                 };
+                let base_url = account
+                    .url_api
+                    .as_deref()
+                    .filter(|url| !url.trim().is_empty())
+                    .unwrap_or(default_url);
 
                 let units_url = format!("{base_url}/api/app/org-unit/my-list");
 
@@ -511,6 +552,7 @@ impl TaxAuthService {
             expires_in: Some(token.expires_in),
             refresh_token: token.refresh_token,
             token_type: token.token_type,
+            url_api: account.url_api.clone(),
         })
     }
 
@@ -518,12 +560,18 @@ impl TaxAuthService {
         &self,
         refresh_token: &str,
         type_app: &TypeApp,
+        url_api: &Option<String>,
     ) -> Result<ApplicationLoginResponse> {
-        let base_url: &str = match type_app {
-            TypeApp::VaOnline => "https://demoketoan.vaonline.vn",
+        let default_url: &str = match type_app {
             TypeApp::VaOne => "http://10.8.0.146:30334",
             TypeApp::VaShop => "https://web.vashop.vn",
+            _ => unreachable!(),
         };
+        let base_url = url_api
+            .as_deref()
+            .filter(|url| !url.trim().is_empty())
+            .unwrap_or(default_url);
+
         let client_id: &str = match type_app {
             TypeApp::VaOnline => "VaOnlineApi_App",
             TypeApp::VaOne => "VaOneApi_Web",
@@ -601,6 +649,7 @@ impl TaxAuthService {
             } else {
                 token.token_type
             },
+            url_api: url_api.clone(),
         })
     }
 
@@ -610,27 +659,54 @@ impl TaxAuthService {
         token: &ApplicationLoginResponse,
         type_app: &TypeApp,
     ) -> Result<Value> {
-        let url = match type_app {
-            TypeApp::VaOnline => "https://demoketoan.vaonline.vn/api/app/upload",
-            TypeApp::VaOne => "http://10.8.0.146:30334/api/app/upload",
-            TypeApp::VaShop => "https://web.vashop.vn/api/app/upload",
+        let tenant_id = token
+            .tenant_id
+            .as_deref()
+            .filter(|id| !id.trim().is_empty())
+            .ok_or_else(|| {
+                TaxSyncError::Authentication("Không tìm thấy tenant_id hợp lệ".to_string())
+            })?;
+
+        let default_url: String = match type_app {
+            TypeApp::VaOne => "http://10.8.0.146:30334".to_string(),
+            TypeApp::VaShop => {
+                "https://web.vashop.vn/api/app/tax-department/import-tax-department-data"
+                    .to_string()
+            }
+            TypeApp::VaOnline => {
+                format!(
+                    "https://{}.vaonline.vn/api/TaxDepartment/ImportJsonData",
+                    tenant_id
+                )
+            }
         };
+
+        let url = token
+            .url_api
+            .as_deref()
+            .filter(|url| !url.trim().is_empty())
+            .unwrap_or(&default_url);
 
         let mut request = self.http.post(url).json(invoice);
 
         match type_app {
             TypeApp::VaOnline => {
-                let access_token = format!(
-                    "{};{:?};{};{}",
-                    token.access_token,
-                    token.org_unit,
-                    get_current_year(),
-                    "vi"
-                );
-                request = request.bearer_auth(access_token);
+                if let Some(org_unit) = &token.org_unit {
+                    let access_token = format!(
+                        "{};{};{};{}",
+                        token.access_token,
+                        org_unit,
+                        get_current_year(),
+                        "vi"
+                    );
+                    request = request.bearer_auth(access_token.clone());
 
-                if let Some(tenant_id) = &token.tenant_id {
                     request = request.header("x-tenant-name", tenant_id);
+
+                    eprintln!(
+                        "URL ={} access_token={},tenant_id={:?}",
+                        url, access_token, tenant_id
+                    );
                 }
             }
             TypeApp::VaOne => {
@@ -639,15 +715,11 @@ impl TaxAuthService {
                     request = request.header("__orgid", org_unit_id);
                 }
 
-                if let Some(tenant_id) = &token.tenant_id {
-                    request = request.header("__tenant", tenant_id);
-                }
+                request = request.header("__tenant", tenant_id);
             }
             TypeApp::VaShop => {
                 request = request.bearer_auth(&token.access_token);
-                if let Some(tenant_id) = &token.tenant_id {
-                    request = request.header("__tenant", tenant_id);
-                }
+                request = request.header("__tenant", tenant_id);
             }
         }
 
@@ -657,6 +729,10 @@ impl TaxAuthService {
         let body = response.text().await?;
 
         if !status.is_success() {
+            // println!(
+            //     "Invoice payload: {}",
+            //     serde_json::to_string_pretty(&invoice).unwrap_or_default()
+            // );
             return Err(TaxSyncError::Authentication(format!(
                 "Gửi dữ liệu hóa đơn thất bại ({}): {}",
                 status.as_u16(),

@@ -38,6 +38,16 @@ export interface ITaxAccount {
 
     created_at: string | null;
     updated_at: string | null;
+
+    note: string | null;
+    url_api: string | null;
+    auth_fail_count: number;
+    auth_blocked: boolean;
+    app_auth_status: string;
+    app_auth_fail_count: number;
+    app_auth_blocked: boolean;
+    last_app_login_at: string | null;
+    last_app_auth_error: string | null;
 }
 
 export type ITaxAccountInput = Pick<
@@ -54,7 +64,15 @@ export type ITaxAccountInput = Pick<
     | "user_app"
     | "pass_app_key"
     | "org_unit"
+    | "note"
+    | "url_api"
 >;
+
+interface LoginResponse {
+    token: string,
+    expires_in: number | null,
+    name: string,
+}
 
 export const taxAccountService = {
     getAll: () =>
@@ -83,8 +101,8 @@ export const taxAccountService = {
             taxPassword?: string;
             appPassword?: string | null;
         },
-    ) =>
-        invoke<void>("check_tax_application_login", {
+    ): Promise<LoginResponse> =>
+        invoke<LoginResponse>("check_tax_application_login", {
             input: {
                 account,
                 taxPassword: passwords?.taxPassword,

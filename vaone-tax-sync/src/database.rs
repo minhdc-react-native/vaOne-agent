@@ -21,7 +21,7 @@ pub struct PendingInvoice {
     pub invoice_key: String,
     pub invoice_date: String,
     pub summary_json: String,
-    pub detail_json: Option<String>,
+    pub xml_data: Option<String>,
     pub detail_status: String,
     pub upload_status: String,
     pub attempt_count: i64,
@@ -129,7 +129,26 @@ impl Database {
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
                 org_unit_id TEXT,
-                tenant_id TEXT
+                tenant_id TEXT,
+
+                note TEXT,
+                url_api TEXT,
+                -- Trạng thái xác thực truy cập cơ quan thuế
+                auth_fail_count INTEGER NOT NULL DEFAULT 0
+                    CHECK (auth_fail_count >= 0),
+                auth_blocked INTEGER NOT NULL DEFAULT 0
+                    CHECK (auth_blocked IN (0, 1)),         
+                -- Trạng thái xác thực truy cập ứng dụng.
+                app_auth_status TEXT NOT NULL DEFAULT 'pending'
+                    CHECK (app_auth_status IN (
+                        'pending', 'authenticated', 'failed'
+                    )),
+                app_auth_fail_count INTEGER NOT NULL DEFAULT 0
+                    CHECK (app_auth_fail_count >= 0),
+                app_auth_blocked INTEGER NOT NULL DEFAULT 0
+                    CHECK (app_auth_blocked IN (0, 1)),
+                last_app_login_at TEXT,
+                last_app_auth_error TEXT           
             );
 
             CREATE TABLE IF NOT EXISTS sync_days (
@@ -189,7 +208,7 @@ impl Database {
                 summary_json TEXT NOT NULL,
 
                 -- JSON đầy đủ sau khi lấy chi tiết.
-                detail_json TEXT,
+                xml_data TEXT,
 
                 -- Trạng thái lấy chi tiết.
                 detail_status TEXT NOT NULL DEFAULT 'pending'
@@ -312,6 +331,8 @@ impl Database {
                     auth_status = 'authenticated',
                     last_login_at = CURRENT_TIMESTAMP,
                     last_auth_error = NULL,
+                    auth_fail_count = 0,
+                    auth_blocked = 0,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE tax_code = ?1
                 ",
@@ -320,6 +341,39 @@ impl Database {
         .map_err(db_error)?;
 
         Ok(())
+    }
+
+    pub fn set_auth_failure(&self, tax_code: &str, error: &str) -> Result<bool> {
+        let conn = self.connect()?;
+
+        conn.execute(
+            "
+        UPDATE tax_accounts
+        SET auth_fail_count = auth_fail_count + 1,
+            auth_status = 'failed',
+            auth_blocked = CASE
+                WHEN auth_fail_count + 1 >= 3 THEN 1
+                ELSE 0
+            END,
+            last_auth_error = ?2,
+            last_login_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tax_code = ?1
+          AND auth_blocked = 0
+        ",
+            params![tax_code, error],
+        )
+        .map_err(db_error)?;
+
+        let blocked: bool = conn
+            .query_row(
+                "SELECT auth_blocked FROM tax_accounts WHERE tax_code = ?1",
+                params![tax_code],
+                |row| row.get(0),
+            )
+            .map_err(db_error)?;
+
+        Ok(blocked)
     }
 
     pub fn set_app_auth_success(
@@ -343,6 +397,11 @@ impl Database {
             app_token_expires_at = ?5,
             org_unit_id = COALESCE(?6, org_unit_id),
             tenant_id = COALESCE(?7, tenant_id),
+            app_auth_status = 'authenticated',
+            last_app_login_at = CURRENT_TIMESTAMP,
+            last_app_auth_error = NULL,
+            app_auth_fail_count = 0,
+            app_auth_blocked = 0,
             updated_at = CURRENT_TIMESTAMP
         WHERE tax_code = ?1
         ",
@@ -359,6 +418,43 @@ impl Database {
         .map_err(db_error)?;
 
         Ok(())
+    }
+
+    pub fn set_app_auth_failure(&self, tax_code: &str, error: &str) -> Result<bool> {
+        let conn = self.connect()?;
+
+        conn.execute(
+            "
+        UPDATE tax_accounts
+        SET app_auth_fail_count = app_auth_fail_count + 1,
+            app_auth_status = 'failed',
+            app_auth_blocked = CASE
+                WHEN app_auth_fail_count + 1 >= 3 THEN 1
+                ELSE 0
+            END,
+            last_app_auth_error = ?2,
+            last_app_login_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tax_code = ?1
+          AND app_auth_blocked = 0
+        ",
+            params![tax_code, error],
+        )
+        .map_err(db_error)?;
+
+        let blocked: bool = conn
+            .query_row(
+                "
+            SELECT app_auth_blocked
+            FROM tax_accounts
+            WHERE tax_code = ?1
+            ",
+                params![tax_code],
+                |row| row.get(0),
+            )
+            .map_err(db_error)?;
+
+        Ok(blocked)
     }
 
     // ---------------------------------------------------------
@@ -646,24 +742,26 @@ impl Database {
         invoice_type: u8,
         invoice_key: &str,
         detail: &Value,
+        xml: &String,
     ) -> Result<()> {
-        let detail_json = serde_json::to_string(detail)
+        let detail_data = serde_json::to_string(detail)
             .map_err(|e| TaxSyncError::InvalidInvoice(e.to_string()))?;
 
         let conn = self.connect()?;
-        // Ghi đè vào summary_json để đỡ dung lượng  (không lưu vào details_json)
+
         conn.execute(
             "
-            UPDATE sync_invoices
-            SET summary_json = ?4,
-                detail_status = 'completed',
-                detail_error = NULL,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE tax_code = ?1
-              AND invoice_type = ?2
-              AND invoice_key = ?3
-            ",
-            params![tax_code, invoice_type, invoice_key, detail_json],
+        UPDATE sync_invoices
+        SET summary_json = ?4,
+            xml_data = ?5,
+            detail_status = 'completed',
+            detail_error = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tax_code = ?1
+          AND invoice_type = ?2
+          AND invoice_key = ?3
+        ",
+            params![tax_code, invoice_type, invoice_key, detail_data, xml],
         )
         .map_err(db_error)?;
 
@@ -719,7 +817,7 @@ impl Database {
               AND invoice_type = ?2
               AND invoice_key = ?3
               AND detail_status = 'completed'
-              AND detail_json IS NOT NULL
+              AND xml_data IS NOT NULL
             ",
             params![tax_code, invoice_type, invoice_key],
         )
@@ -775,7 +873,7 @@ impl Database {
                     invoice_key,
                     invoice_date,
                     summary_json,
-                    detail_json,
+                    xml_data,
                     detail_status,
                     upload_status,
                     attempt_count,
@@ -801,7 +899,7 @@ impl Database {
                     invoice_key: row.get(0)?,
                     invoice_date: row.get(1)?,
                     summary_json: row.get(2)?,
-                    detail_json: row.get(3)?,
+                    xml_data: row.get(3)?,
                     detail_status: row.get(4)?,
                     upload_status: row.get(5)?,
                     attempt_count: row.get(6)?,

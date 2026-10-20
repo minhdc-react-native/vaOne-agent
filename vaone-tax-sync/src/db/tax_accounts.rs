@@ -50,7 +50,14 @@ impl Database {
                     updated_at,
                     org_unit_id,
                     tenant_id,
-                    app_token_type
+                    app_token_type,
+                    note,
+                    url_api,
+                    auth_blocked,
+                    app_auth_status,
+                    app_auth_blocked,
+                    last_app_login_at,
+                    last_app_auth_error
                 FROM tax_accounts
                 ORDER BY tax_code
                 ",
@@ -88,6 +95,13 @@ impl Database {
                     org_unit_id: row.get(25)?,
                     tenant_id: row.get(26)?,
                     app_token_type: row.get(27)?,
+                    note: row.get(28)?,
+                    url_api: row.get(29)?,
+                    auth_blocked: row.get(30)?,
+                    app_auth_status: row.get(31)?,
+                    app_auth_blocked: row.get(32)?,
+                    last_app_login_at: row.get(33)?,
+                    last_app_auth_error: row.get(34)?,
                 })
             })
             .map_err(|e| TaxSyncError::Database(e.to_string()))?;
@@ -145,10 +159,12 @@ impl Database {
                 type_app,
                 user_app,
                 pass_app_key,
-                org_unit
+                org_unit,
+                note,
+                url_api
             )
             VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14
             )
             ",
             params![
@@ -164,6 +180,8 @@ impl Database {
                 input.user_app.as_deref(),
                 pass_app_key,
                 input.org_unit.as_deref(),
+                input.note,
+                input.url_api
             ],
         )
         .map_err(db_error)?;
@@ -267,6 +285,8 @@ impl Database {
             user_app = ?10,
             pass_app_key = ?11,
             org_unit = ?12,
+            note = ?13,
+            url_api = ?14,
             updated_at = CURRENT_TIMESTAMP
         WHERE tax_code = ?1
         ",
@@ -283,6 +303,8 @@ impl Database {
                 input.user_app.as_deref(),
                 pass_app_key,
                 input.org_unit.as_deref(),
+                input.note,
+                input.url_api
             ],
         );
 
@@ -416,7 +438,14 @@ impl Database {
                 updated_at,          -- 24
                 org_unit_id,          -- 25
                 tenant_id,           -- 26
-                app_token_type           -- 27
+                app_token_type,           -- 27
+                note,
+                url_api,
+                auth_blocked,
+                app_auth_status,
+                app_auth_blocked,
+                last_app_login_at,
+                last_app_auth_error
             FROM tax_accounts
             WHERE tax_code = ?1
             ",
@@ -453,6 +482,13 @@ impl Database {
                         org_unit_id: row.get(25)?,
                         tenant_id: row.get(26)?,
                         app_token_type: row.get(27)?,
+                        note: row.get(28)?,
+                        url_api: row.get(29)?,
+                        auth_blocked: row.get(30)?,
+                        app_auth_status: row.get(31)?,
+                        app_auth_blocked: row.get(32)?,
+                        last_app_login_at: row.get(33)?,
+                        last_app_auth_error: row.get(34)?,
                     })
                 },
             )
@@ -515,9 +551,17 @@ impl Database {
                 updated_at,
                 org_unit_id,
                 tenant_id,
-                app_token_type
+                app_token_type,
+                note,
+                url_api,
+                auth_blocked,
+                app_auth_status,
+                app_auth_blocked,
+                last_app_login_at,
+                last_app_auth_error
             FROM tax_accounts
             WHERE enabled = 1
+                AND auth_blocked = 0 
             ORDER BY tax_code
             ",
             )
@@ -554,6 +598,13 @@ impl Database {
                     org_unit_id: row.get(25)?,
                     tenant_id: row.get(26)?,
                     app_token_type: row.get(27)?,
+                    note: row.get(28)?,
+                    url_api: row.get(29)?,
+                    auth_blocked: row.get(30)?,
+                    app_auth_status: row.get(31)?,
+                    app_auth_blocked: row.get(32)?,
+                    last_app_login_at: row.get(33)?,
+                    last_app_auth_error: row.get(34)?,
                 })
             })
             .map_err(db_error)?;

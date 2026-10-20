@@ -28,3 +28,23 @@ export const getCurrentDateTime = (
             return date;
     }
 };
+
+export const formatNumber = (
+    value: number | string | null | undefined,
+    decimals = 0,
+): string => {
+    if (value === null || value === undefined || value === "") {
+        return "";
+    }
+
+    const number = typeof value === "number" ? value : Number(value);
+
+    if (!Number.isFinite(number)) {
+        return "";
+    }
+
+    return new Intl.NumberFormat("vi-VN", {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    }).format(number);
+};

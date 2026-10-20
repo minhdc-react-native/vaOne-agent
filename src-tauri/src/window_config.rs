@@ -11,7 +11,7 @@ pub fn get_window_size(id: &str) -> Option<(f64, f64)> {
         "blank" => Some((10.0, 10.0)),
         "update" => Some((330.0, 120.0)),
         "quit" => Some((350.0, 180.0)),
-        "taxConfig" => Some((800.0, 700.0)),
+        "taxConfig" => Some((900.0, 720.0)),
         "historyInvoice" => Some((1000.0, 800.0)),
         _ => None,
     }

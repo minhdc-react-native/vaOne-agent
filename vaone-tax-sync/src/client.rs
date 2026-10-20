@@ -1,14 +1,23 @@
 use crate::error::TaxSyncError;
 use anyhow::{bail, Context, Result};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{Datelike, Duration, NaiveDate};
 use rand::RngExt;
+use regex::Regex;
 use reqwest::Client;
-use serde_json::Value;
+use serde_json::{json, Value};
+use std::io::{Cursor, Read};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
 use tokio::time::{sleep, Duration as TokioDuration};
+use zip::ZipArchive;
+
+const URL_EXPORT_XML: &str = "https://hoadondientu.gdt.gov.vn/api/query/invoices/export-xml";
+
+const URL_SCO_EXPORT_XML: &str =
+    "https://hoadondientu.gdt.gov.vn/api/sco-query/invoices/export-xml";
 
 const PAGE_SIZE: usize = 50;
 
@@ -168,7 +177,34 @@ impl TaxClient {
         Ok(result)
     }
 
-    pub async fn fetch_detail(&self, invoice: &Value, token: &str) -> Result<Value> {
+    pub async fn fetch_detail_and_xml(
+        &self,
+        invoice: &Value,
+        token: &str,
+    ) -> Result<(Value, String)> {
+        let detail = self.fetch_detail(invoice, token).await?;
+
+        request_delay(2000).await;
+
+        let xml = self.fetch_xml(invoice, token).await?;
+
+        Ok((detail, xml))
+    }
+
+    async fn fetch_detail(&self, invoice: &Value, token: &str) -> Result<Value> {
+        let nbmst: &str = invoice["nbmst"].as_str().context("Missing nbmst")?;
+
+        let khhdon = invoice["khhdon"].as_str().context("Missing khhdon")?;
+
+        let shdon = invoice["shdon"].as_i64().context("Missing shdon")?;
+
+        let khmshdon = invoice["khmshdon"].as_i64().context("Missing khmshdon")?;
+
+        self.fetch_detail_by_key(nbmst, khhdon, shdon, khmshdon, token)
+            .await
+    }
+
+    async fn fetch_xml(&self, invoice: &Value, token: &str) -> Result<String> {
         let nbmst = invoice["nbmst"].as_str().context("Missing nbmst")?;
 
         let khhdon = invoice["khhdon"].as_str().context("Missing khhdon")?;
@@ -177,19 +213,38 @@ impl TaxClient {
 
         let khmshdon = invoice["khmshdon"].as_i64().context("Missing khmshdon")?;
 
-        let mut url =
-            reqwest::Url::parse("https://hoadondientu.gdt.gov.vn/api/query/invoices/detail")?;
+        let invoice_type = u8::try_from(
+            invoice["invoice_type"]
+                .as_u64()
+                .context("Missing invoice_type")?,
+        )
+        .context("invoice_type vượt phạm vi u8")?;
 
-        url.query_pairs_mut()
-            .append_pair("nbmst", nbmst)
-            .append_pair("khhdon", khhdon)
-            .append_pair("shdon", &shdon.to_string())
-            .append_pair("khmshdon", &khmshdon.to_string());
-
-        self.get_json(url.as_str(), token).await
+        self.fetch_xml_by_key(nbmst, khhdon, shdon, khmshdon, invoice_type, token)
+            .await
     }
 
-    pub async fn fetch_detail_by_key(
+    pub async fn fetch_detail_and_xml_by_key(
+        &self,
+        nbmst: &str,
+        khhdon: &str,
+        shdon: i64,
+        khmshdon: i64,
+        invoice_type: u8,
+        token: &str,
+    ) -> Result<(Value, String)> {
+        let detail = self
+            .fetch_detail_by_key(nbmst, khhdon, shdon, khmshdon, token)
+            .await?;
+        request_delay(2000).await;
+        let xml = self
+            .fetch_xml_by_key(nbmst, khhdon, shdon, khmshdon, invoice_type, token)
+            .await?;
+
+        Ok((detail, xml))
+    }
+
+    async fn fetch_detail_by_key(
         &self,
         nbmst: &str,
         khhdon: &str,
@@ -207,5 +262,105 @@ impl TaxClient {
             .append_pair("khmshdon", &khmshdon.to_string());
 
         self.get_json(url.as_str(), token).await
+    }
+
+    pub async fn fetch_xml_by_key(
+        &self,
+        nbmst: &str,
+        khhdon: &str,
+        shdon: i64,
+        khmshdon: i64,
+        invoice_type: u8,
+        token: &str,
+    ) -> Result<String> {
+        let base_url = match invoice_type {
+            1 | 2 => URL_EXPORT_XML,
+            3 | 4 => URL_SCO_EXPORT_XML,
+            _ => {
+                return Err(TaxSyncError::InvalidConfig(format!(
+                    "Loại hóa đơn không hợp lệ: {invoice_type}"
+                ))
+                .into());
+            }
+        };
+
+        let response = self
+            .http
+            .get(base_url)
+            .header("request-id", self.request_id.clone())
+            .query(&[
+                ("nbmst", nbmst),
+                ("khhdon", khhdon),
+                ("shdon", &shdon.to_string()),
+                ("khmshdon", &khmshdon.to_string()),
+            ])
+            .bearer_auth(token)
+            .send()
+            .await?;
+
+        let status = response.status();
+
+        let content_type = response
+            .headers()
+            .get(reqwest::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+
+        let bytes = response.bytes().await?;
+
+        if !status.is_success() {
+            return Err(TaxSyncError::InvalidConfig(format!(
+                "Lấy XML thất bại: HTTP {status}, content-type={content_type}"
+            ))
+            .into());
+        }
+
+        // Phát hiện trường hợp cổng Thuế trả HTML thay vì ZIP.
+        let preview = String::from_utf8_lossy(&bytes[..bytes.len().min(512)]);
+
+        if content_type.to_ascii_lowercase().contains("text/html")
+            || preview.to_ascii_lowercase().contains("<html")
+            || preview.to_ascii_lowercase().contains("<!doctype html")
+        {
+            return Err(TaxSyncError::InvalidConfig(format!(
+                "Cổng Thuế trả về HTML thay vì ZIP: {}",
+                preview.chars().take(200).collect::<String>()
+            ))
+            .into());
+        }
+
+        // ZIP phải bắt đầu bằng PK\x03\x04.
+        if bytes.len() < 4 || bytes[0..4] != [0x50, 0x4B, 0x03, 0x04] {
+            return Err(TaxSyncError::InvalidConfig(
+                "Cổng Thuế không trả về tệp ZIP chứa XML hóa đơn hợp lệ.".to_string(),
+            )
+            .into());
+        }
+
+        // Đọc ZIP và tìm file XML.
+        let cursor = Cursor::new(bytes);
+        let mut archive = ZipArchive::new(cursor)?;
+
+        let mut xml_content = None;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)?;
+
+            if file.name().to_ascii_lowercase().ends_with(".xml") {
+                let mut content = String::new();
+                file.read_to_string(&mut content)?;
+                xml_content = Some(content);
+                break;
+            }
+        }
+
+        let xml = xml_content.ok_or_else(|| {
+            TaxSyncError::InvalidConfig("Không tìm thấy tệp XML bên trong ZIP.".to_string())
+        })?;
+
+        let xml_base64 = STANDARD.encode(xml.as_bytes());
+
+        Ok(xml_base64)
     }
 }

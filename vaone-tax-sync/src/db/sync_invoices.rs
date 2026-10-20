@@ -326,7 +326,8 @@ impl Database {
                 tax_code,
                 invoice_key,
                 invoice_type,
-                summary_json
+                summary_json,
+                xml_data
              FROM sync_invoices
              WHERE tax_code = ?1
                AND detail_status = 'completed'
@@ -342,6 +343,7 @@ impl Database {
                     row.get::<_, String>(1)?,
                     row.get::<_, u8>(2)?,
                     row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
                 ))
             })
             .map_err(db_error)?;
@@ -349,7 +351,8 @@ impl Database {
         let mut invoices = Vec::new();
 
         for row in rows {
-            let (tax_code, invoice_key, invoice_type, summary_json) = row.map_err(db_error)?;
+            let (tax_code, invoice_key, invoice_type, summary_json, xml_data) =
+                row.map_err(db_error)?;
 
             let invoice: Value = serde_json::from_str(&summary_json).map_err(|e| {
                 TaxSyncError::Database(format!(
@@ -362,6 +365,7 @@ impl Database {
                 invoice_key,
                 invoice_type,
                 invoice,
+                xml_data: Some(xml_data),
             });
         }
 

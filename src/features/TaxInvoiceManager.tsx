@@ -17,7 +17,7 @@ import { invoke } from "@tauri-apps/api/core";
 import AppWindow from "../components/AppWindow";
 import { ComboPopup } from "../components/Select/ComboPopup";
 import { DateInput } from "../components/Date/DateInput";
-import { getCurrentDateTime } from "../lib/utils";
+import { formatNumber, getCurrentDateTime } from "../lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import Button from "../components/Button";
 import { formatDate } from "../api/services/tct.service";
@@ -236,9 +236,9 @@ export function TaxInvoiceManager() {
         <AppWindow icon="History"
             content={
                 <div data-tauri-drag-region className="cursor-pointer flex-1 flex flex-wrap items-center justify-between gap-3">
-                    <div data-tauri-drag-region className="mt-1 font-semibold">
-                        Mã số thuế:{" "}
+                    <div data-tauri-drag-region className="mt-1 text-sm font-semibold">
                         <span data-tauri-drag-region className="text-red-600">{taxCode}</span>
+                        {" - "}{account?.note}
                     </div>
                     {/* <Button
                         variant="ghost"
@@ -422,75 +422,105 @@ export function TaxInvoiceManager() {
                                     Không có hóa đơn phù hợp.
                                 </div>
                             ) : (
-                                <table className="w-full border-collapse text-left">
-                                    <thead className="sticky top-0 z-10 bg-gray-50">
-                                        <tr>
-                                            <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                #
-                                            </th>
-                                            <th className="whitespace-nowrap px-3 py-2 font-medium text-center">
-                                                Ngày hóa đơn
-                                            </th>
-                                            <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                Loại
-                                            </th>
-                                            <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                Ký hiệu
-                                            </th>
-                                            <th className="whitespace-nowrap px-3 py-2 font-medium text-right">
-                                                Số hóa đơn
-                                            </th>
-                                            <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                Chi tiết
-                                            </th>
-                                            <th className="whitespace-nowrap px-3 py-2 font-medium">
-                                                Đồng bộ
-                                            </th>
-                                        </tr>
-                                    </thead>
+                                <div className="min-w-full w-max">
+                                    <table className="w-full min-w-max border-collapse text-left">
+                                        <thead className="sticky top-0 z-10 bg-gray-50">
+                                            <tr>
+                                                <th className="w-14 px-3 py-2 font-medium text-center">#</th>
 
-                                    <tbody>
-                                        {invoiceItems.map((invoice, index) => (
-                                            <tr
-                                                key={`${invoice.tax_code}-${invoice.invoice_type}-${invoice.invoice_key}`}
-                                                className="border-t border-gray-100 hover:bg-gray-50"
-                                            >
-                                                <td className="whitespace-nowrap px-3 py-2">
-                                                    {index + 1 + (PAGE_SIZE * (page - 1))}
-                                                </td>
-                                                <td className="whitespace-nowrap px-3 py-2 text-center">
-                                                    {formatDate(invoice.invoice_date)}
-                                                </td>
+                                                <th className="w-32 px-3 py-2 font-medium text-center">
+                                                    Ngày hóa đơn
+                                                </th>
 
-                                                <td className="whitespace-nowrap px-3 py-2">
-                                                    {mapInvoiceType[invoice.invoice_type]}
-                                                </td>
+                                                <th className="w-36 px-3 py-2 font-medium text-center">
+                                                    Loại
+                                                </th>
 
-                                                <td className="whitespace-nowrap px-3 py-2">
-                                                    {invoice.khhdon ?? "—"}
-                                                </td>
+                                                <th className="w-32 px-3 py-2 font-medium text-center">
+                                                    Ký hiệu
+                                                </th>
 
-                                                <td className="whitespace-nowrap px-3 py-2 text-right">
-                                                    {invoice.shdon ?? "—"}
-                                                </td>
+                                                <th className="w-32 px-3 py-2 font-medium text-right">
+                                                    Số hóa đơn
+                                                </th>
 
-                                                <td className="px-3 py-2">
-                                                    <StatusBadge
-                                                        type={mapStatus[invoice.detail_status]}
-                                                        label={mapStatusLabel[invoice.detail_status]}
-                                                    />
-                                                </td>
+                                                <th className="w-35 px-3 py-2 font-medium text-center">
+                                                    Chi tiết
+                                                </th>
 
-                                                <td className="px-3 py-2">
-                                                    <StatusBadge
-                                                        type={mapStatus[invoice.upload_status]}
-                                                        label={mapStatusLabel[invoice.upload_status]}
-                                                    />
-                                                </td>
+                                                <th className="w-35 px-3 py-2 font-medium text-center">
+                                                    Đồng bộ
+                                                </th>
+                                                <th className="w-28 px-3 py-2 font-medium text-center">
+                                                    Tiền tệ
+                                                </th>
+                                                <th className="w-28 px-3 py-2 font-medium text-center">
+                                                    Tiền trước thuế
+                                                </th>
+                                                <th className="w-28 px-3 py-2 font-medium text-center">
+                                                    Thuế
+                                                </th>
+                                                <th className="w-28 px-3 py-2 font-medium text-center">
+                                                    Tổng tiền
+                                                </th>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                        </thead>
+
+                                        <tbody>
+                                            {invoiceItems.map((invoice, index) => (
+                                                <tr
+                                                    key={`${invoice.tax_code}-${invoice.invoice_type}-${invoice.invoice_key}`}
+                                                    className="border-t border-gray-100 hover:bg-gray-50"
+                                                >
+                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                        {index + 1 + (PAGE_SIZE * (page - 1))}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-3 py-2 text-center">
+                                                        {formatDate(invoice.invoice_date)}
+                                                    </td>
+
+                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                        {mapInvoiceType[invoice.invoice_type]}
+                                                    </td>
+
+                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                        {invoice.khhdon ?? "—"}
+                                                    </td>
+
+                                                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                        {invoice.shdon ?? "—"}
+                                                    </td>
+
+                                                    <td className="px-3 py-2">
+                                                        <StatusBadge
+                                                            type={mapStatus[invoice.detail_status]}
+                                                            label={mapStatusLabel[invoice.detail_status]}
+                                                        />
+                                                    </td>
+
+                                                    <td className="px-3 py-2">
+                                                        <StatusBadge
+                                                            type={mapStatus[invoice.upload_status]}
+                                                            label={mapStatusLabel[invoice.upload_status]}
+                                                        />
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                        {invoice.dvtte ?? "—"}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                        {formatNumber(invoice.tgtcthue, invoice.tgia !== 1 ? 2 : 0)}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                        {formatNumber(invoice.tgtthue, invoice.tgia !== 1 ? 2 : 0)}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                        {formatNumber(invoice.tgtttbso, invoice.tgia !== 1 ? 2 : 0)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             )}
                         </div>
 
