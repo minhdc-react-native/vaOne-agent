@@ -205,7 +205,8 @@ pub fn run() {
             commands::tax_accounts::check_tax_application_login,
             commands::sync_invoices::get_invoice_stats,
             commands::sync_invoices::get_sync_days,
-            commands::sync_invoices::get_sync_invoices
+            commands::sync_invoices::get_sync_invoices,
+            commands::sync_invoices::reset_sync_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

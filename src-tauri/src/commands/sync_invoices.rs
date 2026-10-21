@@ -29,3 +29,16 @@ pub fn get_sync_invoices(
     db.get_sync_invoices(&filters, page, page_size)
         .map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn reset_sync_status(
+    tax_code: String,
+    from_date: String,
+    to_date: String,
+    tax_sync: bool,
+    app_sync: bool,
+    db: tauri::State<'_, Database>,
+) -> std::result::Result<(), String> {
+    db.reset_sync_status(&tax_code, &from_date, &to_date, tax_sync, app_sync)
+        .map_err(|e| e.to_string())
+}

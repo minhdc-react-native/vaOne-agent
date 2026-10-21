@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { IGetSyncInvoicesParams, syncInvoiceService } from "../service/syncInvoicesService";
+import { IGetSyncInvoicesParams, ISyncConfig, syncInvoiceService } from "../service/syncInvoicesService";
 
 export const useGetInvoiceStats = () =>
     useMutation({
@@ -21,4 +21,11 @@ export const useGetSyncInvoices = () =>
             page_size,
         }: IGetSyncInvoicesParams) =>
             syncInvoiceService.getSyncInvoices(filters, page, page_size),
+    });
+
+
+export const useResetSyncStatus = () =>
+    useMutation({
+        mutationFn: (param: ISyncConfig) =>
+            syncInvoiceService.resetSyncStatus(param),
     });

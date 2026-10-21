@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Building2,
     Check,
@@ -9,6 +9,7 @@ import {
     KeyRound,
     List,
     MessageCircleMore,
+    MessageCircleWarning,
     Pencil,
     Plus,
     RefreshCw,
@@ -27,8 +28,9 @@ import { Loading } from "../components/Loading";
 import InvoiceTypeCheckbox from "./InvoiceTypeCheckbox";
 import { Tooltip } from "../components/Tooltip/Tooltip";
 import { showNotification } from "../lib/notification";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useVirtualized } from "../hook/useVirtualized";
+import { formatDate } from "../api/services/tct.service";
 const ROW_HEIGHT = 180;
 type AuthStatus = "pending" | "authenticated" | "failed";
 type SyncStatus = "pending" | "running" | "completed" | "failed";
@@ -137,6 +139,7 @@ function authVariant(status: AuthStatus) {
 
 
 export default function TaxAccountManager() {
+    const { taxCode } = useParams<{ taxCode: string | undefined }>();
     const {
         accounts,
         saving,
@@ -207,6 +210,10 @@ export default function TaxAccountManager() {
         setLocalError("");
     };
 
+    useEffect(() => {
+        if (!!selectedTaxCode || accounts.length === 0) return;
+        handleSelect(accounts.find(acc => acc.tax_code === taxCode) ?? accounts[0]);
+    }, [selectedTaxCode, accounts])
     useEffect(() => {
         const displayError = localError || error;
         if (displayError) dialog.info(
@@ -377,6 +384,32 @@ export default function TaxAccountManager() {
         rowHeight: ROW_HEIGHT,
         containerRef,
     });
+
+    const tooltipContentError = useCallback((error1: string | null, error2: string | null): ReactNode => {
+        return (
+            <div className="space-y-2 p-1">
+                <div className="font-bold">
+                    Thông tin lỗi
+                </div>
+
+                <div className="rounded-sm border border-yellow-700/50 bg-yellow-950/40 px-2.5 py-2 text-xs text-yellow-100">
+                    <div className="mb-1 font-semibold text-yellow-300">
+                        Chi tiết
+                    </div>
+
+                    <div className="italic leading-relaxed text-yellow-100/90">
+                        {error1 && <i className="block">
+                            1. {error1}
+                        </i>}
+
+                        {error2 && <i className="block">
+                            2.{error2}
+                        </i>}
+                    </div>
+                </div>
+            </div>
+        );
+    }, [])
 
     return (
         <div className="flex h-full min-h-0 flex-col bg-background text-foreground p-2 w-225" >
@@ -684,10 +717,20 @@ export default function TaxAccountManager() {
                                                     <div className="flex items-start
                                                         justify-between gap-2">
                                                         <div className="min-w-0 flex-1">
-                                                            <p className="truncate
+                                                            <div className="flex gap-1 items-center">
+                                                                <p className="truncate
                                                                 text-sm font-semibold">
-                                                                {account.tax_code}
-                                                            </p>
+                                                                    {account.tax_code}
+                                                                </p>
+                                                                {(account.last_auth_error || account.last_app_auth_error) && <Tooltip
+                                                                    content={tooltipContentError(account.last_auth_error, account.last_app_auth_error)}
+                                                                >
+                                                                    <div className="flex gap-1 justify-center text-[11px] text-orange-500 items-center">
+                                                                        <span>Thông tin lỗi</span>
+                                                                        <MessageCircleWarning size={18} />
+                                                                    </div>
+                                                                </Tooltip>}
+                                                            </div>
                                                             <p className="mt-1 truncate
                                                                 text-xs text-muted-foreground">
                                                                 {account.invoice_type}
@@ -777,26 +820,12 @@ export default function TaxAccountManager() {
                                                             </span>
                                                         </div>
                                                     </div>
-
                                                     <div className="mt-2 flex items-center
                                                         gap-1.5 text-[11px]
                                                         text-muted-foreground">
                                                         <Clock size={12} />
-                                                        Ngày bắt đầu: {account.start_date}
+                                                        Ngày bắt đầu: {formatDate(account.start_date)}
                                                     </div>
-
-                                                    {account.last_auth_error && (
-                                                        <p className="mt-2 truncate text-xs
-                                                            text-red-600">
-                                                            {account.last_auth_error}
-                                                        </p>
-                                                    )}
-                                                    {account.last_sync_error && (
-                                                        <p className="mt-1 truncate text-xs
-                                                            text-red-600">
-                                                            {account.last_sync_error}
-                                                        </p>
-                                                    )}
                                                 </div>
                                             </div>
                                         </button>

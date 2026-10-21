@@ -343,7 +343,7 @@ impl Database {
                     row.get::<_, String>(1)?,
                     row.get::<_, u8>(2)?,
                     row.get::<_, String>(3)?,
-                    row.get::<_, String>(4)?,
+                    row.get::<_, Option<String>>(4)?,
                 ))
             })
             .map_err(db_error)?;
@@ -365,10 +365,71 @@ impl Database {
                 invoice_key,
                 invoice_type,
                 invoice,
-                xml_data: Some(xml_data),
+                xml_data,
             });
         }
 
         Ok(invoices)
+    }
+
+    pub fn reset_sync_status(
+        &self,
+        tax_code: &str,
+        from_date: &str,
+        to_date: &str,
+        tax_sync: bool,
+        app_sync: bool,
+    ) -> Result<()> {
+        // Không có yêu cầu cập nhật.
+        if !tax_sync && !app_sync {
+            return Ok(());
+        }
+
+        let mut conn = self.connect()?;
+        let tx = conn.transaction().map_err(db_error)?;
+
+        if tax_sync {
+            // Xóa hóa đơn theo mã số thuế và ngày hóa đơn.
+            tx.execute(
+                r#"
+            DELETE FROM sync_invoices
+            WHERE tax_code = ?1
+              AND invoice_date >= ?2
+              AND invoice_date <= ?3
+            "#,
+                params![tax_code, from_date, to_date],
+            )
+            .map_err(db_error)?;
+
+            // Xóa trạng thái đồng bộ danh sách theo ngày.
+            tx.execute(
+                r#"
+            DELETE FROM sync_days
+            WHERE tax_code = ?1
+              AND sync_date >= ?2
+              AND sync_date <= ?3
+            "#,
+                params![tax_code, from_date, to_date],
+            )
+            .map_err(db_error)?;
+        } else if app_sync {
+            // Đưa hóa đơn về trạng thái chờ xử lý lại.
+            tx.execute(
+                r#"
+            UPDATE sync_invoices
+            SET
+                upload_status = 'pending'
+            WHERE tax_code = ?1
+              AND invoice_date >= ?2
+              AND invoice_date <= ?3
+            "#,
+                params![tax_code, from_date, to_date],
+            )
+            .map_err(db_error)?;
+        }
+
+        tx.commit().map_err(db_error)?;
+
+        Ok(())
     }
 }

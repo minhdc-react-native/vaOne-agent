@@ -287,6 +287,34 @@ impl Database {
             org_unit = ?12,
             note = ?13,
             url_api = ?14,
+            
+            -- Reset xác thực cơ quan thuế
+            auth_status = 'pending',
+            token = NULL,
+            refresh_token = NULL,
+            token_type = NULL,
+            token_expires_at = NULL,
+            last_login_at = NULL,
+            last_auth_error = NULL,
+            auth_fail_count = 0,
+            auth_blocked = 0,
+
+            -- Reset xác thực ứng dụng
+            app_auth_status = 'pending',
+            app_token = NULL,
+            app_refresh_token = NULL,
+            app_token_type = NULL,
+            app_token_expires_at = NULL,
+            last_app_login_at = NULL,
+            last_app_auth_error = NULL,
+            app_auth_fail_count = 0,
+            app_auth_blocked = 0,
+
+            -- Reset trạng thái đồng bộ gần nhất
+            last_sync_at = NULL,
+            last_sync_status = 'pending',
+            last_sync_error = NULL,
+
             updated_at = CURRENT_TIMESTAMP
         WHERE tax_code = ?1
         ",

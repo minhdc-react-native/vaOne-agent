@@ -29,6 +29,25 @@ export const getCurrentDateTime = (
     }
 };
 
+export const getCurrentMonthDateRange = (): {
+    fromDate: string;
+    toDate: string;
+} => {
+    const now = new Date();
+
+    const pad = (value: number) => String(value).padStart(2, "0");
+
+    const formatDate = (date: Date) =>
+        `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    return {
+        fromDate: formatDate(firstDay),
+        toDate: formatDate(now),
+    };
+};
+
 export const formatNumber = (
     value: number | string | null | undefined,
     decimals = 0,

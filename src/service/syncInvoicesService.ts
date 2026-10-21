@@ -92,6 +92,15 @@ export interface IGetSyncInvoicesParams {
     page_size: number;
 }
 
+
+export interface ISyncConfig {
+    taxCode: string,
+    fromDate?: string,
+    toDate?: string,
+    taxSync: boolean,
+    appSync: boolean,
+}
+
 export const syncInvoiceService = {
     getInvoiceStats: (taxCode: string) =>
         invoke<IInvoiceStats>("get_invoice_stats", { taxCode }),
@@ -108,5 +117,14 @@ export const syncInvoiceService = {
             filters,
             page,
             pageSize: page_size,
+        }),
+
+    resetSyncStatus: (param: ISyncConfig): Promise<void> =>
+        invoke<void>("reset_sync_status", {
+            taxCode: param.taxCode,
+            fromDate: param.fromDate,
+            toDate: param.toDate,
+            taxSync: param.taxSync,
+            appSync: param.appSync,
         }),
 }

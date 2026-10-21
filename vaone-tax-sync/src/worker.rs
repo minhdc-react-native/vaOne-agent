@@ -193,7 +193,7 @@ impl TaxSyncWorker {
                 break;
             }
 
-            sleep(Duration::from_secs(30)).await;
+            sleep(Duration::from_secs(5)).await;
         }
     }
     async fn upload_once(&self) -> Result<()> {
@@ -259,9 +259,6 @@ impl TaxSyncWorker {
 
         self.seed_days(account, &invoice_types).await?;
 
-        // 1. Đồng bộ danh sách hóa đơn.
-        let mut has_synced_day = false;
-
         for invoice_type in &invoice_types {
             if self.cancel.load(Ordering::Relaxed) {
                 break;
@@ -276,11 +273,7 @@ impl TaxSyncWorker {
                     break;
                 }
 
-                if has_synced_day {
-                    request_delay(self.config.delay_ms).await;
-                }
-
-                has_synced_day = true;
+                request_delay(self.config.delay_ms).await;
 
                 if let Err(error) = self
                     .sync_one_day(account, *invoice_type, &date, &token)
@@ -589,7 +582,7 @@ impl TaxSyncWorker {
         let invoices = self.db.get_invoices_pending_upload(tax_code)?;
 
         let mut results = Vec::new();
-        const BATCH_SIZE: usize = 10; // upload 10 hóa đơn 1 lần.
+        const BATCH_SIZE: usize = 1; // upload 5 hóa đơn 1 lần.
 
         for batch in invoices.chunks(BATCH_SIZE) {
             // Bổ sung outOrIn vào từng hóa đơn
@@ -600,7 +593,8 @@ impl TaxSyncWorker {
 
                     if let Value::Object(ref mut map) = invoice {
                         map.insert("outOrIn".to_string(), Value::from(item.invoice_type));
-                        map.insert("xml".to_string(), Value::from(item.xml_data.clone()));
+                        // map.insert("xml".to_string(), Value::from(item.xml_data.clone()));
+                        map.insert("xml".to_string(), Value::Null);
                     }
 
                     invoice
@@ -609,7 +603,7 @@ impl TaxSyncWorker {
 
             // Payload gửi lên API
             let payload = serde_json::json!({
-                "datas": datas
+                "data": datas
             });
 
             match self.auth.post_data(&payload, token, type_app).await {
@@ -633,6 +627,10 @@ impl TaxSyncWorker {
                 }
                 Err(err) => {
                     let message = err.to_string();
+                    println!(
+                        "Invoice payload: {}",
+                        serde_json::to_string_pretty(&payload).unwrap_or_default()
+                    );
 
                     for invoice in batch {
                         let _ = self.db.set_upload_failed(

@@ -3,12 +3,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     useGetInvoiceStats,
     useGetSyncInvoices,
+    useResetSyncStatus,
 } from "../hook/useSyncInvoices";
 import type {
     IInvoiceStats,
     ISyncInvoiceFilters,
     IPaginatedResult,
     ISyncInvoice,
+    ISyncConfig,
 } from "../service/syncInvoicesService";
 import { useTaxAccounts } from "../hook/useTaxAccounts";
 import StatusBadge, { StatusType } from "../components/StatusBadge";
@@ -17,10 +19,14 @@ import { invoke } from "@tauri-apps/api/core";
 import AppWindow from "../components/AppWindow";
 import { ComboPopup } from "../components/Select/ComboPopup";
 import { DateInput } from "../components/Date/DateInput";
-import { formatNumber, getCurrentDateTime } from "../lib/utils";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { formatNumber, getCurrentMonthDateRange } from "../lib/utils";
+import { ChevronLeft, ChevronRight, CloudSync, Loader, RefreshCcw } from "lucide-react";
 import Button from "../components/Button";
 import { formatDate } from "../api/services/tct.service";
+import { dialog } from "../service/dialog.service";
+import { Tabs } from "../components/Tabs";
+import Switch from "../components/Switch";
+import { showNotification } from "../lib/notification";
 
 
 const PAGE_SIZE = 20;
@@ -63,39 +69,22 @@ const mapStatusLabel: Record<string, string> = {
     completed: "Hoàn thành",
     failed: "Lỗi"
 }
+const dateMonth = getCurrentMonthDateRange();
 const initialFilters: ISyncInvoiceFilters = {
     tax_code: "",
     invoice_type: 1,
-    from_date: getCurrentDateTime(),
-    to_date: getCurrentDateTime(),
+    from_date: dateMonth.fromDate,
+    to_date: dateMonth.toDate,
     detail_status: undefined,
     upload_status: undefined,
 };
-
-// function formatDate(value?: string | null) {
-//     if (!value) return "—";
-
-//     const date = new Date(
-//         value.length === 10 ? `${value}T00:00:00` : value,
-//     );
-
-//     if (Number.isNaN(date.getTime())) return value;
-
-//     return new Intl.DateTimeFormat("vi-VN").format(date);
-// }
-
-// function formatDateTime(value?: string | null) {
-//     if (!value) return "—";
-
-//     const date = new Date(value);
-
-//     if (Number.isNaN(date.getTime())) return value;
-
-//     return new Intl.DateTimeFormat("vi-VN", {
-//         dateStyle: "short",
-//         timeStyle: "short",
-//     }).format(date);
-// }
+const initialSync: ISyncConfig = {
+    taxCode: "",
+    fromDate: dateMonth.fromDate,
+    toDate: dateMonth.toDate,
+    taxSync: false,
+    appSync: true,
+};
 
 function StatCard({
     label,
@@ -132,6 +121,19 @@ export function TaxInvoiceManager() {
         isPending: invoicesLoading,
     } = useGetSyncInvoices();
 
+    const { mutate: resetSyncStatus, isPending } = useResetSyncStatus();
+
+    const [syncConfig, setSyncConfig] = useState({
+        ...initialSync,
+        taxCode: taxCode ?? ""
+    });
+
+    const [filters, setFilters] = useState<ISyncInvoiceFilters>({
+        ...initialFilters,
+        tax_code: taxCode,
+    });
+
+
     const [stats, setStats] = useState<IInvoiceStats | null>(null);
 
     const [invoicePage, setInvoicePage] =
@@ -139,10 +141,6 @@ export function TaxInvoiceManager() {
 
     const [page, setPage] = useState(1);
 
-    const [filters, setFilters] = useState<ISyncInvoiceFilters>({
-        ...initialFilters,
-        tax_code: taxCode,
-    });
 
     const [localError, setLocalError] = useState<string | null>(null);
 
@@ -211,6 +209,16 @@ export function TaxInvoiceManager() {
         }));
     };
 
+    const updateSyncConfig = <K extends keyof ISyncConfig>(
+        key: K,
+        value: ISyncConfig[K],
+    ) => {
+        setSyncConfig((current) => ({
+            ...current,
+            [key]: value,
+        }));
+    };
+
     const applyFilters = () => {
         void loadInvoices(filters, 1);
     };
@@ -218,6 +226,26 @@ export function TaxInvoiceManager() {
     useEffect(() => {
         applyFilters();
     }, [filters])
+
+    const handleReset = () => {
+        resetSyncStatus({
+            ...syncConfig,
+            fromDate: filters.from_date,
+            toDate: filters.to_date
+        },
+            {
+                onSuccess: () => {
+                    applyFilters();
+                    showNotification({ type: "success", message: "Cập nhật thành công" });
+                },
+                onError: (error) => {
+                    console.error("Reset sync status failed:", error);
+                    showNotification({ type: "error", message: "Không thể cập nhật" })
+                },
+            },
+        );
+    };
+
 
     const totalPages = invoicePage?.total_pages ?? 0;
     const invoiceItems = invoicePage?.items ?? [];
@@ -228,10 +256,16 @@ export function TaxInvoiceManager() {
     }, []);
 
     const onClose = useCallback(() => {
-        navigate("/tax-config");
+        navigate(`/tax-config/${taxCode}`);
     }, [])
 
-
+    useEffect(() => {
+        if (localError) dialog.info(
+            localError,
+            "Thông tin lỗi",
+        );
+    }, [localError]);
+    const [tab, setTab] = useState(0);
     return (
         <AppWindow icon="History"
             content={
@@ -240,14 +274,15 @@ export function TaxInvoiceManager() {
                         <span data-tauri-drag-region className="text-red-600">{taxCode}</span>
                         {" - "}{account?.note}
                     </div>
-                    {/* <Button
+                    <Button
                         variant="ghost"
-                        icon={<RefreshCcw />}
-                        onClick={() => void refreshAll()}
+                        className="h-6"
+                        icon={<RefreshCcw size={18} />}
+                        onClick={() => void applyFilters()}
                         disabled={statsLoading || invoicesLoading}
                     >
                         Làm mới dữ liệu
-                    </Button> */}
+                    </Button>
                 </div>
             }
             onClose={onClose}
@@ -281,122 +316,176 @@ export function TaxInvoiceManager() {
                                 .reduce((sum, item) => sum + item.count, 0) ?? 0}
                         />
                     </div>
-
-                    {/* Filters */}
                     <section className="flex-1 rounded border border-gray-200 bg-white p-3 space-y-1">
-                        <div className="mb-3 font-semibold">Bộ lọc hóa đơn</div>
+                        <Tabs variant="line" defaultActiveTab={tab} onChange={(idx) => setTab(idx)}>
+                            <Tabs.Header>
+                                <Tabs.Tab index={0} labelClassActive="font-semibold">{"Bộ lọc hóa đơn"}</Tabs.Tab>
+                                <Tabs.Tab index={1} labelClassActive="font-semibold">
+                                    Cập nhật đồng bộ
+                                </Tabs.Tab>
+                            </Tabs.Header>
+                            <Tabs.Content className="border-0">
+                                <Tabs.Panel index={0} className="border border-gray-300 rounded-md">
+                                    {/* Filters */}
+                                    <div className="flex-1 bg-white p-3 space-y-1 h-24">
+                                        <div className="flex gap-1 flex-1">
+                                            <div className="flex-1 flex gap-1 items-center">
+                                                <span className="w-12">Loại</span>
+                                                <ComboPopup
+                                                    value={INVOICE_TYPES.find(i => i.id === filters.invoice_type)}
+                                                    data={INVOICE_TYPES}
+                                                    className="w-45 h-7"
+                                                    onClear={() => {
+                                                        updateFilter(
+                                                            "invoice_type",
+                                                            undefined,
+                                                        );
+                                                    }}
+                                                    onSelect={(item: any) => {
+                                                        updateFilter(
+                                                            "invoice_type",
+                                                            item.id,
+                                                        )
+                                                    }}
+                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40">{item?.label}</div>}
+                                                />
+                                            </div>
+                                            <div className="flex-1 w-50">
+                                                <DateInput
+                                                    label="Từ ngày"
+                                                    labelPosition="left"
+                                                    required
+                                                    value={filters.from_date ?? ""}
+                                                    onChange={(value) =>
+                                                        updateFilter(
+                                                            "from_date",
+                                                            value || undefined,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="w-50">
+                                                <DateInput
+                                                    label="Đến ngày"
+                                                    labelPosition="left"
+                                                    required
+                                                    value={filters.to_date ?? ""}
+                                                    onChange={(value) =>
+                                                        updateFilter(
+                                                            "to_date",
+                                                            value || undefined,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1">
+                                            <div className="flex-1 flex gap-1 items-center">
+                                                <span className="w-12">Chi tiết</span>
+                                                <ComboPopup
+                                                    value={DETAIL_STATUSES.find(i => i.id === filters.detail_status)}
+                                                    data={DETAIL_STATUSES}
+                                                    className="w-45 h-7"
+                                                    onClear={() => {
+                                                        updateFilter(
+                                                            "detail_status",
+                                                            undefined,
+                                                        );
+                                                    }}
+                                                    onSelect={(item: any) => {
+                                                        updateFilter(
+                                                            "detail_status",
+                                                            item.id,
+                                                        )
+                                                    }}
+                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40">{item?.label}</div>}
+                                                />
+                                            </div>
 
-                        <div className="flex gap-1 flex-1">
-                            <div className="flex-1 flex gap-1 items-center">
-                                <span className="w-12">Loại</span>
-                                <ComboPopup
-                                    value={INVOICE_TYPES.find(i => i.id === filters.invoice_type)}
-                                    data={INVOICE_TYPES}
-                                    className="w-45 h-7"
-                                    onClear={() => {
-                                        updateFilter(
-                                            "invoice_type",
-                                            undefined,
-                                        );
-                                    }}
-                                    onSelect={(item: any) => {
-                                        updateFilter(
-                                            "invoice_type",
-                                            item.id,
-                                        )
-                                    }}
-                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40">{item?.label}</div>}
-                                />
-                            </div>
-                            <div className="flex-1 w-50">
-                                <DateInput
-                                    label="Từ ngày"
-                                    labelPosition="left"
-                                    required
-                                    value={filters.from_date ?? ""}
-                                    onChange={(value) =>
-                                        updateFilter(
-                                            "from_date",
-                                            value || undefined,
-                                        )
-                                    }
-                                />
-                            </div>
-                            <div className="w-50">
-                                <DateInput
-                                    label="Đến ngày"
-                                    labelPosition="left"
-                                    required
-                                    value={filters.to_date ?? ""}
-                                    onChange={(value) =>
-                                        updateFilter(
-                                            "to_date",
-                                            value || undefined,
-                                        )
-                                    }
-                                />
-                            </div>
-                        </div>
-                        <div className="flex gap-1">
-                            <div className="flex-1 flex gap-1 items-center">
-                                <span className="w-12">Chi tiết</span>
-                                <ComboPopup
-                                    value={DETAIL_STATUSES.find(i => i.id === filters.detail_status)}
-                                    data={DETAIL_STATUSES}
-                                    className="w-45 h-7"
-                                    onClear={() => {
-                                        updateFilter(
-                                            "detail_status",
-                                            undefined,
-                                        );
-                                    }}
-                                    onSelect={(item: any) => {
-                                        updateFilter(
-                                            "detail_status",
-                                            item.id,
-                                        )
-                                    }}
-                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40">{item?.label}</div>}
-                                />
-                            </div>
-
-                            <div className="flex-2 flex gap-1 items-center">
-                                <span className="w-18">Đồng bộ</span>
-                                <ComboPopup
-                                    value={UPLOAD_STATUSES.find(i => i.id === filters.upload_status)}
-                                    data={UPLOAD_STATUSES}
-                                    className="w-39 h-7"
-                                    onClear={() => {
-                                        updateFilter(
-                                            "upload_status",
-                                            undefined,
-                                        );
-                                    }}
-                                    onSelect={(item: any) => {
-                                        updateFilter(
-                                            "upload_status",
-                                            item.id,
-                                        )
-                                    }}
-                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40">{item?.label}</div>}
-                                />
-                            </div>
-                        </div>
-                        {/* <div className="flex items-end gap-2 flex-1">
-                            <Button
-                                variant="ghost"
-                                icon={<Filter size={15} />}
-                                onClick={applyFilters}
-                                disabled={statsLoading || invoicesLoading}
-                            >
-                                Lọc dữ liệu
-                            </Button>
-                        </div> */}
-                        {localError && (
-                            <div className="mt-3 rounded bg-red-50 p-2 text-red-600">
-                                {localError}
-                            </div>
-                        )}
+                                            <div className="flex-2 flex gap-1 items-center">
+                                                <span className="w-18">Đồng bộ</span>
+                                                <ComboPopup
+                                                    value={UPLOAD_STATUSES.find(i => i.id === filters.upload_status)}
+                                                    data={UPLOAD_STATUSES}
+                                                    className="w-39 h-7"
+                                                    onClear={() => {
+                                                        updateFilter(
+                                                            "upload_status",
+                                                            undefined,
+                                                        );
+                                                    }}
+                                                    onSelect={(item: any) => {
+                                                        updateFilter(
+                                                            "upload_status",
+                                                            item.id,
+                                                        )
+                                                    }}
+                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40">{item?.label}</div>}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Tabs.Panel>
+                                <Tabs.Panel index={1} className="border border-gray-300 rounded-md">
+                                    <div className="flex-1 bg-white p-3 space-y-1 h-24">
+                                        <div className="flex gap-1 flex-1">
+                                            <div className="flex-1 w-50">
+                                                <DateInput
+                                                    label="Từ ngày"
+                                                    labelPosition="left"
+                                                    required
+                                                    value={filters.from_date ?? ""}
+                                                    onChange={(value) =>
+                                                        updateFilter(
+                                                            "from_date",
+                                                            value || undefined,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="w-50">
+                                                <DateInput
+                                                    label="Đến ngày"
+                                                    labelPosition="left"
+                                                    required
+                                                    value={filters.to_date ?? ""}
+                                                    onChange={(value) =>
+                                                        updateFilter(
+                                                            "to_date",
+                                                            value || undefined,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="flex-1" />
+                                        </div>
+                                        <div className="flex gap-4 items-center">
+                                            <div className="flex flex-col gap-1">
+                                                <Switch
+                                                    label="Lấy lại từ cơ quan thuế"
+                                                    // description="Cho phép worker xử lý tài khoản này"
+                                                    checked={syncConfig.taxSync}
+                                                    onChange={(value) =>
+                                                        updateSyncConfig("taxSync", value)
+                                                    }
+                                                />
+                                                <Switch
+                                                    label="Đồng bộ lại sang ứng dụng"
+                                                    // description="Cho phép worker xử lý tài khoản này"
+                                                    checked={syncConfig.appSync}
+                                                    onChange={(value) =>
+                                                        updateSyncConfig("appSync", value)
+                                                    }
+                                                />
+                                            </div>
+                                            <Button onClick={handleReset} icon={isPending ? <Loader className="animate-spin" /> : <CloudSync />} variant="danger">
+                                                Đồng bộ lại
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </Tabs.Panel>
+                            </Tabs.Content>
+                        </Tabs>
                     </section>
                 </div>
                 {/* Main content: 1/3 sync days + 2/3 invoices */}
@@ -426,17 +515,17 @@ export function TaxInvoiceManager() {
                                     <table className="w-full min-w-max border-collapse text-left">
                                         <thead className="sticky top-0 z-10 bg-gray-50">
                                             <tr>
-                                                <th className="w-14 px-3 py-2 font-medium text-center">#</th>
+                                                <th className="w-14 px-3 py-2 font-medium">#</th>
 
                                                 <th className="w-32 px-3 py-2 font-medium text-center">
                                                     Ngày hóa đơn
                                                 </th>
 
-                                                <th className="w-36 px-3 py-2 font-medium text-center">
+                                                <th className="w-36 px-3 py-2 font-medium">
                                                     Loại
                                                 </th>
 
-                                                <th className="w-32 px-3 py-2 font-medium text-center">
+                                                <th className="w-32 px-3 py-2 font-medium">
                                                     Ký hiệu
                                                 </th>
 
@@ -445,22 +534,22 @@ export function TaxInvoiceManager() {
                                                 </th>
 
                                                 <th className="w-35 px-3 py-2 font-medium text-center">
-                                                    Chi tiết
+                                                    Dữ liệu
                                                 </th>
 
                                                 <th className="w-35 px-3 py-2 font-medium text-center">
                                                     Đồng bộ
                                                 </th>
-                                                <th className="w-28 px-3 py-2 font-medium text-center">
+                                                <th className="w-28 px-3 py-2 font-medium">
                                                     Tiền tệ
                                                 </th>
-                                                <th className="w-28 px-3 py-2 font-medium text-center">
-                                                    Tiền trước thuế
+                                                <th className="w-28 px-3 py-2 font-medium text-right">
+                                                    Tiền hàng
                                                 </th>
-                                                <th className="w-28 px-3 py-2 font-medium text-center">
+                                                <th className="w-28 px-3 py-2 font-medium text-right">
                                                     Thuế
                                                 </th>
-                                                <th className="w-28 px-3 py-2 font-medium text-center">
+                                                <th className="w-28 px-3 py-2 font-medium text-right">
                                                     Tổng tiền
                                                 </th>
                                             </tr>
@@ -491,14 +580,14 @@ export function TaxInvoiceManager() {
                                                         {invoice.shdon ?? "—"}
                                                     </td>
 
-                                                    <td className="px-3 py-2">
+                                                    <td className="px-3 py-2 text-center">
                                                         <StatusBadge
                                                             type={mapStatus[invoice.detail_status]}
                                                             label={mapStatusLabel[invoice.detail_status]}
                                                         />
                                                     </td>
 
-                                                    <td className="px-3 py-2">
+                                                    <td className="px-3 py-2 text-center">
                                                         <StatusBadge
                                                             type={mapStatus[invoice.upload_status]}
                                                             label={mapStatusLabel[invoice.upload_status]}

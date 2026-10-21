@@ -742,7 +742,7 @@ impl Database {
         invoice_type: u8,
         invoice_key: &str,
         detail: &Value,
-        xml: &String,
+        xml: &Option<String>,
     ) -> Result<()> {
         let detail_data = serde_json::to_string(detail)
             .map_err(|e| TaxSyncError::InvalidInvoice(e.to_string()))?;

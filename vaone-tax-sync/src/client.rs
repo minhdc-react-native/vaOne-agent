@@ -108,7 +108,6 @@ impl TaxClient {
                 TaxSyncError::InvalidDateRange("from_date must be <= to_date".to_string()).into(),
             );
         }
-        let mut has_requested = false;
         while current <= end {
             if cancel.load(Ordering::Relaxed) {
                 break;
@@ -130,13 +129,10 @@ impl TaxClient {
             let mut state: Option<String> = None;
 
             loop {
-                if has_requested {
-                    request_delay(delay_ms).await;
-                }
                 if cancel.load(Ordering::Relaxed) {
                     break;
                 }
-                has_requested = true;
+                request_delay(delay_ms).await;
                 let mut request_url = base_url.clone();
 
                 if let Some(cursor) = &state {
@@ -181,7 +177,7 @@ impl TaxClient {
         &self,
         invoice: &Value,
         token: &str,
-    ) -> Result<(Value, String)> {
+    ) -> Result<(Value, Option<String>)> {
         let detail = self.fetch_detail(invoice, token).await?;
 
         request_delay(2000).await;
@@ -204,7 +200,7 @@ impl TaxClient {
             .await
     }
 
-    async fn fetch_xml(&self, invoice: &Value, token: &str) -> Result<String> {
+    async fn fetch_xml(&self, invoice: &Value, token: &str) -> Result<Option<String>> {
         let nbmst = invoice["nbmst"].as_str().context("Missing nbmst")?;
 
         let khhdon = invoice["khhdon"].as_str().context("Missing khhdon")?;
@@ -232,7 +228,7 @@ impl TaxClient {
         khmshdon: i64,
         invoice_type: u8,
         token: &str,
-    ) -> Result<(Value, String)> {
+    ) -> Result<(Value, Option<String>)> {
         let detail = self
             .fetch_detail_by_key(nbmst, khhdon, shdon, khmshdon, token)
             .await?;
@@ -272,95 +268,92 @@ impl TaxClient {
         khmshdon: i64,
         invoice_type: u8,
         token: &str,
-    ) -> Result<String> {
+    ) -> Result<Option<String>> {
         let base_url = match invoice_type {
             1 | 2 => URL_EXPORT_XML,
             3 | 4 => URL_SCO_EXPORT_XML,
             _ => {
-                return Err(TaxSyncError::InvalidConfig(format!(
-                    "Loại hóa đơn không hợp lệ: {invoice_type}"
-                ))
-                .into());
+                eprintln!("[tax-sync] Loại hóa đơn không hợp lệ: {invoice_type}");
+                return Ok(None);
             }
         };
 
-        let response = self
-            .http
-            .get(base_url)
-            .header("request-id", self.request_id.clone())
-            .query(&[
-                ("nbmst", nbmst),
-                ("khhdon", khhdon),
-                ("shdon", &shdon.to_string()),
-                ("khmshdon", &khmshdon.to_string()),
-            ])
-            .bearer_auth(token)
-            .send()
-            .await?;
+        let result: Result<Option<String>> = async {
+            let response = self
+                .http
+                .get(base_url)
+                .header("request-id", self.request_id.clone())
+                .query(&[
+                    ("nbmst", nbmst),
+                    ("khhdon", khhdon),
+                    ("shdon", &shdon.to_string()),
+                    ("khmshdon", &khmshdon.to_string()),
+                ])
+                .bearer_auth(token)
+                .send()
+                .await?;
 
-        let status = response.status();
+            let status = response.status();
 
-        let content_type = response
-            .headers()
-            .get(reqwest::header::CONTENT_TYPE)
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("")
-            .to_string();
+            if !status.is_success() {
+                eprintln!("[tax-sync] Lấy XML thất bại: HTTP {status}, shdon={shdon}");
+                return Ok(None);
+            }
 
-        let bytes = response.bytes().await?;
+            let bytes = response.bytes().await?;
 
-        if !status.is_success() {
-            return Err(TaxSyncError::InvalidConfig(format!(
-                "Lấy XML thất bại: HTTP {status}, content-type={content_type}"
-            ))
-            .into());
+            // ZIP thông thường có chữ ký PK.
+            if bytes.len() < 4 || bytes[0..2] != [0x50, 0x4B] {
+                eprintln!("[tax-sync] Response không phải ZIP hợp lệ, shdon={shdon}");
+                return Ok(None);
+            }
+
+            let cursor = Cursor::new(bytes);
+            let mut archive = match ZipArchive::new(cursor) {
+                Ok(archive) => archive,
+                Err(err) => {
+                    eprintln!("[tax-sync] Không đọc được ZIP, shdon={shdon}: {err}");
+                    return Ok(None);
+                }
+            };
+
+            for i in 0..archive.len() {
+                let mut file = match archive.by_index(i) {
+                    Ok(file) => file,
+                    Err(err) => {
+                        eprintln!("[tax-sync] Không đọc được file trong ZIP: {err}");
+                        continue;
+                    }
+                };
+
+                if file.name().to_ascii_lowercase().ends_with(".xml") {
+                    let mut content = String::new();
+
+                    if let Err(err) = file.read_to_string(&mut content) {
+                        eprintln!("[tax-sync] Không đọc được XML, shdon={shdon}: {err}");
+                        return Ok(None);
+                    }
+
+                    return Ok(Some(STANDARD.encode(content.as_bytes())));
+                }
+            }
+
+            eprintln!("[tax-sync] Không tìm thấy XML trong ZIP, shdon={shdon}");
+
+            Ok(None)
         }
+        .await;
 
-        // Phát hiện trường hợp cổng Thuế trả HTML thay vì ZIP.
-        let preview = String::from_utf8_lossy(&bytes[..bytes.len().min(512)]);
-
-        if content_type.to_ascii_lowercase().contains("text/html")
-            || preview.to_ascii_lowercase().contains("<html")
-            || preview.to_ascii_lowercase().contains("<!doctype html")
-        {
-            return Err(TaxSyncError::InvalidConfig(format!(
-                "Cổng Thuế trả về HTML thay vì ZIP: {}",
-                preview.chars().take(200).collect::<String>()
-            ))
-            .into());
-        }
-
-        // ZIP phải bắt đầu bằng PK\x03\x04.
-        if bytes.len() < 4 || bytes[0..4] != [0x50, 0x4B, 0x03, 0x04] {
-            return Err(TaxSyncError::InvalidConfig(
-                "Cổng Thuế không trả về tệp ZIP chứa XML hóa đơn hợp lệ.".to_string(),
-            )
-            .into());
-        }
-
-        // Đọc ZIP và tìm file XML.
-        let cursor = Cursor::new(bytes);
-        let mut archive = ZipArchive::new(cursor)?;
-
-        let mut xml_content = None;
-
-        for i in 0..archive.len() {
-            let mut file = archive.by_index(i)?;
-
-            if file.name().to_ascii_lowercase().ends_with(".xml") {
-                let mut content = String::new();
-                file.read_to_string(&mut content)?;
-                xml_content = Some(content);
-                break;
+        match result {
+            Ok(Some(xml)) => {
+                let xml_base64 = STANDARD.encode(xml.as_bytes());
+                Ok(Some(xml_base64))
+            }
+            Ok(None) => Ok(None),
+            Err(err) => {
+                eprintln!("[tax-sync] Lỗi khi lấy XML, shdon={shdon}: {err}");
+                Ok(None)
             }
         }
-
-        let xml = xml_content.ok_or_else(|| {
-            TaxSyncError::InvalidConfig("Không tìm thấy tệp XML bên trong ZIP.".to_string())
-        })?;
-
-        let xml_base64 = STANDARD.encode(xml.as_bytes());
-
-        Ok(xml_base64)
     }
 }

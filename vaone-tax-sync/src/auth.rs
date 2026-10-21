@@ -691,7 +691,7 @@ impl TaxAuthService {
 
         match type_app {
             TypeApp::VaOnline => {
-                if let Some(org_unit) = &token.org_unit {
+                if let Some(org_unit) = &token.org_unit_id {
                     let access_token = format!(
                         "{};{};{};{}",
                         token.access_token,
@@ -733,12 +733,16 @@ impl TaxAuthService {
             //     "Invoice payload: {}",
             //     serde_json::to_string_pretty(&invoice).unwrap_or_default()
             // );
-            return Err(TaxSyncError::Authentication(format!(
+            let message = format!(
                 "Gửi dữ liệu hóa đơn thất bại ({}): {}",
                 status.as_u16(),
                 body
-            ))
-            .into());
+            );
+
+            return match status.as_u16() {
+                401 | 403 => Err(TaxSyncError::Authentication(message).into()),
+                _ => Err(TaxSyncError::Api(message).into()),
+            };
         }
 
         let result = if body.trim().is_empty() {

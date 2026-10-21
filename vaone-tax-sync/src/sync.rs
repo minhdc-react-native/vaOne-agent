@@ -265,22 +265,13 @@ impl TaxSyncService {
 
         let mut completed = 0;
         let mut failed = 0;
-        let mut has_requested = false;
 
         for invoice in invoices {
             if cancel.load(Ordering::Relaxed) {
                 break;
             }
 
-            if has_requested {
-                request_delay(delay_ms).await;
-            }
-
-            if cancel.load(Ordering::Relaxed) {
-                break;
-            }
-
-            has_requested = true;
+            request_delay(delay_ms).await;
 
             let result = async {
                 let (detail, xml) = self

@@ -87,7 +87,7 @@ function App() {
       <Route path="/blank" element={<BlankPage />} />
       <Route path="/report" element={<PreviewReport />} />
       <Route path="/settings" element={<SettingsPage />} />
-      <Route path="/tax-config" element={<TaxConfig />} />
+      <Route path="/tax-config/:taxCode?" element={<TaxConfig />} />
       <Route path="/history-invoice/:taxCode" element={<TaxInvoiceManager />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/get-invoices" element={<GetInvoices />} />
