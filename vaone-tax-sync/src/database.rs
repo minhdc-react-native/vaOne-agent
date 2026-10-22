@@ -92,7 +92,7 @@ impl Database {
                 access_code TEXT,
 
                 type_app TEXT NOT NULL DEFAULT 'vaOnline'
-                    CHECK (type_app IN ('vaOnline', 'vaOne')),
+                    CHECK (type_app IN ('vaOnline', 'vaOne', 'vaShop')),
 
                 user_app TEXT,
                 pass_app_key TEXT,
@@ -243,6 +243,19 @@ impl Database {
                 )
                 ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS sync_invoices_today (
+                tax_code TEXT NOT NULL,
+                invoice_type INTEGER NOT NULL
+                    CHECK (invoice_type IN (1, 2, 3, 4)),
+                invoice_key TEXT NOT NULL,
+                invoice_date TEXT NOT NULL,
+
+                PRIMARY KEY (tax_code, invoice_type, invoice_key)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_sync_invoices_today_date
+            ON sync_invoices_today (tax_code, invoice_type, invoice_date);
 
             -- Tìm các ngày cần xử lý hoặc retry.
             CREATE INDEX IF NOT EXISTS idx_sync_days_status
@@ -602,6 +615,7 @@ impl Database {
         tax_code: &str,
         invoice_type: u8,
         summary: &Value,
+        is_today: bool,
     ) -> Result<String> {
         let invoice_date = invoice_date_vietnam(summary)?;
         let invoice_key = invoice_key(summary)?;
@@ -609,29 +623,16 @@ impl Database {
         let summary_json = serde_json::to_string(summary)
             .map_err(|e| TaxSyncError::InvalidInvoice(e.to_string()))?;
 
-        let conn = self.connect()?;
+        let mut conn = self.connect()?;
+        let tx = conn.transaction().map_err(db_error)?;
 
-        conn.execute(
+        tx.execute(
             "
         INSERT INTO sync_invoices (
-            tax_code,
-            invoice_type,
-            invoice_key,
-            invoice_date,
-            dvtte,
-            tgia,
-            nbmst,
-            khhdon,
-            shdon,
-            khmshdon,
-            tgtcthue,
-            tgtthue,
-            tgtttbso,
-            tthai,
-            ttxly,
-            summary_json,
-            detail_status,
-            upload_status
+            tax_code, invoice_type, invoice_key, invoice_date,
+            dvtte, tgia, nbmst, khhdon, shdon, khmshdon,
+            tgtcthue, tgtthue, tgtttbso, tthai, ttxly,
+            summary_json, detail_status, upload_status
         )
         VALUES (
             ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
@@ -675,6 +676,24 @@ impl Database {
             ],
         )
         .map_err(db_error)?;
+
+        if is_today {
+            tx.execute(
+                "
+            INSERT OR IGNORE INTO sync_invoices_today (
+                tax_code,
+                invoice_type,
+                invoice_key,
+                invoice_date
+            )
+            VALUES (?1, ?2, ?3, ?4)
+            ",
+                params![tax_code, invoice_type, invoice_key, invoice_date,],
+            )
+            .map_err(db_error)?;
+        }
+
+        tx.commit().map_err(db_error)?;
 
         Ok(invoice_key)
     }
@@ -741,10 +760,13 @@ impl Database {
         tax_code: &str,
         invoice_type: u8,
         invoice_key: &str,
-        detail: &Value,
+        detail: &Option<Value>,
         xml: &Option<String>,
     ) -> Result<()> {
-        let detail_data = serde_json::to_string(detail)
+        let detail_data = detail
+            .as_ref()
+            .map(serde_json::to_string)
+            .transpose()
             .map_err(|e| TaxSyncError::InvalidInvoice(e.to_string()))?;
 
         let conn = self.connect()?;
@@ -752,7 +774,10 @@ impl Database {
         conn.execute(
             "
         UPDATE sync_invoices
-        SET summary_json = ?4,
+        SET summary_json = CASE
+                WHEN ?4 IS NOT NULL THEN ?4
+                ELSE summary_json
+            END,
             xml_data = ?5,
             detail_status = 'completed',
             detail_error = NULL,
@@ -1074,7 +1099,7 @@ fn invoice_date_vietnam(invoice: &Value) -> Result<String> {
 
 /// Ưu tiên ID hóa đơn do cơ quan thuế cấp.
 /// Nếu thiếu ID, sử dụng khóa ghép để dự phòng.
-fn invoice_key(invoice: &Value) -> Result<String> {
+pub fn invoice_key(invoice: &Value) -> Result<String> {
     if let Some(id) = invoice
         .get("id")
         .and_then(Value::as_str)

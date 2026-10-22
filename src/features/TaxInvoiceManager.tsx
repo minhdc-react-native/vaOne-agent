@@ -27,9 +27,10 @@ import { dialog } from "../service/dialog.service";
 import { Tabs } from "../components/Tabs";
 import Switch from "../components/Switch";
 import { showNotification } from "../lib/notification";
+import clsx from "clsx";
 
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
 
 const INVOICE_TYPES = [
     { id: 1, label: "Hóa đơn mua vào" },
@@ -38,10 +39,10 @@ const INVOICE_TYPES = [
     { id: 4, label: "Bán ra MTT" },
 ];
 const mapInvoiceType: Record<number, string> = {
-    1: "Hóa đơn mua vào",
-    2: "Hóa đơn bán ra",
-    3: "Mua vào MTT",
-    4: "Bán ra MTT"
+    1: "Mua vào",
+    2: "Bán ra",
+    3: "Mua vào",
+    4: "Bán ra"
 }
 
 const mapStatus: Record<string, StatusType> = {
@@ -89,14 +90,16 @@ const initialSync: ISyncConfig = {
 function StatCard({
     label,
     value,
+    classNumber
 }: {
     label: string;
     value: number;
+    classNumber?: string;
 }) {
     return (
         <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-2">
             <div className="truncate text-sm text-gray-500">{label}</div>
-            <div className="mt-1 text-lg font-semibold tabular-nums">
+            <div className={clsx("mt-1 text-3xl font-semibold tabular-nums", classNumber)}>
                 {value.toLocaleString("vi-VN")}
             </div>
         </div>
@@ -227,7 +230,19 @@ export function TaxInvoiceManager() {
         applyFilters();
     }, [filters])
 
-    const handleReset = () => {
+    const handleReset = async () => {
+        if (!filters.from_date || !filters.to_date) {
+            showNotification({
+                type: "warning",
+                message: "Bạn phải nhập đủ ngày!"
+            });
+            return;
+        };
+        const confirmed = await dialog.question(
+            `Bạn có chắc chắn đồng bộ lại dữ liệu của mã số thuế ${taxCode}?`,
+            `Từ ngày: ${formatDate(filters.from_date)} đến ngày ${formatDate(filters.to_date)}`,
+        );
+        if (!confirmed) return;
         resetSyncStatus({
             ...syncConfig,
             fromDate: filters.from_date,
@@ -293,6 +308,7 @@ export function TaxInvoiceManager() {
                         <StatCard
                             label="Tổng hóa đơn"
                             value={stats?.total ?? 0}
+                            classNumber="text-green-600"
                         />
 
                         <StatCard
@@ -300,6 +316,7 @@ export function TaxInvoiceManager() {
                             value={stats?.groups
                                 .filter((item) => item.detail_status === "pending")
                                 .reduce((sum, item) => sum + item.count, 0) ?? 0}
+                            classNumber="text-blue-600"
                         />
 
                         <StatCard
@@ -307,6 +324,7 @@ export function TaxInvoiceManager() {
                             value={stats?.groups
                                 .filter((item) => item.detail_status === "failed")
                                 .reduce((sum, item) => sum + item.count, 0) ?? 0}
+                            classNumber="text-orange-600"
                         />
 
                         <StatCard
@@ -314,6 +332,7 @@ export function TaxInvoiceManager() {
                             value={stats?.groups
                                 .filter((item) => item.upload_status === "failed")
                                 .reduce((sum, item) => sum + item.count, 0) ?? 0}
+                            classNumber="text-orange-600"
                         />
                     </div>
                     <section className="flex-1 rounded border border-gray-200 bg-white p-3 space-y-1">
@@ -513,43 +532,43 @@ export function TaxInvoiceManager() {
                             ) : (
                                 <div className="min-w-full w-max">
                                     <table className="w-full min-w-max border-collapse text-left">
-                                        <thead className="sticky top-0 z-10 bg-gray-50">
+                                        <thead className="sticky top-0 z-10 bg-gray-100">
                                             <tr>
-                                                <th className="w-14 px-3 py-2 font-medium">#</th>
+                                                <th className="w-14 px-2 py-1 font-medium">#</th>
 
-                                                <th className="w-32 px-3 py-2 font-medium text-center">
+                                                <th className="w-32 px-2 py-1 font-medium text-center">
                                                     Ngày hóa đơn
                                                 </th>
 
-                                                <th className="w-36 px-3 py-2 font-medium">
+                                                <th className="w-36 px-2 py-1 font-medium">
                                                     Loại
                                                 </th>
 
-                                                <th className="w-32 px-3 py-2 font-medium">
+                                                <th className="w-32 px-2 py-1 font-medium">
                                                     Ký hiệu
                                                 </th>
 
-                                                <th className="w-32 px-3 py-2 font-medium text-right">
+                                                <th className="w-32 px-2 py-1 font-medium text-right">
                                                     Số hóa đơn
                                                 </th>
 
-                                                <th className="w-35 px-3 py-2 font-medium text-center">
+                                                <th className="w-35 px-2 py-1 font-medium text-center">
                                                     Dữ liệu
                                                 </th>
 
-                                                <th className="w-35 px-3 py-2 font-medium text-center">
+                                                <th className="w-35 px-2 py-1 font-medium text-center">
                                                     Đồng bộ
                                                 </th>
-                                                <th className="w-28 px-3 py-2 font-medium">
+                                                <th className="w-28 px-2 py-1 font-medium">
                                                     Tiền tệ
                                                 </th>
-                                                <th className="w-28 px-3 py-2 font-medium text-right">
+                                                <th className="w-28 px-2 py-1 font-medium text-right">
                                                     Tiền hàng
                                                 </th>
-                                                <th className="w-28 px-3 py-2 font-medium text-right">
+                                                <th className="w-28 px-2 py-1 font-medium text-right">
                                                     Thuế
                                                 </th>
-                                                <th className="w-28 px-3 py-2 font-medium text-right">
+                                                <th className="w-28 px-2 py-1 font-medium text-right">
                                                     Tổng tiền
                                                 </th>
                                             </tr>
@@ -559,50 +578,50 @@ export function TaxInvoiceManager() {
                                             {invoiceItems.map((invoice, index) => (
                                                 <tr
                                                     key={`${invoice.tax_code}-${invoice.invoice_type}-${invoice.invoice_key}`}
-                                                    className="border-t border-gray-100 hover:bg-gray-50"
+                                                    className="border-t border-gray-100 hover:bg-gray-50 font-xs"
                                                 >
-                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                    <td className="whitespace-nowrap px-2 py-1">
                                                         {index + 1 + (PAGE_SIZE * (page - 1))}
                                                     </td>
-                                                    <td className="whitespace-nowrap px-3 py-2 text-center">
+                                                    <td className="whitespace-nowrap px-2 py-1 text-center">
                                                         {formatDate(invoice.invoice_date)}
                                                     </td>
 
-                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                    <td className="whitespace-nowrap px-2 py-1">
                                                         {mapInvoiceType[invoice.invoice_type]}
                                                     </td>
 
-                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                    <td className="whitespace-nowrap px-2 py-1">
                                                         {invoice.khhdon ?? "—"}
                                                     </td>
 
-                                                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
                                                         {invoice.shdon ?? "—"}
                                                     </td>
 
-                                                    <td className="px-3 py-2 text-center">
+                                                    <td className="px-2 py-1 text-center">
                                                         <StatusBadge
                                                             type={mapStatus[invoice.detail_status]}
                                                             label={mapStatusLabel[invoice.detail_status]}
                                                         />
                                                     </td>
 
-                                                    <td className="px-3 py-2 text-center">
+                                                    <td className="px-2 py-1 text-center">
                                                         <StatusBadge
                                                             type={mapStatus[invoice.upload_status]}
                                                             label={mapStatusLabel[invoice.upload_status]}
                                                         />
                                                     </td>
-                                                    <td className="whitespace-nowrap px-3 py-2">
+                                                    <td className="whitespace-nowrap px-2 py-1">
                                                         {invoice.dvtte ?? "—"}
                                                     </td>
-                                                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
                                                         {formatNumber(invoice.tgtcthue, invoice.tgia !== 1 ? 2 : 0)}
                                                     </td>
-                                                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
                                                         {formatNumber(invoice.tgtthue, invoice.tgia !== 1 ? 2 : 0)}
                                                     </td>
-                                                    <td className="whitespace-nowrap px-3 py-2 text-right">
+                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
                                                         {formatNumber(invoice.tgtttbso, invoice.tgia !== 1 ? 2 : 0)}
                                                     </td>
                                                 </tr>

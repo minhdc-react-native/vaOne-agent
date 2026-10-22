@@ -1,8 +1,8 @@
 use anyhow::{anyhow, Context, Result};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{DateTime, Duration as ChronoDuration, NaiveDate, NaiveDateTime, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
 use std::{
     collections::HashSet,
     sync::{
@@ -46,7 +46,7 @@ fn parse_invoice_types(raw: &str) -> Result<Vec<u8>> {
     Ok(types.into_iter().filter(|t| unique.insert(*t)).collect())
 }
 
-async fn vietnam_yesterday() -> Result<NaiveDate> {
+pub async fn vietnam_today() -> Result<NaiveDate> {
     let response: TimeApiResponse = reqwest::Client::new()
         .get("https://timeapi.io/api/Time/current/zone")
         .query(&[("timeZone", "Asia/Ho_Chi_Minh")])
@@ -62,7 +62,12 @@ async fn vietnam_yesterday() -> Result<NaiveDate> {
         .or_else(|_| NaiveDateTime::parse_from_str(&response.date_time, "%Y-%m-%dT%H:%M:%S"))?
         .date();
 
-    today
+    Ok(today)
+}
+
+async fn vietnam_yesterday() -> Result<NaiveDate> {
+    vietnam_today()
+        .await?
         .pred_opt()
         .ok_or_else(|| anyhow!("Không xác định được ngày hôm qua"))
 }
@@ -139,25 +144,15 @@ impl TaxSyncWorker {
     }
 
     pub fn start(self: Arc<Self>) {
-        // Không khởi chạy nếu worker đang chạy.
-        if self.cancel.swap(false, Ordering::SeqCst) {
-            return;
-        }
-
-        // Reset cờ dừng trước khi chạy.
         self.cancel.store(false, Ordering::SeqCst);
     }
 
     pub fn stop(&self) {
-        if self.cancel.swap(true, Ordering::SeqCst) {
-            return;
-        }
-
         self.cancel.store(true, Ordering::SeqCst);
     }
 
     pub async fn run_workers(&self) {
-        tokio::join!(self.run(), self.run_upload(),);
+        tokio::join!(self.run(), self.run_upload(), self.run_update());
     }
 
     /// Chạy liên tục cho đến khi được yêu cầu dừng hoặc runtime kết thúc.
@@ -186,6 +181,24 @@ impl TaxSyncWorker {
             }
 
             if let Err(error) = self.upload_once().await {
+                eprintln!("[tax-sync] Upload iteration failed: {error:#}");
+            }
+
+            if self.cancel.load(Ordering::Relaxed) {
+                break;
+            }
+
+            sleep(Duration::from_secs(5)).await;
+        }
+    }
+
+    async fn run_update(&self) {
+        loop {
+            if self.cancel.load(Ordering::Relaxed) {
+                break;
+            }
+
+            if let Err(error) = self.update_once().await {
                 eprintln!("[tax-sync] Upload iteration failed: {error:#}");
             }
 
@@ -244,7 +257,22 @@ impl TaxSyncWorker {
         Ok(())
     }
 
-    async fn process_account(&self, account: &TaxAccount) -> Result<()> {
+    pub async fn update_once(&self) -> Result<()> {
+        let accounts = self.db.get_enabled_tax_accounts()?;
+        for account in accounts {
+            if self.cancel.load(Ordering::Relaxed) {
+                break;
+            }
+
+            if let Err(error) = self.process_account_update(&account).await {
+                eprintln!("[tax-sync] Account {} failed: {error:#}", account.tax_code);
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn process_account_update(&self, account: &TaxAccount) -> Result<()> {
         if self.cancel.load(Ordering::Relaxed) {
             return Ok(());
         }
@@ -257,40 +285,6 @@ impl TaxSyncWorker {
 
         let token = self.ensure_valid_token(account).await?;
 
-        self.seed_days(account, &invoice_types).await?;
-
-        for invoice_type in &invoice_types {
-            if self.cancel.load(Ordering::Relaxed) {
-                break;
-            }
-
-            let dates = self
-                .db
-                .get_incomplete_days(&account.tax_code, *invoice_type)?;
-
-            for date in dates {
-                if self.cancel.load(Ordering::Relaxed) {
-                    break;
-                }
-
-                request_delay(self.config.delay_ms).await;
-
-                if let Err(error) = self
-                    .sync_one_day(account, *invoice_type, &date, &token)
-                    .await
-                {
-                    eprintln!(
-                        "[tax-sync] tax_code={}, type={}, date={}: {error:#}",
-                        account.tax_code, invoice_type, date
-                    );
-                }
-            }
-        }
-
-        // 2. Retry các hóa đơn chưa tải được detail.
-        if self.cancel.load(Ordering::Relaxed) {
-            return Ok(());
-        }
         let service = TaxSyncService::new(self.db.clone())?;
         for invoice_type in &invoice_types {
             if self.cancel.load(Ordering::Relaxed) {
@@ -312,6 +306,61 @@ impl TaxSyncWorker {
                 "[tax-sync] Detail retry: tax_code={}, type={}, completed={}, failed={}",
                 account.tax_code, invoice_type, completed, failed
             );
+        }
+
+        Ok(())
+    }
+
+    async fn process_account(&self, account: &TaxAccount) -> Result<()> {
+        if self.cancel.load(Ordering::Relaxed) {
+            return Ok(());
+        }
+
+        let invoice_types = parse_invoice_types(&account.invoice_type)?;
+
+        if invoice_types.is_empty() {
+            return Ok(());
+        }
+
+        let token = self.ensure_valid_token(account).await?;
+
+        self.seed_days(account, &invoice_types).await?;
+
+        for invoice_type in &invoice_types {
+            if self.cancel.load(Ordering::Relaxed) {
+                break;
+            }
+
+            let today = vietnam_today().await?;
+
+            let mut dates = self
+                .db
+                .get_incomplete_days(&account.tax_code, *invoice_type)?;
+
+            let today_str = today.format("%Y-%m-%d").to_string();
+            dates.insert(0, today_str);
+
+            for date in dates {
+                eprintln!(
+                    "[tax-sync] tax_code={}, type={}, date={}",
+                    account.tax_code, invoice_type, date
+                );
+                if self.cancel.load(Ordering::Relaxed) {
+                    break;
+                }
+
+                request_delay(self.config.delay_ms).await;
+
+                if let Err(error) = self
+                    .sync_one_day(account, *invoice_type, &date, &token)
+                    .await
+                {
+                    eprintln!(
+                        "[tax-sync] tax_code={}, type={}, date={}: {error:#}",
+                        account.tax_code, invoice_type, date
+                    );
+                }
+            }
         }
 
         Ok(())
@@ -473,7 +522,12 @@ impl TaxSyncWorker {
                     let type_app = TypeApp::try_from(account.type_app.as_str())?;
                     match self
                         .auth
-                        .refresh_vaone_token(refresh_token, &type_app, &account.url_api)
+                        .refresh_vaone_token(
+                            refresh_token,
+                            &account.tenant_id,
+                            &type_app,
+                            &account.url_api,
+                        )
                         .await
                     {
                         Ok(token) => token,
@@ -582,7 +636,7 @@ impl TaxSyncWorker {
         let invoices = self.db.get_invoices_pending_upload(tax_code)?;
 
         let mut results = Vec::new();
-        const BATCH_SIZE: usize = 1; // upload 5 hóa đơn 1 lần.
+        const BATCH_SIZE: usize = 10; // upload 10 hóa đơn 1 lần.
 
         for batch in invoices.chunks(BATCH_SIZE) {
             // Bổ sung outOrIn vào từng hóa đơn
@@ -593,8 +647,19 @@ impl TaxSyncWorker {
 
                     if let Value::Object(ref mut map) = invoice {
                         map.insert("outOrIn".to_string(), Value::from(item.invoice_type));
-                        // map.insert("xml".to_string(), Value::from(item.xml_data.clone()));
-                        map.insert("xml".to_string(), Value::Null);
+
+                        let xml_base64 = item
+                            .xml_data
+                            .as_ref()
+                            .map(|xml| STANDARD.encode(xml.as_bytes()));
+
+                        map.insert(
+                            "xml".to_string(),
+                            match xml_base64 {
+                                Some(value) => Value::String(value),
+                                None => Value::Null,
+                            },
+                        );
                     }
 
                     invoice

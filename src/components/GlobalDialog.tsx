@@ -34,8 +34,8 @@ export function GlobalDialog() {
             type={current.type}
             title={current.title}
             message={current.message}
-            confirmText="OK"
-            cancelText="Cancel"
+            confirmText="Đồng ý"
+            cancelText="Hủy bỏ"
             onCancel={() => {
                 dialog.resolve(current.id, false);
                 setCurrent(null);

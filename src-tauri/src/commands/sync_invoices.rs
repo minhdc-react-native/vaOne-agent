@@ -1,7 +1,10 @@
+use tauri::State;
 use vaone_tax_sync::{
     database::Database,
     models::{InvoiceStats, SyncDay, SyncInvoiceFilters, SyncInvoicePage},
 };
+
+use crate::services::worker_manage::TaxSyncWorkerManager;
 
 #[tauri::command]
 pub fn get_invoice_stats(
@@ -41,4 +44,15 @@ pub fn reset_sync_status(
 ) -> std::result::Result<(), String> {
     db.reset_sync_status(&tax_code, &from_date, &to_date, tax_sync, app_sync)
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn start_tax_sync_worker(manager: State<'_, TaxSyncWorkerManager>) -> Result<(), String> {
+    manager.start()
+}
+
+#[tauri::command]
+pub fn stop_tax_sync_worker(manager: State<'_, TaxSyncWorkerManager>) -> Result<(), String> {
+    manager.stop();
+    Ok(())
 }

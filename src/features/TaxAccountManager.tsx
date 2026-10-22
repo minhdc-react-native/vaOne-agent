@@ -23,7 +23,7 @@ import Switch from "../components/Switch";
 import Button from "../components/Button";
 import { dialog } from "../service/dialog.service";
 import { useCheckTaxAccountLogin, useTaxAccounts } from "../hook/useTaxAccounts";
-import { ITaxAccount, ITaxAccountInput } from "../service/taxAccountService";
+import { ITaxAccount, ITaxAccountInput, TypeApp } from "../service/taxAccountService";
 import { Loading } from "../components/Loading";
 import InvoiceTypeCheckbox from "./InvoiceTypeCheckbox";
 import { Tooltip } from "../components/Tooltip/Tooltip";
@@ -31,6 +31,8 @@ import { showNotification } from "../lib/notification";
 import { useNavigate, useParams } from "react-router-dom";
 import { useVirtualized } from "../hook/useVirtualized";
 import { formatDate } from "../api/services/tct.service";
+import { useLatest } from "../hook/useLatest";
+import { usePauseTaxSyncWorker } from "../hook/usePauseTaxSyncWorker";
 const ROW_HEIGHT = 180;
 type AuthStatus = "pending" | "authenticated" | "failed";
 type SyncStatus = "pending" | "running" | "completed" | "failed";
@@ -139,6 +141,9 @@ function authVariant(status: AuthStatus) {
 
 
 export default function TaxAccountManager() {
+
+    const { stop, start } = usePauseTaxSyncWorker();
+
     const { taxCode } = useParams<{ taxCode: string | undefined }>();
     const {
         accounts,
@@ -156,21 +161,29 @@ export default function TaxAccountManager() {
     const [form, setForm] = useState<ITaxAccount>(createEmptyAccount);
     const [selectedTaxCode, setSelectedTaxCode] = useState<string | null>(null);
     const [search, setSearch] = useState("");
+    const [isError, setIsError] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
     const [localError, setLocalError] = useState("");
 
     const filteredAccounts = useMemo(() => {
         const keyword = search.trim().toLowerCase();
 
-        return accounts.filter((item) =>
-            [
+        return accounts.filter((item) => {
+            const matchesKeyword = [
                 item.tax_code,
                 item.username,
                 item.user_app ?? "",
                 item.org_unit ?? "",
-            ].some((value) => value.toLowerCase().includes(keyword)),
-        );
-    }, [accounts, search]);
+            ].some((value) => value.toLowerCase().includes(keyword));
+
+            const matchesError =
+                !isError ||
+                item.auth_blocked ||
+                item.app_auth_blocked;
+
+            return matchesKeyword && matchesError;
+        });
+    }, [accounts, search, isError]);
 
     const updateField = <K extends keyof ITaxAccount>(
         key: K,
@@ -193,7 +206,11 @@ export default function TaxAccountManager() {
         setLocalError("");
     };
 
-    const handleSelect = (account: ITaxAccount) => {
+    const handleSelect = (account?: ITaxAccount) => {
+        if (!account) {
+            handleNew();
+            return;
+        }
         setForm({
             ...account,
             password_key: "",
@@ -210,10 +227,12 @@ export default function TaxAccountManager() {
         setLocalError("");
     };
 
+    const refTaxCode = useLatest(selectedTaxCode);
     useEffect(() => {
-        if (!!selectedTaxCode || accounts.length === 0) return;
-        handleSelect(accounts.find(acc => acc.tax_code === taxCode) ?? accounts[0]);
-    }, [selectedTaxCode, accounts])
+        const accountSelected = filteredAccounts.find(acc => acc.tax_code === refTaxCode.current) ?? filteredAccounts[0];
+        handleSelect(accountSelected);
+    }, [filteredAccounts])
+
     useEffect(() => {
         const displayError = localError || error;
         if (displayError) dialog.info(
@@ -223,7 +242,7 @@ export default function TaxAccountManager() {
     }, [localError, error]);
 
     const handleSave = async () => {
-
+        setLocalError("");
         const taxCode = form.tax_code.trim();
 
         if (!taxCode || !form.start_date) {
@@ -411,6 +430,19 @@ export default function TaxAccountManager() {
         );
     }, [])
 
+    const label_access_code = useMemo(() => {
+        switch (form.type_app) {
+            case "vaOnline":
+                return "Domain truy cập";
+            case "vaOne":
+                return "Mã số thuế";
+            case "vaShop":
+                return "Mã cửa hàng"
+            default:
+                return "Mã truy cập";
+        }
+    }, [form.type_app]);
+
     return (
         <div className="flex h-full min-h-0 flex-col bg-background text-foreground p-2 w-225" >
             <div
@@ -456,7 +488,7 @@ export default function TaxAccountManager() {
                                 />
 
                                 <DateInput
-                                    label="Ngày bắt đầu"
+                                    label="Ngày bắt đầu đồng bộ"
                                     sizeInput="xs"
                                     required
                                     value={form.start_date ?? ""}
@@ -555,7 +587,7 @@ export default function TaxAccountManager() {
 
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <Input
-                                    label="Mã truy cập"
+                                    label={label_access_code}
                                     sizeInput="xs"
                                     required
                                     value={form.access_code}
@@ -565,7 +597,7 @@ export default function TaxAccountManager() {
                                 />
 
                                 {["vaOnline", "vaOne"].includes(form.type_app) ? <Input
-                                    label="Mã đơn vị"
+                                    label="Đơn vị dữ liệu"
                                     sizeInput="xs"
                                     value={form.org_unit ?? ""}
                                     onChange={(e) =>
@@ -641,6 +673,7 @@ export default function TaxAccountManager() {
                             <List size={14} />
                             Danh sách tài khoản
                         </div>
+
                         <div className="w-45">
                             <Input
                                 placeholder="Tìm mã số thuế..."
@@ -650,6 +683,14 @@ export default function TaxAccountManager() {
                                 onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
+                        <Switch
+                            label="Lỗi"
+                            className="text-xs"
+                            checked={isError}
+                            onChange={(value) =>
+                                setIsError(value)
+                            }
+                        />
                     </div>
                     <div className="min-h-0 flex-1 overflow-y-auto p-3 bg-gray-100">
                         {visibleData.length === 0 ? (

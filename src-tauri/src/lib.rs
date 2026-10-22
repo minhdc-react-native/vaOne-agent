@@ -12,6 +12,7 @@ use crate::services::tct::tax_sync_adapter::{
     ConsoleSyncObserver, LocalCaptchaSolver, MacOsPasswordProvider,
 };
 use crate::services::update::check_update_on_startup;
+use crate::services::worker_manage::TaxSyncWorkerManager;
 use crate::state::{APP_STATE, SYNC_MENU};
 use crate::state::{CURRENT_ROUTE, ONLINE_MENU};
 use crate::utils::public::navigate_to_route;
@@ -73,7 +74,7 @@ pub fn run() {
             let tax_menu = MenuItem::with_id(
                 app,
                 "tax_config",
-                "Cấu hình kết nối mã số thuế",
+                "Cấu hình kết nối tổng cục thuế",
                 true,
                 None::<&str>,
             )?;
@@ -143,16 +144,19 @@ pub fn run() {
 
             let sync_observer = Arc::new(ConsoleSyncObserver);
 
-            let worker = TaxSyncWorker::new(
+            let worker = Arc::new(TaxSyncWorker::new(
                 db.clone(),
                 captcha_solver,
                 sync_observer,
                 TaxSyncWorkerConfig::new(),
-            )?;
+            )?);
 
-            tauri::async_runtime::spawn(async move {
-                worker.run_workers().await;
-            });
+            let worker_manager = TaxSyncWorkerManager::new(worker);
+
+            // Tự chạy khi ứng dụng khởi động
+            worker_manager.start().map_err(std::io::Error::other)?;
+
+            app.manage(worker_manager);
 
             Ok(())
         })
@@ -206,7 +210,9 @@ pub fn run() {
             commands::sync_invoices::get_invoice_stats,
             commands::sync_invoices::get_sync_days,
             commands::sync_invoices::get_sync_invoices,
-            commands::sync_invoices::reset_sync_status
+            commands::sync_invoices::reset_sync_status,
+            commands::sync_invoices::start_tax_sync_worker,
+            commands::sync_invoices::stop_tax_sync_worker
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

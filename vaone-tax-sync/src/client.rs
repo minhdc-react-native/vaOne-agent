@@ -177,14 +177,18 @@ impl TaxClient {
         &self,
         invoice: &Value,
         token: &str,
-    ) -> Result<(Value, Option<String>)> {
-        let detail = self.fetch_detail(invoice, token).await?;
+    ) -> Result<(Option<Value>, Option<String>)> {
+        let xml = self.fetch_xml(invoice, token).await?;
+
+        if xml.is_some() {
+            return Ok((None, xml));
+        }
 
         request_delay(2000).await;
 
-        let xml = self.fetch_xml(invoice, token).await?;
+        let detail = self.fetch_detail(invoice, token).await?;
 
-        Ok((detail, xml))
+        Ok((Some(detail), None))
     }
 
     async fn fetch_detail(&self, invoice: &Value, token: &str) -> Result<Value> {
@@ -228,16 +232,20 @@ impl TaxClient {
         khmshdon: i64,
         invoice_type: u8,
         token: &str,
-    ) -> Result<(Value, Option<String>)> {
-        let detail = self
-            .fetch_detail_by_key(nbmst, khhdon, shdon, khmshdon, token)
-            .await?;
-        request_delay(2000).await;
+    ) -> Result<(Option<Value>, Option<String>)> {
         let xml = self
             .fetch_xml_by_key(nbmst, khhdon, shdon, khmshdon, invoice_type, token)
             .await?;
 
-        Ok((detail, xml))
+        if xml.is_some() {
+            return Ok((None, xml));
+        }
+        request_delay(2000).await;
+        let detail = self
+            .fetch_detail_by_key(nbmst, khhdon, shdon, khmshdon, token)
+            .await?;
+
+        Ok((Some(detail), None))
     }
 
     async fn fetch_detail_by_key(
@@ -296,64 +304,53 @@ impl TaxClient {
             let status = response.status();
 
             if !status.is_success() {
-                eprintln!("[tax-sync] Lấy XML thất bại: HTTP {status}, shdon={shdon}");
-                return Ok(None);
+                return Err(TaxSyncError::Api(format!(
+                    "Lấy XML thất bại: HTTP {status}, shdon={shdon}"
+                ))
+                .into());
             }
 
             let bytes = response.bytes().await?;
 
-            // ZIP thông thường có chữ ký PK.
             if bytes.len() < 4 || bytes[0..2] != [0x50, 0x4B] {
-                eprintln!("[tax-sync] Response không phải ZIP hợp lệ, shdon={shdon}");
-                return Ok(None);
+                return Err(TaxSyncError::Api(format!(
+                    "Response không phải ZIP hợp lệ, shdon={shdon}"
+                ))
+                .into());
             }
 
             let cursor = Cursor::new(bytes);
-            let mut archive = match ZipArchive::new(cursor) {
-                Ok(archive) => archive,
-                Err(err) => {
-                    eprintln!("[tax-sync] Không đọc được ZIP, shdon={shdon}: {err}");
-                    return Ok(None);
-                }
-            };
+
+            let mut archive = ZipArchive::new(cursor).map_err(|err| {
+                TaxSyncError::Api(format!("Không đọc được ZIP, shdon={shdon}: {err}"))
+            })?;
 
             for i in 0..archive.len() {
-                let mut file = match archive.by_index(i) {
-                    Ok(file) => file,
-                    Err(err) => {
-                        eprintln!("[tax-sync] Không đọc được file trong ZIP: {err}");
-                        continue;
-                    }
-                };
+                let mut file = archive.by_index(i).map_err(|err| {
+                    TaxSyncError::Api(format!(
+                        "Không đọc được file trong ZIP, shdon={shdon}: {err}"
+                    ))
+                })?;
 
                 if file.name().to_ascii_lowercase().ends_with(".xml") {
                     let mut content = String::new();
 
-                    if let Err(err) = file.read_to_string(&mut content) {
-                        eprintln!("[tax-sync] Không đọc được XML, shdon={shdon}: {err}");
-                        return Ok(None);
-                    }
-
-                    return Ok(Some(STANDARD.encode(content.as_bytes())));
+                    file.read_to_string(&mut content).map_err(|err| {
+                        TaxSyncError::Api(format!("Không đọc được XML, shdon={shdon}: {err}"))
+                    })?;
+                    return Ok(Some(content));
+                    // return Ok(Some(STANDARD.encode(content.as_bytes())));
                 }
             }
 
-            eprintln!("[tax-sync] Không tìm thấy XML trong ZIP, shdon={shdon}");
-
-            Ok(None)
+            Err(TaxSyncError::Api(format!("Không tìm thấy XML trong ZIP, shdon={shdon}")).into())
         }
         .await;
 
-        match result {
-            Ok(Some(xml)) => {
-                let xml_base64 = STANDARD.encode(xml.as_bytes());
-                Ok(Some(xml_base64))
-            }
-            Ok(None) => Ok(None),
-            Err(err) => {
-                eprintln!("[tax-sync] Lỗi khi lấy XML, shdon={shdon}: {err}");
-                Ok(None)
-            }
+        if let Err(ref err) = result {
+            eprintln!("[tax-sync] Lỗi khi lấy XML, shdon={shdon}: {err}");
         }
+
+        result
     }
 }

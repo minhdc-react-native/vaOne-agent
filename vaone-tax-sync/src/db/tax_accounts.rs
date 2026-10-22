@@ -688,9 +688,9 @@ fn validate_tax_account_input(input: &TaxAccountInput, is_create: bool) -> Resul
         ));
     }
 
-    if input.type_app != "vaOnline" && input.type_app != "vaOne" {
+    if input.type_app != "vaOnline" && input.type_app != "vaOne" && input.type_app != "vaShop" {
         return Err(TaxSyncError::Database(
-            "type_app chỉ chấp nhận vaOnline hoặc vaOne".to_string(),
+            "type_app chỉ chấp nhận vaOnline, vaOne hoặc vaShop".to_string(),
         ));
     }
 

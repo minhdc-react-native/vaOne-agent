@@ -401,6 +401,18 @@ impl Database {
             )
             .map_err(db_error)?;
 
+            // Xóa hóa đơn today
+            tx.execute(
+                r#"
+            DELETE FROM sync_invoices_today
+            WHERE tax_code = ?1
+              AND invoice_date >= ?2
+              AND invoice_date <= ?3
+            "#,
+                params![tax_code, from_date, to_date],
+            )
+            .map_err(db_error)?;
+
             // Xóa trạng thái đồng bộ danh sách theo ngày.
             tx.execute(
                 r#"
@@ -431,5 +443,83 @@ impl Database {
         tx.commit().map_err(db_error)?;
 
         Ok(())
+    }
+
+    // invoice today
+    pub fn insert_invoice_today_if_absent(
+        &self,
+        tax_code: &str,
+        invoice_type: u8,
+        invoice_key: &str,
+        invoice_date: &str,
+    ) -> Result<bool> {
+        let conn = self.connect()?;
+
+        let affected = conn
+            .execute(
+                "
+                INSERT OR IGNORE INTO sync_invoices_today (
+                    tax_code,
+                    invoice_type,
+                    invoice_key,
+                    invoice_date
+                )
+                VALUES (?1, ?2, ?3, ?4)
+                ",
+                params![tax_code, invoice_type, invoice_key, invoice_date],
+            )
+            .map_err(db_error)?;
+
+        Ok(affected > 0)
+    }
+
+    pub fn invoice_today_exists(
+        &self,
+        tax_code: &str,
+        invoice_type: u8,
+        invoice_key: &str,
+    ) -> Result<bool> {
+        let conn = self.connect()?;
+
+        let exists: bool = conn
+            .query_row(
+                "
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM sync_invoices_today
+                    WHERE tax_code = ?1
+                      AND invoice_type = ?2
+                      AND invoice_key = ?3
+                )
+                ",
+                params![tax_code, invoice_type, invoice_key],
+                |row| row.get(0),
+            )
+            .map_err(db_error)?;
+
+        Ok(exists)
+    }
+
+    pub fn delete_invoices_today_by_date(
+        &self,
+        tax_code: &str,
+        invoice_type: u8,
+        invoice_date: &str,
+    ) -> Result<usize> {
+        let conn = self.connect()?;
+
+        let affected = conn
+            .execute(
+                "
+                DELETE FROM sync_invoices_today
+                WHERE tax_code = ?1
+                  AND invoice_type = ?2
+                  AND invoice_date = ?3
+                ",
+                params![tax_code, invoice_type, invoice_date],
+            )
+            .map_err(db_error)?;
+
+        Ok(affected)
     }
 }

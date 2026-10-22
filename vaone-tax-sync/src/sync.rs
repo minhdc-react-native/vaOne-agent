@@ -1,5 +1,7 @@
 use crate::client::request_delay;
+use crate::database::invoice_key;
 use crate::error::TaxSyncError;
+use crate::worker::vietnam_today;
 use crate::{
     client::TaxClient,
     database::Database,
@@ -118,6 +120,19 @@ impl TaxSyncService {
                 break;
             }
 
+            let invoice_key = invoice_key(item)?;
+            let exists = self.db.invoice_today_exists(
+                &request.tax_code,
+                request.invoice_type,
+                &invoice_key,
+            )?;
+
+            if exists {
+                continue;
+            }
+
+            let today = vietnam_today().await?;
+
             // Bước 1: Lưu summary trước.
             let result = (|| -> Result<(String, String)> {
                 let date = invoice_date_vietnam(item)?;
@@ -125,9 +140,14 @@ impl TaxSyncService {
                 self.db
                     .ensure_sync_day(&request.tax_code, request.invoice_type, &date)?;
 
-                let key =
-                    self.db
-                        .save_invoice_summary(&request.tax_code, request.invoice_type, item)?;
+                let is_today = date == today.format("%Y-%m-%d").to_string();
+
+                let key = self.db.save_invoice_summary(
+                    &request.tax_code,
+                    request.invoice_type,
+                    item,
+                    is_today,
+                )?;
 
                 Ok((date, key))
             })();
@@ -135,7 +155,6 @@ impl TaxSyncService {
             match result {
                 Ok((_date, invoice_key)) => {
                     summary.completed += 1;
-
                     // Bước 2: Tải chi tiết hóa đơn.
                     let (detail, xml) = match self
                         .client
@@ -243,6 +262,9 @@ impl TaxSyncService {
         for date in &dates {
             self.db
                 .mark_day_list_completed(&request.tax_code, request.invoice_type, date)?;
+
+            self.db
+                .delete_invoices_today_by_date(&request.tax_code, request.invoice_type, date)?;
         }
 
         observer.on_finished(&summary);

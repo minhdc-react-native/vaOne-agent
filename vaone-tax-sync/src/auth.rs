@@ -257,6 +257,7 @@ impl TaxAuthService {
         match account.type_app.as_str() {
             "vaOnline" => self.check_vaonline_login(account, password).await,
             "vaOne" => self.check_vaone_login(account, password, type_app).await,
+            "vaShop" => self.check_vaone_login(account, password, type_app).await,
             _ => Err(TaxSyncError::Authentication(
                 "Loại ứng dụng không được hỗ trợ".to_string(),
             )),
@@ -424,73 +425,81 @@ impl TaxAuthService {
             "{base_url}/api/abp/multi-tenancy/tenants/by-name/{}",
             access_code
         );
-
         let response = self
             .http
             .get(&tenant_url)
             .header("Accept", "application/json")
             .send()
             .await
-            .map_err(|e| {
-                TaxSyncError::Authentication(format!("Không thể kiểm tra tenant vaOne: {e}"))
-            })?;
+            .map_err(|e| TaxSyncError::Authentication(format!("Không thể kiểm tra tenant: {e}")))?;
 
         let status = response.status();
 
         if !status.is_success() {
             return Err(TaxSyncError::Authentication(format!(
-                "Kiểm tra mã truy cập vaOne thất bại, HTTP {status}"
+                "Kiểm tra mã truy cập thất bại, HTTP {status}"
             )));
         }
 
         let tenant: VaOneTenantResponse = response.json().await.map_err(|e| {
-            TaxSyncError::Authentication(format!("Dữ liệu tenant vaOne không hợp lệ: {e}"))
+            TaxSyncError::Authentication(format!("Dữ liệu tenant không hợp lệ: {e}"))
         })?;
 
         if !tenant.success || tenant.tenant_id.as_deref().unwrap_or("").is_empty() {
             return Err(TaxSyncError::Authentication(format!(
-                "Mã truy cập vaOne không hợp lệ: {access_code}"
+                "Mã truy cập không hợp lệ: {access_code}"
             )));
         }
+        let tenant_id: &str = tenant.tenant_id.as_deref().unwrap();
 
         // 2. Đăng nhập lấy access_token và refresh_token.
         let token_url = format!("{base_url}/connect/token");
+
+        println!(
+            "token_url={token_url}, client_id={client_id}, username={username}, scope={scope}"
+        );
+
+        let mut form = vec![
+            ("client_id", client_id),
+            ("grant_type", "password"),
+            ("username", username),
+            ("password", password),
+            ("scope", scope),
+        ];
+
+        if matches!(type_app, TypeApp::VaOne) {
+            form.push(("client_secret", CLIENT_SECRET));
+        }
 
         let response = self
             .http
             .post(&token_url)
             .header("Accept", "application/json")
-            .form(&[
-                ("client_id", client_id),
-                ("client_secret", CLIENT_SECRET),
-                ("grant_type", "password"),
-                ("username", username),
-                ("password", password),
-                ("scope", scope),
-            ])
+            .header("__tenant", tenant_id)
+            .form(&form)
             .send()
             .await
-            .map_err(|e| TaxSyncError::Authentication(format!("Không thể đăng nhập vaOne: {e}")))?;
+            .map_err(|e| TaxSyncError::Authentication(format!("Không thể đăng nhập: {e}")))?;
 
         let status = response.status();
         let body = response.text().await.map_err(|e| {
-            TaxSyncError::Authentication(format!("Không thể đọc response đăng nhập vaOne: {e}"))
+            TaxSyncError::Authentication(format!("Không thể đọc response đăng nhập: {e}"))
         })?;
 
         if !status.is_success() {
             return Err(TaxSyncError::Authentication(format!(
-                "Đăng nhập vaOne thất bại, HTTP {status}: {}",
+                "Đăng nhập thất bại, HTTP {status}: {}",
                 truncate_body(&body)
             )));
         }
 
         let token: VaOneTokenResponse = serde_json::from_str(&body).map_err(|e| {
-            TaxSyncError::Authentication(format!("Response token vaOne không hợp lệ: {e}"))
+            TaxSyncError::Authentication(format!("Response token không hợp lệ: {e}"))
         })?;
 
         if token.access_token.trim().is_empty() {
             return Err(TaxSyncError::Authentication(
-                "vaOne không trả về access_token hợp lệ".to_string(),
+                "Không trả về access_token hợp lệ".to_string(),
             ));
         }
 
@@ -559,6 +568,7 @@ impl TaxAuthService {
     pub async fn refresh_vaone_token(
         &self,
         refresh_token: &str,
+        tenant_id: &Option<String>,
         type_app: &TypeApp,
         url_api: &Option<String>,
     ) -> Result<ApplicationLoginResponse> {
@@ -590,18 +600,23 @@ impl TaxAuthService {
 
         let url = format!("{base_url}/connect/token");
 
-        let response = self
-            .http
-            .post(&url)
-            .header("Accept", "application/json")
-            .form(&[
-                ("client_id", client_id),
-                ("client_secret", CLIENT_SECRET),
-                ("grant_type", "refresh_token"),
-                ("refresh_token", refresh_token),
-            ])
-            .send()
-            .await?;
+        let mut request = self.http.post(&url).header("Accept", "application/json");
+
+        if let Some(tenant_id) = tenant_id.as_deref() {
+            request = request.header("__tenant", tenant_id);
+        }
+
+        let mut form = vec![
+            ("client_id", client_id),
+            ("grant_type", "refresh_token"),
+            ("refresh_token", refresh_token),
+        ];
+
+        if matches!(type_app, TypeApp::VaOne) {
+            form.push(("client_secret", CLIENT_SECRET));
+        }
+
+        let response = request.form(&form).send().await?;
 
         let status = response.status();
         let body = response.text().await?;
