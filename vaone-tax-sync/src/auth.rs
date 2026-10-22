@@ -39,6 +39,13 @@ impl TryFrom<&str> for TypeApp {
 /// Thời hạn token do ứng dụng quy ước: 24 giờ.
 pub const TOKEN_EXPIRES_IN_SECS: u64 = 24 * 60 * 60;
 
+#[derive(Debug, Deserialize, Clone)]
+pub struct VaOnlineOrgUnit {
+    id: String,
+    value: String,
+    tax_code: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct ApplicationLoginResponse {
     pub org_unit: Option<String>,
@@ -51,12 +58,7 @@ pub struct ApplicationLoginResponse {
     pub refresh_token: Option<String>,
     pub token_type: String,
     pub url_api: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct VaOnlineOrgUnit {
-    id: String,
-    value: String,
+    pub org_units: Vec<VaOnlineOrgUnit>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -282,8 +284,12 @@ impl TaxAuthService {
             ));
         }
 
+        let base_url = account
+            .url_api
+            .clone()
+            .unwrap_or_else(|| format!("https://{}.vaonline.vn", access_code));
         // 1. Đăng nhập ứng dụng.
-        let login_url = format!("https://{}.vaonline.vn/api/User/Login", access_code);
+        let login_url = format!("{base_url}/api/User/Login");
 
         let response = self
             .http
@@ -323,13 +329,34 @@ impl TaxAuthService {
         })?;
 
         // 2. Lấy danh sách đơn vị.
-        let org_url = format!("https://{}.vaonline.vn/api/User/GetListDvcs", access_code);
+        let org_url = format!("{base_url}/api/System/GetDataByWindowNo");
+        let payload = serde_json::json!({
+            "window_id": "WIN00115",
+            "start": 0,
+            "count": 100,
+            "continue": "true",
+            "filter": [
+                {
+                    "columnName": "MS_THUE",
+                    "columnType": "VC_CODE_SM",
+                    "value": account.tax_code
+                },
+                {
+                    "columnName": "TEN_V",
+                    "columnType": "VC_INFO_LG",
+                    "value": ""
+                }
+            ],
+            "infoparam": null,
+            "tlbparam": []
+        });
 
         let response = self
             .http
-            .get(&org_url)
+            .post(&org_url)
             .header("Accept", "application/json")
             .bearer_auth(&token)
+            .json(&payload)
             .send()
             .await
             .map_err(|e| {
@@ -346,33 +373,54 @@ impl TaxAuthService {
             )));
         }
 
-        let units: Vec<VaOnlineOrgUnit> = response.json().await.map_err(|e| {
+        let result: serde_json::Value = response.json().await.map_err(|e| {
             TaxSyncError::Authentication(format!(
-                "Dữ liệu danh sách đơn vị vaOnline không hợp lệ: {e}"
+                "Không thể đọc dữ liệu danh sách đơn vị vaOnline: {e}"
             ))
         })?;
 
-        // 3. Kiểm tra mã đơn vị.
-        let unit = units
+        let units = result
+            .get("data")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        let org_units: Vec<VaOnlineOrgUnit> = units
             .iter()
-            .find(|unit| unit.id == org_unit)
-            .ok_or_else(|| {
-                TaxSyncError::Authentication(format!(
-                    "Không tìm thấy đơn vị vaOnline có mã: {org_unit}"
-                ))
-            })?;
+            .map(|item| VaOnlineOrgUnit {
+                id: item
+                    .get("DVCS_ID")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                value: item
+                    .get("TEN_V")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                tax_code: item
+                    .get("MS_THUE")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+            })
+            .collect();
+
+        // 3. Kiểm tra mã đơn vị.
+        let unit = org_units.iter().find(|unit| unit.id == org_unit);
 
         Ok(ApplicationLoginResponse {
             org_unit: Some(org_unit.to_string()),
             year: Some(get_current_year()),
             lang: Some("vi".to_string()),
-            org_unit_id: Some(unit.id.to_string()),
+            org_unit_id: unit.map(|unit| unit.id.clone()),
             tenant_id: Some(access_code.to_string()),
             access_token: token,
             expires_in: None,
             refresh_token: None,
             token_type: "Bearer".to_string(),
             url_api: account.url_api.clone(),
+            org_units,
         })
     }
 
@@ -503,12 +551,10 @@ impl TaxAuthService {
             ));
         }
 
-        let org_unit_id = match type_app {
+        let org_units: Option<Vec<VaOnlineOrgUnit>> = match type_app {
             TypeApp::VaOne => {
-                let default_url: &str = match type_app {
-                    TypeApp::VaOne => "http://10.8.0.146:30334",
-                    _ => unreachable!(),
-                };
+                let default_url = "http://10.8.0.146:30334";
+
                 let base_url = account
                     .url_api
                     .as_deref()
@@ -536,32 +582,54 @@ impl TaxAuthService {
                     )));
                 }
 
-                let units: Vec<VaOneOrgUnit> = response.json().await.map_err(|e| {
+                let units: Vec<Value> = response.json().await.map_err(|e| {
                     TaxSyncError::Authentication(format!(
                         "Dữ liệu danh sách đơn vị không hợp lệ: {e}"
                     ))
                 })?;
 
-                units
-                    .iter()
-                    .find(|unit| unit.code == org_unit)
-                    .map(|unit| unit.id.to_string())
-            }
+                let items: Vec<VaOnlineOrgUnit> = units
+                    .into_iter()
+                    .map(|unit| VaOnlineOrgUnit {
+                        id: unit
+                            .get("code")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_string(),
+                        value: unit
+                            .get("name")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_string(),
+                        tax_code: unit
+                            .get("taxCode")
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_string(),
+                    })
+                    .collect();
 
+                Some(items)
+            }
             _ => None,
         };
+
+        let org_units: Vec<VaOnlineOrgUnit> = org_units.unwrap_or_default();
+
+        let unit = org_units.iter().find(|unit| unit.id == org_unit);
 
         Ok(ApplicationLoginResponse {
             org_unit: Some(org_unit.to_string()),
             year: Some(get_current_year()),
             lang: Some("vi".to_string()),
-            org_unit_id,
+            org_unit_id: unit.map(|unit| unit.id.clone()),
             tenant_id: Some(tenant.tenant_id.as_deref().unwrap_or("").to_string()),
             access_token: token.access_token,
             expires_in: Some(token.expires_in),
             refresh_token: token.refresh_token,
             token_type: token.token_type,
             url_api: account.url_api.clone(),
+            org_units,
         })
     }
 
@@ -665,6 +733,7 @@ impl TaxAuthService {
                 token.token_type
             },
             url_api: url_api.clone(),
+            org_units: vec![],
         })
     }
 

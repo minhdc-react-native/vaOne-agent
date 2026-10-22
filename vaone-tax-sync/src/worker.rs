@@ -1,3 +1,13 @@
+use crate::auth::VaOnlineOrgUnit;
+use crate::{
+    auth::{get_current_year, ApplicationLoginResponse, TaxAuthService, TypeApp},
+    client::request_delay,
+    database::Database,
+    error::TaxSyncError,
+    models::{SyncRequest, TaxAccount},
+    sync::{SyncObserver, TaxSyncService},
+    SecretStore,
+};
 use anyhow::{anyhow, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{DateTime, Duration as ChronoDuration, NaiveDate, NaiveDateTime, Utc};
@@ -10,16 +20,6 @@ use std::{
         Arc,
     },
     time::Duration,
-};
-
-use crate::{
-    auth::{get_current_year, ApplicationLoginResponse, TaxAuthService, TypeApp},
-    client::request_delay,
-    database::Database,
-    error::TaxSyncError,
-    models::{SyncRequest, TaxAccount},
-    sync::{SyncObserver, TaxSyncService},
-    SecretStore,
 };
 
 use tokio::time::sleep;
@@ -488,6 +488,7 @@ impl TaxSyncWorker {
                         .clone()
                         .unwrap_or_else(|| "Bearer".to_string()),
                     url_api: account.url_api.clone(),
+                    org_units: vec![],
                 }));
             }
         }
