@@ -24,7 +24,7 @@ export default function QuitPage() {
                 <div className="mt-6 flex justify-end gap-2">
                     <Button
                         variant="secondary"
-                        onClick={hideWindow}
+                        onClick={() => hideWindow()}
                     >
                         Hủy
                     </Button>
