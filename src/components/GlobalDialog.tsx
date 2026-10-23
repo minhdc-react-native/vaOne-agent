@@ -3,15 +3,19 @@ import { listen } from "@tauri-apps/api/event";
 import Dialog from "./Dialog";
 import { dialog } from "../service/dialog.service";
 
-type Payload = {
+export type DialogPayload = {
     id: string;
     type: any;
     title?: string;
     message?: string;
+    text?: {
+        confirmText?: string;
+        cancelText?: string;
+    }
 };
 
 export function GlobalDialog() {
-    const [current, setCurrent] = useState<Payload | null>(null);
+    const [current, setCurrent] = useState<DialogPayload | null>(null);
 
     useEffect(() => {
         console.log("🔔 Dialog listener mounted");
@@ -34,8 +38,8 @@ export function GlobalDialog() {
             type={current.type}
             title={current.title}
             message={current.message}
-            confirmText="Đồng ý"
-            cancelText="Hủy bỏ"
+            confirmText={current.text?.confirmText ?? "Đồng ý"}
+            cancelText={current.text?.cancelText ?? "Hủy bỏ"}
             onCancel={() => {
                 dialog.resolve(current.id, false);
                 setCurrent(null);

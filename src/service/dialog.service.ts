@@ -1,13 +1,7 @@
-import { emit, listen } from "@tauri-apps/api/event";
+import { emit } from "@tauri-apps/api/event";
+import { DialogPayload } from "../components/GlobalDialog";
 
 type DialogType = "info" | "success" | "error" | "warning" | "question";
-
-type DialogPayload = {
-    id: string;
-    type: DialogType;
-    title?: string;
-    message?: string;
-};
 
 const listeners: Map<string, (result: boolean) => void> = new Map();
 
@@ -36,23 +30,48 @@ export const dialog = {
     },
 
     // shortcuts
-    info(message: string, title = "Info") {
-        return dialog.open({ type: "info", message, title });
+    info(message: string, title = "Info",
+        text?: {
+            confirmText?: string;
+            cancelText?: string;
+        }
+    ) {
+        return dialog.open({ type: "info", message, title, text });
     },
 
-    success(message: string, title = "Success") {
-        return dialog.open({ type: "success", message, title });
+    success(message: string, title = "Success",
+        text?: {
+            confirmText?: string;
+            cancelText?: string;
+        }
+    ) {
+        return dialog.open({ type: "success", message, title, text });
     },
 
-    error(message: string, title = "Error") {
-        return dialog.open({ type: "error", message, title });
+    error(message: string, title = "Error",
+        text?: {
+            confirmText?: string;
+            cancelText?: string;
+        }
+    ) {
+        return dialog.open({ type: "error", message, title, text });
     },
 
-    warning(message: string, title = "Warning") {
-        return dialog.open({ type: "warning", message, title });
+    warning(message: string, title = "Warning",
+        text?: {
+            confirmText?: string;
+            cancelText?: string;
+        }
+    ) {
+        return dialog.open({ type: "warning", message, title, text });
     },
 
-    question(message: string, title = "Confirm") {
-        return dialog.open({ type: "question", message, title });
+    question(message: string, title = "Confirm",
+        text?: {
+            confirmText?: string;
+            cancelText?: string;
+        }
+    ) {
+        return dialog.open({ type: "question", message, title, text });
     },
 };

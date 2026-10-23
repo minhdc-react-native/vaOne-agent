@@ -320,7 +320,7 @@ export function TaxInvoiceManager() {
                     </Button>
                 </div>
             }
-            onClose={onClose}
+            callBack={{ onClose }}
         >
             <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 text-sm text-gray-800 p-2 bg-gray-100">
                 <div className="flex gap-1">

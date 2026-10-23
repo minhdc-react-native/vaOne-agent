@@ -13,14 +13,27 @@ interface AppWindowProps {
     children: ReactNode;
     content?: ReactNode;
     disableClose?: boolean;
-    onClose?: () => void;
+    callBack?: {
+        onConfirm?: () => Promise<boolean>;
+        onClose?: () => void;
+    }
 }
-export const hideWindow = async (onClose?: () => void) => {
+export const hideWindow = async (callBack?: {
+    onConfirm?: () => Promise<boolean>;
+    onClose?: () => void;
+}) => {
+    if (callBack?.onConfirm) {
+        const confirmed = await callBack.onConfirm();
+
+        if (!confirmed) return;
+    }
+
     await trayApi.post("/open_tray_page", {
         route: "/blank",
         data: {},
     });
-    onClose?.();
+
+    callBack?.onClose?.();
 };
 
 export default function AppWindow({
@@ -29,7 +42,7 @@ export default function AppWindow({
     children,
     content,
     disableClose = false,
-    onClose
+    callBack
 }: AppWindowProps) {
     const location = useLocation();
     useEscape(hideWindow, !disableClose);
@@ -70,7 +83,7 @@ export default function AppWindow({
                 {content}
                 {!disableClose && <Button
                     // disabled={disableClose}
-                    onClick={() => hideWindow(onClose)} variant="ghost"
+                    onClick={() => hideWindow(callBack)} variant="ghost"
                     iconOnly icon={<X size={15} />}
                 />}
             </header>

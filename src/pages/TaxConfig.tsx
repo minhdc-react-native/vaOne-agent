@@ -6,6 +6,8 @@ import { usePauseTaxSyncWorker } from "../hook/usePauseTaxSyncWorker";
 import { Loader, SquarePause, SquarePlay } from "lucide-react";
 import Button from "../components/Button";
 import { Tooltip } from "../components/Tooltip/Tooltip";
+import { useLatest } from "../hook/useLatest";
+import { dialog } from "../service/dialog.service";
 
 export const TaxConfig = () => {
     const { loading,
@@ -13,10 +15,23 @@ export const TaxConfig = () => {
         setWorkerRunning
     } = usePauseTaxSyncWorker();
 
+    const refIsRunning = useLatest(isRunning);
+
     useEffect(() => {
         invoke("page_ready", { name: "taxConfig" });
     }, []);
 
+    const onConfirm = async () => {
+        const confirmed = await dialog.question(
+            `Bạn đang dừng dịch vụ, bạn nên bật lại dịch vụ đồng bộ!, bạn vẫn muốn thoát màn hình? `,
+            "Thoát màn hình",
+            {
+                confirmText: "Có",
+                cancelText: "Không"
+            }
+        );
+        return confirmed;
+    }
     return (
         <AppWindow title={"Quản lý kết nối, đồng bộ dữ liệu với tổng cục thuế"} icon="Unplug"
             content={
@@ -30,6 +45,7 @@ export const TaxConfig = () => {
                         </div>}
                 </div>
             }
+            callBack={!isRunning ? { onConfirm } : undefined}
         >
             <TaxAccountManager isRunning={isRunning} />
         </AppWindow>

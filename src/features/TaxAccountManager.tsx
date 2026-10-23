@@ -143,7 +143,7 @@ function authVariant(status: AuthStatus) {
 }
 
 interface ITaxAccountManager {
-    isRunning: boolean
+    isRunning: boolean;
 }
 export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
 
