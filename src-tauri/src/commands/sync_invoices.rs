@@ -52,7 +52,11 @@ pub fn start_tax_sync_worker(manager: State<'_, TaxSyncWorkerManager>) -> Result
 }
 
 #[tauri::command]
-pub fn stop_tax_sync_worker(manager: State<'_, TaxSyncWorkerManager>) -> Result<(), String> {
-    manager.stop();
-    Ok(())
+pub async fn stop_tax_sync_worker(manager: State<'_, TaxSyncWorkerManager>) -> Result<(), String> {
+    manager.stop_and_wait().await
+}
+
+#[tauri::command]
+pub fn is_tax_sync_worker_running(manager: State<'_, TaxSyncWorkerManager>) -> bool {
+    manager.is_running()
 }

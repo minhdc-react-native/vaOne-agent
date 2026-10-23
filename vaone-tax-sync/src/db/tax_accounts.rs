@@ -384,6 +384,67 @@ impl Database {
         }
     }
 
+    pub fn update_auto_sync(
+        &self,
+        tax_code: &str,
+        enabled: &bool,
+        auto_sync: &bool,
+    ) -> Result<TaxAccount> {
+        let conn = self.connect()?;
+
+        let affected = conn
+            .execute(
+                "UPDATE tax_accounts
+             SET enabled = ?1,
+                auto_sync = ?2,
+                -- Reset xác thực ứng dụng
+                app_auth_status = 'pending',
+                app_token = NULL,
+                app_refresh_token = NULL,
+                app_token_type = NULL,
+                app_token_expires_at = NULL,
+                last_app_login_at = NULL,
+                last_app_auth_error = NULL,
+                app_auth_fail_count = 0,
+                app_auth_blocked = 0,
+
+                updated_at = CURRENT_TIMESTAMP
+             WHERE tax_code = ?3",
+                rusqlite::params![enabled, auto_sync, tax_code],
+            )
+            .map_err(db_error)?;
+
+        if affected == 0 {
+            return Err(TaxSyncError::Database(format!(
+                "Không tìm thấy tài khoản mã số thuế: {tax_code}"
+            )));
+        }
+
+        self.get_tax_account(tax_code)
+    }
+
+    pub fn update_sync_time(&self, tax_code: &str) -> Result<()> {
+        let conn = self.connect()?;
+
+        let affected = conn
+            .execute(
+                "UPDATE tax_accounts
+             SET updated_at = CURRENT_TIMESTAMP
+             WHERE tax_code = ?1",
+                rusqlite::params![tax_code],
+            )
+            .map_err(db_error)?;
+
+        if affected == 0 {
+            return Err(TaxSyncError::Database(format!(
+                "Không tìm thấy tài khoản mã số thuế: {tax_code}"
+            ))
+            .into());
+        }
+
+        Ok(())
+    }
+
     /// Xóa tài khoản theo mã số thuế.
     pub fn delete_tax_account(&self, tax_code: &str) -> Result<()> {
         let tax_code = tax_code.trim();
@@ -397,6 +458,33 @@ impl Database {
         let mut conn = self.connect()?;
 
         let tx = conn.transaction().map_err(db_error)?;
+
+        let (old_password_key, old_app_key) = tx
+            .query_row(
+                "SELECT password_key, pass_app_key
+             FROM tax_accounts
+             WHERE tax_code = ?1",
+                params![tax_code],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            )
+            .optional()
+            .map_err(db_error)?
+            .ok_or_else(|| {
+                TaxSyncError::Database(format!("Không tìm thấy tài khoản mã số thuế: {tax_code}"))
+            })?;
+
+        let store = SecretStore::new();
+        if !old_password_key.trim().is_empty() {
+            store.delete_secret(&old_password_key).map_err(|e| {
+                TaxSyncError::Database(format!("Không thể xóa key mật khẩu tài khoản thuế: {e}"))
+            })?;
+        }
+
+        if let Some(key) = old_app_key.as_deref().filter(|key| !key.trim().is_empty()) {
+            store.delete_secret(key).map_err(|e| {
+                TaxSyncError::Database(format!("Không thể xóa key mật khẩu ứng dụng: {e}"))
+            })?;
+        }
 
         // 1. Xóa dữ liệu đồng bộ hóa đơn
         tx.execute(

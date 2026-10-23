@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use tauri::State;
 use vaone_tax_sync::{
-    auth::{LoginResponse, TaxAuthService, TypeApp},
+    auth::{ApplicationLoginResponse, LoginResponse, TaxAuthService, TypeApp},
     database::Database,
     error::TaxSyncError,
     models::{TaxAccount, TaxAccountInput},
@@ -42,6 +42,17 @@ pub fn update_tax_account(
     input: TaxAccountInput,
 ) -> Result<TaxAccount, String> {
     db.update_tax_account(&tax_code, &input)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_auto_sync(
+    db: State<'_, Database>,
+    tax_code: String,
+    enabled: bool,
+    auto_sync: bool,
+) -> Result<TaxAccount, String> {
+    db.update_auto_sync(&tax_code, &enabled, &auto_sync)
         .map_err(|e| e.to_string())
 }
 
@@ -104,4 +115,39 @@ pub async fn check_tax_application_login(
             .map_err(|e| format!("Đăng nhập ứng dụng thất bại: {e}"))?;
     }
     Ok(token)
+}
+
+#[tauri::command]
+pub async fn check_app_login(
+    input: CheckTaxLoginInput,
+) -> Result<ApplicationLoginResponse, String> {
+    let store = SecretStore::new();
+    let auth = TaxAuthService::new().map_err(|e| e.to_string())?;
+    let account = &input.account;
+    // 3. Lấy mật khẩu ứng dụng:
+    // Ưu tiên mật khẩu nhập trên form, nếu không có thì đọc SecretStore.
+    let app_password = match input.app_password {
+        Some(password) if !password.trim().is_empty() => password,
+        _ => {
+            let key = account
+                .pass_app_key
+                .as_deref()
+                .filter(|key| !key.trim().is_empty())
+                .ok_or_else(|| {
+                    "Chưa có mật khẩu ứng dụng. Vui lòng nhập mật khẩu để kiểm tra.".to_string()
+                })?;
+
+            store.get_secret(key).map_err(|e| {
+                format!("Không lấy được mật khẩu ứng dụng. Vui lòng nhập lại mật khẩu: {e}")
+            })?
+        }
+    };
+    let type_app = TypeApp::try_from(account.type_app.as_str()).map_err(|e| e.to_string())?;
+    // 4. Kiểm tra đăng nhập vaOnline hoặc vaOne.
+    let result = auth
+        .check_application_login(account, &app_password, &type_app)
+        .await
+        .map_err(|e| format!("Đăng nhập ứng dụng thất bại: {e}"))?;
+
+    Ok(result)
 }

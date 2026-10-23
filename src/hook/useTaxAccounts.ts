@@ -53,6 +53,24 @@ export function useTaxAccounts() {
             }),
     });
 
+    const saveAutoSync = useMutation({
+        mutationFn: ({
+            taxCode,
+            enabled,
+            autoSync,
+        }: {
+            taxCode: string;
+            enabled: boolean;
+            autoSync: boolean;
+        }): Promise<ITaxAccount> =>
+            taxAccountService.updateAutoSync(taxCode, enabled, autoSync),
+
+        onSuccess: () =>
+            queryClient.invalidateQueries({
+                queryKey: TAX_ACCOUNTS_QUERY_KEY,
+            }),
+    });
+
     // 4. Xóa tài khoản
     const deleteMutation = useMutation({
         mutationFn: (taxCode: string) =>
@@ -88,6 +106,12 @@ export function useTaxAccounts() {
             input: ITaxAccountInput,
         ) => updateMutation.mutateAsync({ taxCode, input }),
 
+        updateAutoSync: (
+            taxCode: string,
+            enabled: boolean,
+            autoSync: boolean,
+        ) => saveAutoSync.mutateAsync({ taxCode, enabled, autoSync }),
+
         deleteAccount: deleteMutation.mutateAsync,
     };
 }
@@ -108,4 +132,13 @@ export const useCheckTaxAccountLogin = () =>
             passwords,
         }: CheckTaxAccountLoginParams) =>
             taxAccountService.checkLogin(account, passwords),
+    });
+
+export const useCheckLoginApp = () =>
+    useMutation({
+        mutationFn: ({
+            account,
+            passwords,
+        }: CheckTaxAccountLoginParams) =>
+            taxAccountService.checkLoginApp(account, passwords),
     });

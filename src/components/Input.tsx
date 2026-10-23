@@ -13,6 +13,7 @@ export interface InputProps
     extends InputHTMLAttributes<HTMLInputElement> {
     label?: ReactNode;
     labelPosition?: "top" | "left" | "right";
+    labelWidth?: number;
     error?: string;
     icon?: ReactNode;
     password?: boolean;
@@ -24,6 +25,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {
             label,
             labelPosition = "top",
+            labelWidth,
             error,
             icon,
             password = false,
@@ -59,7 +61,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                 sizeInput === "sm" ? "text-sm" : "text-xs"
             )}>
                 {label && (
-                    <label className={labelClass}>
+                    <label className={labelClass} style={{ width: labelWidth }}>
                         {label} {required && <span className="text-red-500">*</span>}
                     </label>
                 )}

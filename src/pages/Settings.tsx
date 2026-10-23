@@ -148,7 +148,7 @@ export default function SettingsPage() {
                         onChange={setAutoStart}
                     />
 
-                    <Input
+                    {/* <Input
                         label="Delay Request (ms)"
                         labelPosition="left"
                         type="number"
@@ -156,7 +156,7 @@ export default function SettingsPage() {
                         onChange={(e) =>
                             setDelay(Number(e.target.value))
                         }
-                    />
+                    /> */}
 
                 </div>
 

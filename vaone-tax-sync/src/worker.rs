@@ -21,8 +21,8 @@ use std::{
     },
     time::Duration,
 };
-
 use tokio::time::sleep;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Deserialize)]
 struct TimeApiResponse {
@@ -113,7 +113,6 @@ pub struct TaxSyncWorker {
     captcha_solver: Arc<dyn CaptchaSolver>,
     observer: Arc<dyn SyncObserver>,
     config: TaxSyncWorkerConfig,
-    cancel: Arc<AtomicBool>,
 }
 
 impl TaxSyncWorker {
@@ -139,102 +138,130 @@ impl TaxSyncWorker {
             captcha_solver,
             observer,
             config,
-            cancel: Arc::new(AtomicBool::new(false)),
         })
     }
 
-    pub fn start(self: Arc<Self>) {
-        self.cancel.store(false, Ordering::SeqCst);
+    pub async fn run_workers(&self, cancel: CancellationToken) {
+        tokio::join!(
+            self.run(cancel.clone()),
+            self.run_upload(cancel.clone()),
+            self.run_update(cancel.clone()),
+        );
     }
 
-    pub fn stop(&self) {
-        self.cancel.store(true, Ordering::SeqCst);
-    }
-
-    pub async fn run_workers(&self) {
-        tokio::join!(self.run(), self.run_upload(), self.run_update());
-    }
-
-    /// Chạy liên tục cho đến khi được yêu cầu dừng hoặc runtime kết thúc.
-    async fn run(&self) {
+    async fn run(&self, cancel: CancellationToken) {
         loop {
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
+            println!("[tax-sync] RUN_ONCE");
 
-            if let Err(error) = self.run_once().await {
+            if let Err(error) = self.run_once(cancel.clone()).await {
                 eprintln!("[tax-sync] Worker iteration failed: {error:#}");
             }
 
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
 
-            sleep(Duration::from_secs(self.config.poll_interval_secs.max(60))).await;
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = sleep(Duration::from_secs(
+                    self.config.poll_interval_secs.max(60)
+                )) => {}
+            }
         }
     }
 
-    async fn run_upload(&self) {
+    async fn run_upload(&self, cancel: CancellationToken) {
         loop {
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
 
-            if let Err(error) = self.upload_once().await {
+            if let Err(error) = self.upload_once(cancel.clone()).await {
                 eprintln!("[tax-sync] Upload iteration failed: {error:#}");
             }
 
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
 
-            sleep(Duration::from_secs(5)).await;
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = sleep(Duration::from_secs(5)) => {}
+            }
         }
     }
 
-    async fn run_update(&self) {
+    async fn run_update(&self, cancel: CancellationToken) {
         loop {
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
 
-            if let Err(error) = self.update_once().await {
-                eprintln!("[tax-sync] Upload iteration failed: {error:#}");
+            if let Err(error) = self.update_once(cancel.clone()).await {
+                eprintln!("[tax-sync] Update iteration failed: {error:#}");
             }
 
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
 
-            sleep(Duration::from_secs(5)).await;
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = sleep(Duration::from_secs(5)) => {}
+            }
         }
     }
-    async fn upload_once(&self) -> Result<()> {
+
+    async fn upload_once(&self, cancel: CancellationToken) -> Result<()> {
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
+
         let accounts = self.db.get_enabled_tax_accounts()?;
+
         for account in accounts {
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
 
-            if account.auto_sync {
-                match self.ensure_valid_app_token(&account).await {
-                    Ok(Some(token)) => {
-                        let type_app = TypeApp::try_from(account.type_app.as_str())?;
-                        let _ = self
-                            .invoices_pending_upload(&account.tax_code, &token, &type_app)
-                            .await?;
-                        eprintln!(
-                            "[tax-sync] App token ready: tax_code={}, app={}",
-                            account.tax_code, account.type_app
-                        );
+            if !account.auto_sync {
+                continue;
+            }
+
+            match self.ensure_valid_app_token(&account).await {
+                Ok(Some(token)) => {
+                    if cancel.is_cancelled() {
+                        break;
                     }
-                    Ok(None) => {}
-                    Err(error) => {
-                        eprintln!(
-                            "[tax-sync] App authentication failed: tax_code={}, error={:#}",
-                            account.tax_code, error
-                        );
+
+                    let type_app = TypeApp::try_from(account.type_app.as_str())?;
+
+                    self.invoices_pending_upload(
+                        &account.tax_code,
+                        &token,
+                        &type_app,
+                        cancel.clone(),
+                    )
+                    .await?;
+
+                    eprintln!(
+                        "[tax-sync] App token ready: tax_code={}, app={}",
+                        account.tax_code, account.type_app
+                    );
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    if cancel.is_cancelled() {
+                        break;
                     }
+
+                    eprintln!(
+                        "[tax-sync] App authentication failed: tax_code={}, error={:#}",
+                        account.tax_code, error
+                    );
                 }
             }
         }
@@ -242,14 +269,18 @@ impl TaxSyncWorker {
         Ok(())
     }
     /// Một lượt quét toàn bộ tài khoản thuế đang bật.
-    pub async fn run_once(&self) -> Result<()> {
+    pub async fn run_once(&self, cancel: CancellationToken) -> Result<()> {
         let accounts = self.db.get_enabled_tax_accounts()?;
         for account in accounts {
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
 
-            if let Err(error) = self.process_account(&account).await {
+            if let Err(err) = self.db.update_sync_time(&account.tax_code) {
+                eprintln!("[tax-sync] Update sync time failed: {err}");
+            }
+
+            if let Err(error) = self.process_account(&account, cancel.clone()).await {
                 eprintln!("[tax-sync] Account {} failed: {error:#}", account.tax_code);
             }
         }
@@ -257,23 +288,40 @@ impl TaxSyncWorker {
         Ok(())
     }
 
-    pub async fn update_once(&self) -> Result<()> {
+    pub async fn update_once(&self, cancel: CancellationToken) -> Result<()> {
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
+
         let accounts = self.db.get_enabled_tax_accounts()?;
+
         for account in accounts {
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
 
-            if let Err(error) = self.process_account_update(&account).await {
-                eprintln!("[tax-sync] Account {} failed: {error:#}", account.tax_code);
+            if let Err(error) = self.process_account_update(&account, cancel.clone()).await {
+                // Không ghi nhận việc hủy worker như lỗi tài khoản.
+                if cancel.is_cancelled() {
+                    break;
+                }
+
+                eprintln!(
+                    "[tax-sync] Account {} update failed: {error:#}",
+                    account.tax_code
+                );
             }
         }
 
         Ok(())
     }
 
-    async fn process_account_update(&self, account: &TaxAccount) -> Result<()> {
-        if self.cancel.load(Ordering::Relaxed) {
+    async fn process_account_update(
+        &self,
+        account: &TaxAccount,
+        cancel: CancellationToken,
+    ) -> Result<()> {
+        if cancel.is_cancelled() {
             return Ok(());
         }
 
@@ -283,11 +331,22 @@ impl TaxSyncWorker {
             return Ok(());
         }
 
+        // Không bắt đầu đăng nhập nếu worker đã được yêu cầu dừng.
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
+
         let token = self.ensure_valid_token(account).await?;
 
+        // Nếu đăng nhập xong mới nhận yêu cầu dừng, không xử lý tiếp.
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
+
         let service = TaxSyncService::new(self.db.clone())?;
+
         for invoice_type in &invoice_types {
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
 
@@ -298,7 +357,7 @@ impl TaxSyncWorker {
                     &token,
                     self.config.delay_ms,
                     100, // Số hóa đơn mỗi batch
-                    Arc::clone(&self.cancel),
+                    cancel.clone(),
                 )
                 .await?;
 
@@ -306,13 +365,18 @@ impl TaxSyncWorker {
                 "[tax-sync] Detail retry: tax_code={}, type={}, completed={}, failed={}",
                 account.tax_code, invoice_type, completed, failed
             );
+
+            if cancel.is_cancelled() {
+                break;
+            }
         }
 
         Ok(())
     }
 
-    async fn process_account(&self, account: &TaxAccount) -> Result<()> {
-        if self.cancel.load(Ordering::Relaxed) {
+    async fn process_account(&self, account: &TaxAccount, cancel: CancellationToken) -> Result<()> {
+        // Không bắt đầu xử lý tài khoản mới nếu đã có yêu cầu dừng.
+        if cancel.is_cancelled() {
             return Ok(());
         }
 
@@ -322,43 +386,76 @@ impl TaxSyncWorker {
             return Ok(());
         }
 
+        // Đăng nhập có thể mất thời gian.
+        // Nếu dừng trong lúc đăng nhập, chờ đăng nhập xong rồi thoát.
         let token = self.ensure_valid_token(account).await?;
+
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
 
         self.seed_days(account, &invoice_types).await?;
 
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
+
         for invoice_type in &invoice_types {
-            if self.cancel.load(Ordering::Relaxed) {
+            if cancel.is_cancelled() {
                 break;
             }
 
             let today = vietnam_today().await?;
+
+            if cancel.is_cancelled() {
+                break;
+            }
 
             let mut dates = self
                 .db
                 .get_incomplete_days(&account.tax_code, *invoice_type)?;
 
             let today_str = today.format("%Y-%m-%d").to_string();
-            dates.insert(0, today_str);
+
+            // Tránh thêm ngày hôm nay nhiều lần nếu đã có trong danh sách.
+            if !dates.contains(&today_str) {
+                dates.insert(0, today_str);
+            }
 
             for date in dates {
+                if cancel.is_cancelled() {
+                    break;
+                }
+
                 eprintln!(
                     "[tax-sync] tax_code={}, type={}, date={}",
                     account.tax_code, invoice_type, date
                 );
-                if self.cancel.load(Ordering::Relaxed) {
+
+                // Cho phép dừng ngay cả khi đang chờ delay.
+                tokio::select! {
+                    _ = cancel.cancelled() => break,
+                    _ = request_delay(self.config.delay_ms) => {}
+                }
+
+                if cancel.is_cancelled() {
                     break;
                 }
 
-                request_delay(self.config.delay_ms).await;
-
                 if let Err(error) = self
-                    .sync_one_day(account, *invoice_type, &date, &token)
+                    .sync_one_day(account, *invoice_type, &date, &token, cancel.clone())
                     .await
                 {
                     eprintln!(
                         "[tax-sync] tax_code={}, type={}, date={}: {error:#}",
                         account.tax_code, invoice_type, date
                     );
+                }
+
+                // Nếu vừa hoàn thành một ngày mà nhận tín hiệu dừng,
+                // không tiếp tục sang ngày tiếp theo.
+                if cancel.is_cancelled() {
+                    break;
                 }
             }
         }
@@ -602,11 +699,11 @@ impl TaxSyncWorker {
         invoice_type: u8,
         date: &str,
         token: &str,
+        cancel: CancellationToken,
     ) -> Result<()> {
-        if self.cancel.load(Ordering::Relaxed) {
+        if cancel.is_cancelled() {
             return Ok(());
         }
-
         let service = TaxSyncService::new(self.db.clone())?;
 
         let request = SyncRequest {
@@ -617,13 +714,24 @@ impl TaxSyncWorker {
             token: token.to_string(),
             delay_ms: self.config.delay_ms,
         };
+        if cancel.is_cancelled() {
+            return Ok(());
+        }
         self.db
             .set_day_running(&account.tax_code, invoice_type, date)?;
 
         service
-            .run(request, self.observer.as_ref(), Arc::clone(&self.cancel))
+            .run(request, self.observer.as_ref(), cancel.clone())
             .await
             .map_err(|error| anyhow!(error.to_string()))?;
+
+        if cancel.is_cancelled() {
+            // Không đánh dấu completed nếu quá trình bị dừng.
+            // Ngày cần được giữ ở trạng thái có thể retry.
+            self.db
+                .set_day_pending(&account.tax_code, invoice_type, date)?;
+            return Ok(());
+        }
 
         Ok(())
     }
@@ -633,14 +741,24 @@ impl TaxSyncWorker {
         tax_code: &str,
         token: &ApplicationLoginResponse,
         type_app: &TypeApp,
+        cancel: CancellationToken,
     ) -> Result<Value> {
+        if cancel.is_cancelled() {
+            return Ok(Value::Array(Vec::new()));
+        }
+
         let invoices = self.db.get_invoices_pending_upload(tax_code)?;
 
         let mut results = Vec::new();
-        const BATCH_SIZE: usize = 10; // upload 10 hóa đơn 1 lần.
+        const BATCH_SIZE: usize = 10;
 
         for batch in invoices.chunks(BATCH_SIZE) {
-            // Bổ sung outOrIn vào từng hóa đơn
+            // Không bắt đầu batch mới khi đã nhận yêu cầu dừng.
+            if cancel.is_cancelled() {
+                break;
+            }
+
+            // Bổ sung outOrIn và xml vào từng hóa đơn.
             let datas: Vec<Value> = batch
                 .iter()
                 .map(|item| {
@@ -667,11 +785,12 @@ impl TaxSyncWorker {
                 })
                 .collect();
 
-            // Payload gửi lên API
             let payload = serde_json::json!({
                 "data": datas
             });
 
+            // Không select! để hủy ngang request upload.
+            // Chờ kết quả để biết có cần cập nhật trạng thái DB hay không.
             match self.auth.post_data(&payload, token, type_app).await {
                 Ok(result) => {
                     for invoice in batch {
@@ -691,20 +810,22 @@ impl TaxSyncWorker {
 
                     results.push(result);
                 }
+
                 Err(err) => {
                     let message = err.to_string();
-                    println!(
-                        "Invoice payload: {}",
-                        serde_json::to_string_pretty(&payload).unwrap_or_default()
-                    );
 
                     for invoice in batch {
-                        let _ = self.db.set_upload_failed(
+                        if let Err(db_err) = self.db.set_upload_failed(
                             tax_code,
                             invoice.invoice_type,
                             &invoice.invoice_key,
                             &message,
-                        );
+                        ) {
+                            eprintln!(
+                                "[tax-sync] Mark upload failed failed: key={}, error={}",
+                                invoice.invoice_key, db_err
+                            );
+                        }
                     }
 
                     eprintln!(
@@ -715,7 +836,16 @@ impl TaxSyncWorker {
                 }
             }
 
-            request_delay(self.config.delay_ms).await;
+            // Hoàn tất cập nhật trạng thái batch hiện tại rồi mới dừng.
+            if cancel.is_cancelled() {
+                break;
+            }
+
+            // Có thể dừng ngay trong thời gian chờ delay.
+            tokio::select! {
+                _ = cancel.cancelled() => break,
+                _ = request_delay(self.config.delay_ms) => {}
+            }
         }
 
         Ok(Value::Array(results))

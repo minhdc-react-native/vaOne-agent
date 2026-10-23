@@ -164,6 +164,20 @@ impl Database {
             .map(str::trim)
             .filter(|s| !s.is_empty());
 
+        let nbmst = filters
+            .nbmst
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+
+        let khhdon = filters
+            .khhdon
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+
+        let shdon = filters.shdon;
+
         let from_date = filters.from_date.as_deref().filter(|s| !s.is_empty());
 
         let to_date = filters.to_date.as_deref().filter(|s| !s.is_empty());
@@ -192,13 +206,19 @@ impl Database {
              FROM sync_invoices
              WHERE (?1 IS NULL OR tax_code = ?1)
                AND (?2 IS NULL OR invoice_type = ?2)
-               AND (?3 IS NULL OR invoice_date >= ?3)
-               AND (?4 IS NULL OR invoice_date <= ?4)
-               AND (?5 IS NULL OR detail_status = ?5)
-               AND (?6 IS NULL OR upload_status = ?6)",
+               AND (?3 IS NULL OR nbmst = ?3)
+               AND (?4 IS NULL OR khhdon = ?4)
+               AND (?5 IS NULL OR shdon = ?5)
+               AND (?6 IS NULL OR invoice_date >= ?6)
+               AND (?7 IS NULL OR invoice_date <= ?7)
+               AND (?8 IS NULL OR detail_status = ?8)
+               AND (?9 IS NULL OR upload_status = ?9)",
                 params![
                     tax_code,
                     filters.invoice_type,
+                    nbmst,
+                    khhdon,
+                    shdon.map(|v| v as i64),
                     from_date,
                     to_date,
                     detail_status,
@@ -233,16 +253,20 @@ impl Database {
                 detail_error,
                 upload_error,
                 updated_at,
-                completed_at
+                completed_at,
+                nbten
              FROM sync_invoices
              WHERE (?1 IS NULL OR tax_code = ?1)
                AND (?2 IS NULL OR invoice_type = ?2)
-               AND (?3 IS NULL OR invoice_date >= ?3)
-               AND (?4 IS NULL OR invoice_date <= ?4)
-               AND (?5 IS NULL OR detail_status = ?5)
-               AND (?6 IS NULL OR upload_status = ?6)
+               AND (?3 IS NULL OR nbmst = ?3)
+               AND (?4 IS NULL OR khhdon = ?4)
+               AND (?5 IS NULL OR shdon = ?5)
+               AND (?6 IS NULL OR invoice_date >= ?6)
+               AND (?7 IS NULL OR invoice_date <= ?7)
+               AND (?8 IS NULL OR detail_status = ?8)
+               AND (?9 IS NULL OR upload_status = ?9)
              ORDER BY invoice_date DESC, invoice_key DESC
-             LIMIT ?7 OFFSET ?8",
+             LIMIT ?10 OFFSET ?11",
             )
             .map_err(db_error)?;
 
@@ -251,6 +275,9 @@ impl Database {
                 params![
                     tax_code,
                     filters.invoice_type,
+                    nbmst,
+                    khhdon,
+                    shdon.map(|v| v as i64),
                     from_date,
                     to_date,
                     detail_status,
@@ -283,6 +310,7 @@ impl Database {
                         upload_error: row.get(20)?,
                         updated_at: row.get(21)?,
                         completed_at: row.get(22)?,
+                        nbten: row.get(23)?,
                     })
                 },
             )

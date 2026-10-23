@@ -193,6 +193,7 @@ impl Database {
                 dvtte TEXT,
                 tgia REAL,
                 nbmst TEXT,
+                nbten TEXT,
                 khhdon TEXT,
                 shdon INTEGER,
                 khmshdon INTEGER,
@@ -519,6 +520,30 @@ impl Database {
         Ok(())
     }
 
+    pub fn set_day_pending(&self, tax_code: &str, invoice_type: u8, sync_date: &str) -> Result<()> {
+        let conn = self.connect()?;
+
+        conn.execute(
+            "
+            UPDATE sync_days
+            SET
+                list_status = 'pending',
+                status = 'pending',
+                last_error = NULL,
+                attempt_count = attempt_count + 1,
+                started_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE tax_code = ?1
+            AND invoice_type = ?2
+            AND sync_date = ?3;
+            ",
+            params![tax_code, invoice_type, sync_date],
+        )
+        .map_err(db_error)?;
+
+        Ok(())
+    }
+
     pub fn set_day_list_failed(
         &self,
         tax_code: &str,
@@ -631,13 +656,13 @@ impl Database {
         INSERT INTO sync_invoices (
             tax_code, invoice_type, invoice_key, invoice_date,
             dvtte, tgia, nbmst, khhdon, shdon, khmshdon,
-            tgtcthue, tgtthue, tgtttbso, tthai, ttxly,
+            tgtcthue, tgtthue, tgtttbso, tthai, ttxly, nbten,
             summary_json, detail_status, upload_status
         )
         VALUES (
             ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
             ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-            ?16, 'pending', 'pending'
+            ?16, ?17, 'pending', 'pending'
         )
         ON CONFLICT(tax_code, invoice_type, invoice_key)
         DO UPDATE SET
@@ -653,6 +678,7 @@ impl Database {
             tgtttbso = excluded.tgtttbso,
             tthai = excluded.tthai,
             ttxly = excluded.ttxly,
+            nbten = excluded.nbten,
             summary_json = excluded.summary_json,
             updated_at = CURRENT_TIMESTAMP
         ",
@@ -672,6 +698,7 @@ impl Database {
                 summary["tgtttbso"].as_f64(),
                 summary["tthai"].as_i64(),
                 summary["ttxly"].as_i64(),
+                summary["nbten"].as_str(),
                 summary_json,
             ],
         )

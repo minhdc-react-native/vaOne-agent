@@ -161,6 +161,9 @@ pub struct SyncDay {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SyncInvoiceFilters {
     pub tax_code: Option<String>,
+    pub nbmst: Option<String>,
+    pub khhdon: Option<String>,
+    pub shdon: Option<u64>,
     pub invoice_type: Option<i64>,
     pub from_date: Option<String>,
     pub to_date: Option<String>,
@@ -176,6 +179,7 @@ pub struct SyncInvoice {
     pub dvtte: Option<String>,
     pub tgia: Option<f64>,
     pub nbmst: Option<String>,
+    pub nbten: Option<String>,
     pub khhdon: Option<String>,
     pub shdon: Option<i64>,
     pub khmshdon: Option<i64>,

@@ -74,6 +74,11 @@ interface LoginResponse {
     name: string,
 }
 
+
+interface LoginAppResponse {
+    org_units: any[]
+}
+
 export const taxAccountService = {
     getAll: () =>
         invoke<ITaxAccount[]>("get_tax_accounts"),
@@ -90,6 +95,17 @@ export const taxAccountService = {
             input,
         }),
 
+    updateAutoSync: (
+        taxCode: string,
+        enabled: boolean,
+        autoSync: boolean,
+    ): Promise<ITaxAccount> =>
+        invoke<ITaxAccount>("update_auto_sync", {
+            taxCode,
+            enabled,
+            autoSync,
+        }),
+
     delete: (taxCode: string) =>
         invoke<void>("delete_tax_account", {
             taxCode,
@@ -103,6 +119,21 @@ export const taxAccountService = {
         },
     ): Promise<LoginResponse> =>
         invoke<LoginResponse>("check_tax_application_login", {
+            input: {
+                account,
+                taxPassword: passwords?.taxPassword,
+                appPassword: passwords?.appPassword,
+            },
+        }),
+
+    checkLoginApp: (
+        account: ITaxAccount,
+        passwords?: {
+            taxPassword?: string;
+            appPassword?: string | null;
+        },
+    ): Promise<LoginAppResponse> =>
+        invoke<LoginAppResponse>("check_app_login", {
             input: {
                 account,
                 taxPassword: passwords?.taxPassword,

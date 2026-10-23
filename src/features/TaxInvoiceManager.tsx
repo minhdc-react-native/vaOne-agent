@@ -20,7 +20,7 @@ import AppWindow from "../components/AppWindow";
 import { ComboPopup } from "../components/Select/ComboPopup";
 import { DateInput } from "../components/Date/DateInput";
 import { formatNumber, getCurrentMonthDateRange } from "../lib/utils";
-import { ChevronLeft, ChevronRight, CloudSync, Loader, RefreshCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, CloudSync, Loader, RefreshCcw } from "lucide-react";
 import Button from "../components/Button";
 import { formatDate } from "../api/services/tct.service";
 import { dialog } from "../service/dialog.service";
@@ -28,9 +28,10 @@ import { Tabs } from "../components/Tabs";
 import Switch from "../components/Switch";
 import { showNotification } from "../lib/notification";
 import clsx from "clsx";
+import Input from "../components/Input";
 
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 100;
 
 const INVOICE_TYPES = [
     { id: 1, label: "Hóa đơn mua vào" },
@@ -43,6 +44,21 @@ const mapInvoiceType: Record<number, string> = {
     2: "Bán ra",
     3: "Mua vào",
     4: "Bán ra"
+}
+
+const mapInvoiceStatus: Record<number, string> = {
+    1: "Hóa đơn mới",
+    2: "Hóa đơn thay thế",
+    3: "Hóa đơn điều chỉnh",
+    4: "Hóa đơn đã bị thay thế",
+    5: "Hóa đơn đã bị điều chỉnh"
+}
+const mapInvoiceStyle: Record<number, StatusType> = {
+    1: "pending",
+    2: "warning",
+    3: "progress",
+    4: "draft",
+    5: "draft"
 }
 
 const mapStatus: Record<string, StatusType> = {
@@ -73,6 +89,9 @@ const mapStatusLabel: Record<string, string> = {
 const dateMonth = getCurrentMonthDateRange();
 const initialFilters: ISyncInvoiceFilters = {
     tax_code: "",
+    nbmst: undefined,
+    khhdon: undefined,
+    shdon: undefined,
     invoice_type: 1,
     from_date: dateMonth.fromDate,
     to_date: dateMonth.toDate,
@@ -97,9 +116,9 @@ function StatCard({
     classNumber?: string;
 }) {
     return (
-        <div className="min-w-0 rounded-xl border border-gray-200 bg-white p-2">
+        <div className="w-full rounded-xl border border-gray-200 bg-white p-2">
             <div className="truncate text-sm text-gray-500">{label}</div>
-            <div className={clsx("mt-1 text-3xl font-semibold tabular-nums", classNumber)}>
+            <div className={clsx("mt-1 text-3xl font-semibold tabular-nums text-right", classNumber)}>
                 {value.toLocaleString("vi-VN")}
             </div>
         </div>
@@ -107,6 +126,7 @@ function StatCard({
 }
 
 export function TaxInvoiceManager() {
+
     const { taxCode } = useParams<{ taxCode: string }>();
     const {
         accounts,
@@ -304,36 +324,51 @@ export function TaxInvoiceManager() {
         >
             <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 text-sm text-gray-800 p-2 bg-gray-100">
                 <div className="flex gap-1">
-                    <div className="grid grid-cols-2 gap-1 w-70 shrink-0">
-                        <StatCard
-                            label="Tổng hóa đơn"
-                            value={stats?.total ?? 0}
-                            classNumber="text-green-600"
-                        />
+                    <div className="flex flex-col gap-1 w-70 shrink-0">
+                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
+                            <Clock className="h-6 w-6 shrink-0 text-gray-500" />
 
-                        <StatCard
-                            label="Chờ lấy chi tiết"
-                            value={stats?.groups
-                                .filter((item) => item.detail_status === "pending")
-                                .reduce((sum, item) => sum + item.count, 0) ?? 0}
-                            classNumber="text-blue-600"
-                        />
+                            <span className="text-sm text-gray-500">
+                                Đồng bộ
+                            </span>
 
-                        <StatCard
-                            label="Lỗi lấy chi tiết"
-                            value={stats?.groups
-                                .filter((item) => item.detail_status === "failed")
-                                .reduce((sum, item) => sum + item.count, 0) ?? 0}
-                            classNumber="text-orange-600"
-                        />
+                            <span className="text-sm font-medium text-gray-800">
+                                {account?.updated_at
+                                    ? formatDate(account.updated_at, true)
+                                    : "Chưa đồng bộ"}
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1 flex-1">
+                            <StatCard
+                                label="Tổng hóa đơn"
+                                value={stats?.total ?? 0}
+                                classNumber="text-green-600"
+                            />
 
-                        <StatCard
-                            label="Lỗi upload"
-                            value={stats?.groups
-                                .filter((item) => item.upload_status === "failed")
-                                .reduce((sum, item) => sum + item.count, 0) ?? 0}
-                            classNumber="text-orange-600"
-                        />
+                            <StatCard
+                                label="Chờ lấy chi tiết"
+                                value={stats?.groups
+                                    .filter((item) => item.detail_status === "pending")
+                                    .reduce((sum, item) => sum + item.count, 0) ?? 0}
+                                classNumber="text-blue-600"
+                            />
+
+                            <StatCard
+                                label="Lỗi lấy chi tiết"
+                                value={stats?.groups
+                                    .filter((item) => item.detail_status === "failed")
+                                    .reduce((sum, item) => sum + item.count, 0) ?? 0}
+                                classNumber="text-orange-600"
+                            />
+
+                            <StatCard
+                                label="Lỗi upload"
+                                value={stats?.groups
+                                    .filter((item) => item.upload_status === "failed")
+                                    .reduce((sum, item) => sum + item.count, 0) ?? 0}
+                                classNumber="text-orange-600"
+                            />
+                        </div>
                     </div>
                     <section className="flex-1 rounded border border-gray-200 bg-white p-3 space-y-1">
                         <Tabs variant="line" defaultActiveTab={tab} onChange={(idx) => setTab(idx)}>
@@ -346,14 +381,14 @@ export function TaxInvoiceManager() {
                             <Tabs.Content className="border-0">
                                 <Tabs.Panel index={0} className="border border-gray-300 rounded-md">
                                     {/* Filters */}
-                                    <div className="flex-1 bg-white p-3 space-y-1 h-24">
+                                    <div className="flex-1 bg-white p-3 space-y-1 h-28 w-100">
                                         <div className="flex gap-1 flex-1">
                                             <div className="flex-1 flex gap-1 items-center">
-                                                <span className="w-12">Loại</span>
+                                                <span className="w-12 shrink-0">Loại</span>
                                                 <ComboPopup
                                                     value={INVOICE_TYPES.find(i => i.id === filters.invoice_type)}
                                                     data={INVOICE_TYPES}
-                                                    className="w-45 h-7"
+                                                    className="w-45 shrink-0 h-7"
                                                     onClear={() => {
                                                         updateFilter(
                                                             "invoice_type",
@@ -366,14 +401,13 @@ export function TaxInvoiceManager() {
                                                             item.id,
                                                         )
                                                     }}
-                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40">{item?.label}</div>}
+                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40 shrink-0">{item?.label}</div>}
                                                 />
                                             </div>
-                                            <div className="flex-1 w-50">
+                                            <div className="w-50 shrink-0">
                                                 <DateInput
                                                     label="Từ ngày"
                                                     labelPosition="left"
-                                                    required
                                                     value={filters.from_date ?? ""}
                                                     onChange={(value) =>
                                                         updateFilter(
@@ -383,11 +417,10 @@ export function TaxInvoiceManager() {
                                                     }
                                                 />
                                             </div>
-                                            <div className="w-50">
+                                            <div className="w-50 shrink-0">
                                                 <DateInput
                                                     label="Đến ngày"
                                                     labelPosition="left"
-                                                    required
                                                     value={filters.to_date ?? ""}
                                                     onChange={(value) =>
                                                         updateFilter(
@@ -400,11 +433,11 @@ export function TaxInvoiceManager() {
                                         </div>
                                         <div className="flex gap-1">
                                             <div className="flex-1 flex gap-1 items-center">
-                                                <span className="w-12">Chi tiết</span>
+                                                <span className="w-12 shrink-0">Chi tiết</span>
                                                 <ComboPopup
                                                     value={DETAIL_STATUSES.find(i => i.id === filters.detail_status)}
                                                     data={DETAIL_STATUSES}
-                                                    className="w-45 h-7"
+                                                    className="w-45 shrink-0 h-7"
                                                     onClear={() => {
                                                         updateFilter(
                                                             "detail_status",
@@ -417,16 +450,16 @@ export function TaxInvoiceManager() {
                                                             item.id,
                                                         )
                                                     }}
-                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40">{item?.label}</div>}
+                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40 shrink-0">{item?.label}</div>}
                                                 />
                                             </div>
 
                                             <div className="flex-2 flex gap-1 items-center">
-                                                <span className="w-18">Đồng bộ</span>
+                                                <span className="w-17.5 shrink-0">Đồng bộ</span>
                                                 <ComboPopup
                                                     value={UPLOAD_STATUSES.find(i => i.id === filters.upload_status)}
                                                     data={UPLOAD_STATUSES}
-                                                    className="w-39 h-7"
+                                                    className="w-39 shrink-0 h-7"
                                                     onClear={() => {
                                                         updateFilter(
                                                             "upload_status",
@@ -439,14 +472,59 @@ export function TaxInvoiceManager() {
                                                             item.id,
                                                         )
                                                     }}
-                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40">{item?.label}</div>}
+                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40 shrink-0">{item?.label}</div>}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-1 flex-1">
+                                            <div className="flex-1 w-58 shrink-0">
+                                                <Input
+                                                    label="MST"
+                                                    labelPosition="left"
+                                                    labelWidth={53}
+                                                    value={filters.nbmst ?? ""}
+                                                    onChange={(e) =>
+                                                        updateFilter(
+                                                            "nbmst",
+                                                            e.target.value || undefined,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="w-57.5 shrink-0">
+                                                <Input
+                                                    label="Ký hiệu"
+                                                    labelPosition="left"
+                                                    labelWidth={98}
+                                                    value={filters.khhdon ?? ""}
+                                                    onChange={(e) =>
+                                                        updateFilter(
+                                                            "khhdon",
+                                                            e.target.value || undefined,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div className="w-55 shrink-0">
+                                                <Input
+                                                    label="Số hóa đơn"
+                                                    type="number"
+                                                    labelPosition="left"
+                                                    className="text-right"
+                                                    value={filters.shdon ?? ""}
+                                                    onChange={(e) =>
+                                                        updateFilter(
+                                                            "shdon",
+                                                            Number(e.target.value) || undefined,
+                                                        )
+                                                    }
                                                 />
                                             </div>
                                         </div>
                                     </div>
                                 </Tabs.Panel>
                                 <Tabs.Panel index={1} className="border border-gray-300 rounded-md">
-                                    <div className="flex-1 bg-white p-3 space-y-1 h-24">
+                                    <div className="flex-1 bg-white p-3 space-y-2 h-28 w-100">
                                         <div className="flex gap-1 flex-1">
                                             <div className="flex-1 w-50">
                                                 <DateInput
@@ -479,7 +557,7 @@ export function TaxInvoiceManager() {
                                             <div className="flex-1" />
                                         </div>
                                         <div className="flex gap-4 items-center">
-                                            <div className="flex flex-col gap-1">
+                                            <div className="flex flex-col gap-2">
                                                 <Switch
                                                     label="Lấy lại từ cơ quan thuế"
                                                     // description="Cho phép worker xử lý tài khoản này"
@@ -508,7 +586,7 @@ export function TaxInvoiceManager() {
                     </section>
                 </div>
                 {/* Main content: 1/3 sync days + 2/3 invoices */}
-                <div className="flex-1 grid min-h-0 grid-cols-1 gap-4 xl:grid-cols-3">
+                <div className="flex-1 grid min-h-0 grid-cols-1 gap-4">
                     <section className="min-w-0 min-h-0 flex flex-col overflow-hidden rounded border border-gray-200 bg-white xl:col-span-2">
                         {/* Header: giữ nguyên chiều cao */}
                         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-3 py-3">
@@ -535,9 +613,8 @@ export function TaxInvoiceManager() {
                                         <thead className="sticky top-0 z-10 bg-gray-100">
                                             <tr>
                                                 <th className="w-14 px-2 py-1 font-medium">#</th>
-
-                                                <th className="w-32 px-2 py-1 font-medium text-center">
-                                                    Ngày hóa đơn
+                                                <th className="w-40 px-2 py-1 font-medium">
+                                                    Mã số thuế
                                                 </th>
 
                                                 <th className="w-36 px-2 py-1 font-medium">
@@ -551,13 +628,11 @@ export function TaxInvoiceManager() {
                                                 <th className="w-32 px-2 py-1 font-medium text-right">
                                                     Số hóa đơn
                                                 </th>
-
-                                                <th className="w-35 px-2 py-1 font-medium text-center">
-                                                    Dữ liệu
+                                                <th className="w-32 px-2 py-1 font-medium text-center">
+                                                    Ngày lập
                                                 </th>
-
-                                                <th className="w-35 px-2 py-1 font-medium text-center">
-                                                    Đồng bộ
+                                                <th className="px-2 py-1 font-medium">
+                                                    Tên người bán
                                                 </th>
                                                 <th className="w-28 px-2 py-1 font-medium">
                                                     Tiền tệ
@@ -571,6 +646,15 @@ export function TaxInvoiceManager() {
                                                 <th className="w-28 px-2 py-1 font-medium text-right">
                                                     Tổng tiền
                                                 </th>
+                                                <th className="w-35 px-2 py-1 font-medium text-center">
+                                                    Dữ liệu
+                                                </th>
+                                                <th className="w-35 px-2 py-1 font-medium text-center">
+                                                    Đồng bộ
+                                                </th>
+                                                <th className="w-50 px-2 py-1 font-medium text-center">
+                                                    Trạng thái
+                                                </th>
                                             </tr>
                                         </thead>
 
@@ -583,8 +667,9 @@ export function TaxInvoiceManager() {
                                                     <td className="whitespace-nowrap px-2 py-1">
                                                         {index + 1 + (PAGE_SIZE * (page - 1))}
                                                     </td>
-                                                    <td className="whitespace-nowrap px-2 py-1 text-center">
-                                                        {formatDate(invoice.invoice_date)}
+
+                                                    <td className="whitespace-nowrap px-2 py-1">
+                                                        {invoice.nbmst}
                                                     </td>
 
                                                     <td className="whitespace-nowrap px-2 py-1">
@@ -598,7 +683,25 @@ export function TaxInvoiceManager() {
                                                     <td className="whitespace-nowrap px-2 py-1 text-right">
                                                         {invoice.shdon ?? "—"}
                                                     </td>
+                                                    <td className="whitespace-nowrap px-2 py-1 text-center">
+                                                        {formatDate(invoice.invoice_date)}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-2 py-1">
+                                                        {invoice.nbten}
+                                                    </td>
 
+                                                    <td className="whitespace-nowrap px-2 py-1">
+                                                        {invoice.dvtte ?? "—"}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
+                                                        {formatNumber(invoice.tgtcthue, invoice.tgia !== 1 ? 2 : 0)}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
+                                                        {formatNumber(invoice.tgtthue, invoice.tgia !== 1 ? 2 : 0)}
+                                                    </td>
+                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
+                                                        {formatNumber(invoice.tgtttbso, invoice.tgia !== 1 ? 2 : 0)}
+                                                    </td>
                                                     <td className="px-2 py-1 text-center">
                                                         <StatusBadge
                                                             type={mapStatus[invoice.detail_status]}
@@ -612,17 +715,12 @@ export function TaxInvoiceManager() {
                                                             label={mapStatusLabel[invoice.upload_status]}
                                                         />
                                                     </td>
-                                                    <td className="whitespace-nowrap px-2 py-1">
-                                                        {invoice.dvtte ?? "—"}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
-                                                        {formatNumber(invoice.tgtcthue, invoice.tgia !== 1 ? 2 : 0)}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
-                                                        {formatNumber(invoice.tgtthue, invoice.tgia !== 1 ? 2 : 0)}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
-                                                        {formatNumber(invoice.tgtttbso, invoice.tgia !== 1 ? 2 : 0)}
+                                                    <td className="px-2 py-1 text-center">
+                                                        <StatusBadge
+                                                            variant="text"
+                                                            type={mapInvoiceStyle[invoice.tthai as any]}
+                                                            label={mapInvoiceStatus[invoice.tthai as any]}
+                                                        />
                                                     </td>
                                                 </tr>
                                             ))}

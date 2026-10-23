@@ -35,8 +35,9 @@ export default function AppWindow({
     useEscape(hideWindow, !disableClose);
 
     useEffect(() => {
+        const path = location.pathname.split("/").slice(0, 2).join("/");
         invoke("set_current_route", {
-            route: location.pathname,
+            route: path,
         });
     }, [location.pathname]);
 

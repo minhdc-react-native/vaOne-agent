@@ -8,6 +8,7 @@ import {
     History,
     KeyRound,
     List,
+    Loader,
     MessageCircleMore,
     MessageCircleWarning,
     Pencil,
@@ -22,7 +23,7 @@ import { DateInput } from "../components/Date/DateInput";
 import Switch from "../components/Switch";
 import Button from "../components/Button";
 import { dialog } from "../service/dialog.service";
-import { useCheckTaxAccountLogin, useTaxAccounts } from "../hook/useTaxAccounts";
+import { useCheckLoginApp, useCheckTaxAccountLogin, useTaxAccounts } from "../hook/useTaxAccounts";
 import { ITaxAccount, ITaxAccountInput, TypeApp } from "../service/taxAccountService";
 import { Loading } from "../components/Loading";
 import InvoiceTypeCheckbox from "./InvoiceTypeCheckbox";
@@ -33,6 +34,8 @@ import { useVirtualized } from "../hook/useVirtualized";
 import { formatDate } from "../api/services/tct.service";
 import { useLatest } from "../hook/useLatest";
 import { usePauseTaxSyncWorker } from "../hook/usePauseTaxSyncWorker";
+import { isEmpty } from "../lib/utils";
+import { ComboPopup } from "../components/Select/ComboPopup";
 const ROW_HEIGHT = 180;
 type AuthStatus = "pending" | "authenticated" | "failed";
 type SyncStatus = "pending" | "running" | "completed" | "failed";
@@ -139,10 +142,10 @@ function authVariant(status: AuthStatus) {
     return "warning";
 }
 
-
-export default function TaxAccountManager() {
-
-    const { stop, start } = usePauseTaxSyncWorker();
+interface ITaxAccountManager {
+    isRunning: boolean
+}
+export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
 
     const { taxCode } = useParams<{ taxCode: string | undefined }>();
     const {
@@ -151,12 +154,15 @@ export default function TaxAccountManager() {
         error,
         createAccount,
         updateAccount,
+        updateAutoSync,
         deleteAccount,
     } = useTaxAccounts();
 
     const [loading, setLoading] = useState(false);
 
     const { mutateAsync: checkLogin, isPending: isCheckingLogin } = useCheckTaxAccountLogin();
+
+    const { mutateAsync: checkLoginApp, isPending: isCheckingLoginApp } = useCheckLoginApp();
 
     const [form, setForm] = useState<ITaxAccount>(createEmptyAccount);
     const [selectedTaxCode, setSelectedTaxCode] = useState<string | null>(null);
@@ -216,7 +222,7 @@ export default function TaxAccountManager() {
             password_key: "",
             pass_app_key: "",
         });
-
+        console.log('org_unit account>>', account.org_unit);
         refSecretKeys.current = {
             taxPasswordKey: account.password_key,
             appPasswordKey: account.pass_app_key,
@@ -240,8 +246,91 @@ export default function TaxAccountManager() {
             "Thông tin lỗi",
         );
     }, [localError, error]);
+    const [orgUnits, setOrgUnits] = useState<{ id: string, value: string, tax_code: string }[]>([]);
+
+    useEffect(() => {
+        setOrgUnits([]);
+    }, [
+        form.tax_code,
+        form.access_code
+    ])
+
+    const handleCheckLoginApp = async () => {
+        const password = refSecretKeys.current?.appPasswordKey || form.pass_app_key;
+        if (isEmpty(form.access_code) || isEmpty(form.user_app) || isEmpty(password)) {
+            showNotification({
+                type: "warning",
+                message: "Bạn cần nhập đủ thông tin đăng nhập"
+            });
+            return;
+        }
+        const taxCode = form.tax_code.trim();
+        const nextAccount: ITaxAccount = {
+            ...form,
+            tax_code: taxCode,
+            username: taxCode,
+        };
+        const checkData = {
+            account: {
+                ...nextAccount,
+                password_key: refSecretKeys.current?.taxPasswordKey ?? "",
+                pass_app_key: refSecretKeys.current?.appPasswordKey ?? null
+            },
+            passwords: {
+                taxPassword: form.password_key,
+                appPassword: form.pass_app_key
+            },
+        };
+        setLocalError("");
+        try {
+            const response = await checkLoginApp(checkData);
+            setOrgUnits(response.org_units || []);
+        } catch (error) {
+            setLocalError(
+                error instanceof Error ? error.message : String(error),
+            );
+        }
+    }
+    const [loadingUpdate, setLoadingUpdate] = useState<{ enabled: boolean, autoSync: boolean }>({ enabled: false, autoSync: false });
+
+    const handleSaveAutoSync = async (fieldChange: 'enabled' | 'autoSync',
+        taxCode: string, enabled: boolean,
+        autoSync: boolean, accessCode?: string) => {
+        if (isRunning) {
+            showNotification({
+                type: "warning",
+                message: "Bạn phải dừng dịch vụ đồng bộ mới được cập nhật!"
+            })
+            return;
+        }
+        if (isEmpty(accessCode) && autoSync && fieldChange === "autoSync") {
+            showNotification({
+                type: "warning",
+                message: "Dữ liệu không đủ thông tin để bật cơ chế dồng bộ tự động!"
+            })
+            return
+        };
+        setLocalError("");
+        try {
+            setLoadingUpdate(prev => ({ ...prev, [fieldChange]: true }));
+            await updateAutoSync(taxCode, enabled, autoSync);
+        } catch (error) {
+            setLocalError(
+                error instanceof Error ? error.message : String(error),
+            );
+        } finally {
+            setLoadingUpdate(prev => ({ ...prev, [fieldChange]: false }));
+        }
+    }
 
     const handleSave = async () => {
+        if (isRunning && isEdit) {
+            showNotification({
+                type: "warning",
+                message: "Bạn phải dừng dịch vụ đồng bộ mới được cập nhật!"
+            })
+            return;
+        }
         setLocalError("");
         const taxCode = form.tax_code.trim();
 
@@ -380,7 +469,6 @@ export default function TaxAccountManager() {
         );
 
         if (!confirmed) return;
-
         try {
             await deleteAccount(taxCode);
             handleNew();
@@ -450,7 +538,6 @@ export default function TaxAccountManager() {
                 grid-cols-2 gap-1
                 overflow-hidden"
             >
-
                 {/* LEFT: Form */}
                 <section className="flex min-h-0 flex-col border border-gray-300 rounded-md">
                     <div className="flex shrink-0 items-center justify-between
@@ -471,7 +558,7 @@ export default function TaxAccountManager() {
                         </button>
                     </div>
 
-                    <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
+                    <div className="min-h-0 flex-1 space-y-1 p-4">
                         {/* Tax credentials */}
                         <div className="space-y-3">
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -513,7 +600,6 @@ export default function TaxAccountManager() {
                                         <span>Mật khẩu thuế</span>
                                         <Tooltip title="Nhập để cập nhật mật khẩu" subTitle={isEdit ? "(nếu để trắng thì hệ thống giữ nguyên mật khẩu cũ))" : undefined}> <MessageCircleMore size={12} className="text-blue-500" /></Tooltip>
                                     </div>}
-                                    disabled={isEdit}
                                     password
                                     // placeholder="Mật khẩu truy cập..."
                                     sizeInput="xs"
@@ -526,6 +612,7 @@ export default function TaxAccountManager() {
                                 <div className="flex items-end justify-end">
                                     <Switch
                                         label="Kích hoạt"
+                                        labelClass="text-xs"
                                         // description="Cho phép worker xử lý tài khoản này"
                                         checked={form.enabled}
                                         onChange={(value) =>
@@ -552,6 +639,7 @@ export default function TaxAccountManager() {
                         <div className="border-t border-gray-300" />
                         <Switch
                             label="Tự động đồng bộ"
+                            labelClass="text-xs"
                             description="Cho phép worker xử lý đồng bộ"
                             checked={form.auto_sync}
                             onChange={(value) =>
@@ -596,15 +684,6 @@ export default function TaxAccountManager() {
                                     }
                                 />
 
-                                {["vaOnline", "vaOne"].includes(form.type_app) ? <Input
-                                    label="Đơn vị dữ liệu"
-                                    sizeInput="xs"
-                                    value={form.org_unit ?? ""}
-                                    onChange={(e) =>
-                                        updateField("org_unit", e.target.value)
-                                    }
-                                /> : <div />}
-
                                 <Input
                                     label="Tài khoản ứng dụng"
                                     sizeInput="xs"
@@ -628,6 +707,31 @@ export default function TaxAccountManager() {
                                         updateField("pass_app_key", e.target.value)
                                     }
                                 />
+
+
+                                {["vaOnline", "vaOne"].includes(form.type_app) ?
+                                    <div className="flex-1 flex flex-col gap-1">
+                                        <span className="text-xs font-medium">Đơn vị dữ liệu</span>
+                                        <div className="flex gap-1 items-center">
+                                            <ComboPopup
+                                                value={orgUnits.find(i => i.id === form.org_unit)}
+                                                data={orgUnits}
+                                                placement="bottom-start"
+                                                className="w-45 h-7"
+                                                onClear={() => {
+                                                    updateField("org_unit", "")
+                                                }}
+                                                onSelect={(item) => {
+                                                    updateField("org_unit", item.id)
+                                                }}
+                                                renderDisplay={(item) => <span className="text-xs px-2">{form.org_unit}</span>}
+                                                renderItem={(item) => <div key={item?.id} className="text-xs"><span className="text-blue-500">{item?.tax_code}</span> - {item?.value}</div>}
+                                            />
+                                            <Tooltip title="Lấy danh sách đơn vị"><Button variant="secondary" icon={
+                                                <RefreshCw size={15} className={isCheckingLoginApp ? "animate-spin" : undefined} />
+                                            } disabled={isCheckingLoginApp} iconOnly={true} onClick={handleCheckLoginApp} /></Tooltip>
+                                        </div>
+                                    </div> : <div />}
                             </div>
 
                             <Input
@@ -685,7 +789,7 @@ export default function TaxAccountManager() {
                         </div>
                         <Switch
                             label="Lỗi"
-                            className="text-xs"
+                            labelClass="text-xs"
                             checked={isError}
                             onChange={(value) =>
                                 setIsError(value)
@@ -733,8 +837,7 @@ export default function TaxAccountManager() {
                                     const selected =
                                         selectedTaxCode === account.tax_code;
                                     return (
-                                        <button
-                                            type="button"
+                                        <div
                                             key={account.tax_code}
                                             onClick={() => handleSelect(account)}
                                             className={`w-full rounded border border-gray-300 p-3 text-left
@@ -763,6 +866,11 @@ export default function TaxAccountManager() {
                                                                 text-sm font-semibold">
                                                                     {account.tax_code}
                                                                 </p>
+                                                                {loadingUpdate.enabled ? <Loader className="animate-spin" size={15} /> : <Switch
+                                                                    labelClass="text-xs"
+                                                                    checked={account.enabled}
+                                                                    onChange={(enabled) => handleSaveAutoSync("enabled", account.tax_code, enabled, account.auto_sync, account.access_code)}
+                                                                />}
                                                                 {(account.last_auth_error || account.last_app_auth_error) && <Tooltip
                                                                     content={tooltipContentError(account.last_auth_error, account.last_app_auth_error)}
                                                                 >
@@ -838,28 +946,12 @@ export default function TaxAccountManager() {
                                                             <RefreshCw size={12} />
                                                             {syncLabels[account.last_sync_status]}
                                                         </div>
-
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-xs
-                                                                text-muted-foreground">
-                                                                Tự động
-                                                            </span>
-                                                            <span className={`relative
-                                                                inline-flex h-4 w-7
-                                                                rounded-full transition-colors
-                                                                ${account.auto_sync
-                                                                    ? "bg-[#e11c2a]"
-                                                                    : "bg-gray-300"
-                                                                }`}>
-                                                                <span className={`absolute
-                                                                    top-0.5 size-3 rounded-full
-                                                                    bg-white transition-transform
-                                                                    ${account.auto_sync
-                                                                        ? "translate-x-3.5"
-                                                                        : "translate-x-0.5"
-                                                                    }`} />
-                                                            </span>
-                                                        </div>
+                                                        {loadingUpdate.autoSync ? <Loader className="animate-spin" size={15} /> : <Switch
+                                                            label="Tự động"
+                                                            labelClass="text-xs"
+                                                            checked={account.auto_sync}
+                                                            onChange={(autoSync) => handleSaveAutoSync("autoSync", account.tax_code, account.enabled, autoSync, account.access_code)}
+                                                        />}
                                                     </div>
                                                     <div className="mt-2 flex items-center
                                                         gap-1.5 text-[11px]
@@ -869,7 +961,7 @@ export default function TaxAccountManager() {
                                                     </div>
                                                 </div>
                                             </div>
-                                        </button>
+                                        </div>
                                     );
                                 })}
                                 <div style={{ height: offsetBottom }} />

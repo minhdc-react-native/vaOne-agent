@@ -12,6 +12,7 @@ use std::sync::{
     Arc,
 };
 use tokio::time::{sleep, Duration as TokioDuration};
+use tokio_util::sync::CancellationToken;
 use zip::ZipArchive;
 
 const URL_EXPORT_XML: &str = "https://hoadondientu.gdt.gov.vn/api/query/invoices/export-xml";
@@ -96,7 +97,7 @@ impl TaxClient {
         to_date: &str,
         token: &str,
         delay_ms: u64,
-        cancel: Arc<AtomicBool>,
+        cancel: CancellationToken,
     ) -> Result<Vec<Value>> {
         let mut result = Vec::new();
 
@@ -108,9 +109,10 @@ impl TaxClient {
                 TaxSyncError::InvalidDateRange("from_date must be <= to_date".to_string()).into(),
             );
         }
+
         while current <= end {
-            if cancel.load(Ordering::Relaxed) {
-                break;
+            if cancel.is_cancelled() {
+                return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
             }
 
             let first_next_month = if current.month() == 12 {
@@ -129,10 +131,22 @@ impl TaxClient {
             let mut state: Option<String> = None;
 
             loop {
-                if cancel.load(Ordering::Relaxed) {
-                    break;
+                if cancel.is_cancelled() {
+                    return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
                 }
-                request_delay(delay_ms).await;
+
+                // Có thể dừng ngay trong thời gian chờ delay.
+                tokio::select! {
+                    _ = cancel.cancelled() => {
+                        return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
+                    }
+                    _ = request_delay(delay_ms) => {}
+                }
+
+                if cancel.is_cancelled() {
+                    return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
+                }
+
                 let mut request_url = base_url.clone();
 
                 if let Some(cursor) = &state {
@@ -146,7 +160,13 @@ impl TaxClient {
                     );
                 }
 
+                // Nếu request đang chờ HTTP, cần timeout hoặc truyền cancel
+                // trực tiếp vào get_json() để có thể dừng nhanh.
                 let response = self.get_json(&request_url, token).await?;
+
+                if cancel.is_cancelled() {
+                    return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
+                }
 
                 if let Some(items) = response["datas"].as_array() {
                     result.extend(items.iter().cloned());
@@ -161,6 +181,10 @@ impl TaxClient {
             }
 
             current = first_next_month;
+        }
+
+        if cancel.is_cancelled() {
+            return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
         }
 
         result.sort_by(|a, b| {

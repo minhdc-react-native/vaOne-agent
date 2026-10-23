@@ -40,6 +40,7 @@ export interface ISyncInvoice {
     dvtte: string | null;
     tgia: number | null;
     nbmst: string | null;
+    nbten: string | null;
     khhdon: string | null;
     shdon: number | null;
     khmshdon: number | null;
@@ -66,6 +67,9 @@ export interface ISyncInvoice {
 
 export interface ISyncInvoiceFilters {
     tax_code?: string;
+    nbmst?: string;
+    khhdon?: string;
+    shdon?: number;
     invoice_type?: number;
     from_date?: string;
     to_date?: string;

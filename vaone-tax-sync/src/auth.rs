@@ -39,14 +39,14 @@ impl TryFrom<&str> for TypeApp {
 /// Thời hạn token do ứng dụng quy ước: 24 giờ.
 pub const TOKEN_EXPIRES_IN_SECS: u64 = 24 * 60 * 60;
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, Serialize)]
 pub struct VaOnlineOrgUnit {
     id: String,
     value: String,
     tax_code: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ApplicationLoginResponse {
     pub org_unit: Option<String>,
     pub year: Option<String>,
@@ -276,11 +276,11 @@ impl TaxAuthService {
 
         let username = account.user_app.as_deref().unwrap_or("").trim();
 
-        let org_unit = account.org_unit.as_deref().unwrap_or("").trim();
+        let mut org_unit = account.org_unit.as_deref().unwrap_or("").trim().to_string();
 
-        if access_code.is_empty() || username.is_empty() || org_unit.is_empty() {
+        if access_code.is_empty() || username.is_empty() {
             return Err(TaxSyncError::Authentication(
-                "Thiếu mã truy cập, tài khoản ứng dụng hoặc mã đơn vị".to_string(),
+                "Thiếu mã truy cập hoặc tài khoản ứng dụng".to_string(),
             ));
         }
 
@@ -327,7 +327,55 @@ impl TaxAuthService {
         let token = login.token.ok_or_else(|| {
             TaxSyncError::Authentication("vaOnline không trả về token".to_string())
         })?;
+        if org_unit.is_empty() {
+            // Lấy tạm 1 đơn vị
+            let org_url = format!("{base_url}/api/User/GetListDvcs");
+            let access_token = format!("{};;{};{}", token, get_current_year(), "vi");
 
+            let response = self
+                .http
+                .get(&org_url)
+                .header("Accept", "application/json")
+                .header("x-tenant-name", access_code)
+                .bearer_auth(&access_token)
+                .send()
+                .await
+                .map_err(|e| {
+                    TaxSyncError::Authentication(format!(
+                        "Không thể lấy danh sách đơn vị lần 1 vaOnline: {e}"
+                    ))
+                })?;
+
+            let status = response.status();
+
+            if !status.is_success() {
+                return Err(TaxSyncError::Authentication(format!(
+                    "Lấy danh sách đơn vị lần 1 vaOnline thất bại, HTTP {status}"
+                )));
+            }
+
+            let result: serde_json::Value = response.json().await.map_err(|e| {
+                TaxSyncError::Authentication(format!(
+                    "Không thể đọc dữ liệu danh sách đơn vị lần 1 vaOnline: {e}"
+                ))
+            })?;
+
+            org_unit = result
+                .as_array()
+                .and_then(|items| items.first())
+                .and_then(|item| item.get("id"))
+                .and_then(|id| {
+                    id.as_str()
+                        .map(String::from)
+                        .or_else(|| id.as_i64().map(|n| n.to_string()))
+                })
+                .ok_or_else(|| {
+                    TaxSyncError::Authentication(
+                        "Không tìm thấy id của đơn vị đầu tiên trong danh sách vaOnline"
+                            .to_string(),
+                    )
+                })?;
+        }
         // 2. Lấy danh sách đơn vị.
         let org_url = format!("{base_url}/api/System/GetDataByWindowNo");
         let payload = serde_json::json!({
@@ -350,12 +398,13 @@ impl TaxAuthService {
             "infoparam": null,
             "tlbparam": []
         });
-
+        let access_token = format!("{};{};{};{}", token, org_unit, get_current_year(), "vi");
         let response = self
             .http
             .post(&org_url)
             .header("Accept", "application/json")
-            .bearer_auth(&token)
+            .header("x-tenant-name", access_code)
+            .bearer_auth(&access_token)
             .json(&payload)
             .send()
             .await
@@ -462,9 +511,9 @@ impl TaxAuthService {
 
         let tax_code = account.tax_code.trim();
 
-        if access_code.is_empty() || username.is_empty() || org_unit.is_empty() {
+        if access_code.is_empty() || username.is_empty() {
             return Err(TaxSyncError::Authentication(
-                "Thiếu mã truy cập, tài khoản ứng dụng hoặc mã đơn vị".to_string(),
+                "Thiếu mã truy cập hoặc tài khoản ứng dụng".to_string(),
             ));
         }
 

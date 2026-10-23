@@ -1,10 +1,24 @@
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { showNotification } from "../lib/notification";
 
 export function usePauseTaxSyncWorker() {
-    const stop = useCallback(async () => {
+    const [isRunning, setIsRunning] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const checkWorkerStatus = async () => {
+        const running = await invoke<boolean>(
+            "is_tax_sync_worker_running",
+        );
+        setIsRunning(running);
+        setLoading(false);
+    };
+
+    useEffect(() => {
+        checkWorkerStatus();
+    }, [])
+
+    const stopSyncWorker = useCallback(async () => {
         await invoke("stop_tax_sync_worker").catch((error) => {
             showNotification({
                 type: "warning",
@@ -12,7 +26,8 @@ export function usePauseTaxSyncWorker() {
             })
         });
     }, [])
-    const start = useCallback(async () => {
+
+    const startSyncWorker = useCallback(async () => {
         await invoke("start_tax_sync_worker").catch((error) => {
             showNotification({
                 type: "warning",
@@ -20,8 +35,29 @@ export function usePauseTaxSyncWorker() {
             })
         });
     }, [])
+
+    const setWorkerRunning = useCallback(async (running: boolean) => {
+        setLoading(true);
+        try {
+            if (running) {
+                await startSyncWorker();
+            } else {
+                await stopSyncWorker();
+            }
+            setIsRunning(running);
+        } catch (error) {
+
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+
     return {
-        stop,
-        start
+        loading,
+        isRunning,
+        setWorkerRunning,
+        stopSyncWorker,
+        startSyncWorker
     }
 }

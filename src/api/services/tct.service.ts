@@ -2,16 +2,39 @@ import axios from "axios";
 import { getDelayRequest, getTokenTct } from "../../stores/app.store";
 import { invoke } from "@tauri-apps/api/core";
 import { dialog } from "../../service/dialog.service";
-export function formatDate(dateStr?: string): string {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return "";
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
 
-    return `${day}/${month}/${year}`;
+export function formatDate(
+    dateStr?: string | null,
+    includeTime = false,
+): string {
+    if (!dateStr) return "";
+
+    // SQLite CURRENT_TIMESTAMP có dạng YYYY-MM-DD HH:mm:ss (UTC).
+    // Chuyển thành ISO UTC để JavaScript parse đúng múi giờ.
+    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateStr)
+        ? dateStr.replace(" ", "T") + "Z"
+        : dateStr;
+
+    const date = new Date(normalized);
+    if (isNaN(date.getTime())) return "";
+
+    const options: Intl.DateTimeFormatOptions = {
+        timeZone: "Asia/Ho_Chi_Minh",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    };
+
+    if (includeTime) {
+        options.hour = "2-digit";
+        options.minute = "2-digit";
+        options.second = "2-digit";
+        options.hourCycle = "h23";
+    }
+
+    return new Intl.DateTimeFormat("vi-VN", options).format(date);
 }
+
 interface IInfoLogin {
     username: string;
     password: string;
