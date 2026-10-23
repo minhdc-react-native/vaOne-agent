@@ -118,7 +118,7 @@ function StatCard({
     return (
         <div className="w-full rounded-xl border border-gray-200 bg-white p-2">
             <div className="truncate text-sm text-gray-500">{label}</div>
-            <div className={clsx("mt-1 text-3xl font-semibold tabular-nums text-right", classNumber)}>
+            <div className={clsx("mt-1 text-xl font-semibold tabular-nums text-right", classNumber)}>
                 {value.toLocaleString("vi-VN")}
             </div>
         </div>
