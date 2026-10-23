@@ -461,6 +461,13 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
         navigate(`/history-invoice/${taxCode}`);
     }
     const handleDelete = async (taxCode: string) => {
+        if (isRunning) {
+            showNotification({
+                type: "warning",
+                message: "Bạn phải dừng dịch vụ đồng bộ mới được cập nhật!"
+            })
+            return;
+        }
         if (saving) return;
 
         const confirmed = await dialog.question(

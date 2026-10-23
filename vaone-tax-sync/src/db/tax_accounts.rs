@@ -475,15 +475,15 @@ impl Database {
 
         let store = SecretStore::new();
         if !old_password_key.trim().is_empty() {
-            store.delete_secret(&old_password_key).map_err(|e| {
-                TaxSyncError::Database(format!("Không thể xóa key mật khẩu tài khoản thuế: {e}"))
-            })?;
+            if let Err(e) = store.delete_secret(&old_password_key) {
+                eprintln!("[tax-sync] Không thể xóa key mật khẩu tài khoản thuế: {e}");
+            }
         }
 
         if let Some(key) = old_app_key.as_deref().filter(|key| !key.trim().is_empty()) {
-            store.delete_secret(key).map_err(|e| {
-                TaxSyncError::Database(format!("Không thể xóa key mật khẩu ứng dụng: {e}"))
-            })?;
+            if let Err(e) = store.delete_secret(key) {
+                eprintln!("[tax-sync] Không thể xóa key mật khẩu ứng dụng: {e}");
+            }
         }
 
         // 1. Xóa dữ liệu đồng bộ hóa đơn
