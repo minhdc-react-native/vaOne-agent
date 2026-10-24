@@ -17,7 +17,19 @@
         "width": 10,
         "height": 10,
         "resizable": false,
-        "decorations": false
+        "decorations": false,
+        "visible": false
+      },
+      {
+        "label": "splash_screen",
+        "title": "Loading",
+        "url": "/splash",
+        "width": 240,
+        "height": 120,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "center": true
       }
     ],
     "security": {
@@ -45,7 +57,10 @@
     "macOS": {
       "infoPlist": "Info.plist",
       "signingIdentity": "Developer ID Application: Duy Thanh Vũ (YTH6G323A9)"
-    }
+    },
+    "resources": [
+      "resources/pdfium/pdfium.dll"
+    ]
   },
   "plugins": {
     "updater": {

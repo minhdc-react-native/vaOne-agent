@@ -1,0 +1,33 @@
+[package]
+name = "captcha-db"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Error handling
+anyhow = "1"
+
+# Serialize
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# XML parser
+roxmltree = "0.20"
+
+# Regex (dùng parser path nếu cần)
+regex = "1"
+
+# SHA256
+sha2 = "0.10"
+hex = "0.4"
+
+# SQLite
+rusqlite = { version = "0.37", features = ["bundled"] }
+
+# Thời gian
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
+log = "0.4"
+env_logger = "0.11"
+svgtypes = "0.16.1"

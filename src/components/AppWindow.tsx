@@ -9,16 +9,31 @@ import { IconLucide, IconName } from "./IconLucide";
 
 interface AppWindowProps {
     icon?: IconName,
-    title: string;
+    title?: string;
     children: ReactNode;
     content?: ReactNode;
     disableClose?: boolean;
+    callBack?: {
+        onConfirm?: () => Promise<boolean>;
+        onClose?: () => void;
+    }
 }
-export const hideWindow = async () => {
+export const hideWindow = async (callBack?: {
+    onConfirm?: () => Promise<boolean>;
+    onClose?: () => void;
+}) => {
+    if (callBack?.onConfirm) {
+        const confirmed = await callBack.onConfirm();
+
+        if (!confirmed) return;
+    }
+
     await trayApi.post("/open_tray_page", {
         route: "/blank",
         data: {},
     });
+
+    callBack?.onClose?.();
 };
 
 export default function AppWindow({
@@ -26,14 +41,16 @@ export default function AppWindow({
     title,
     children,
     content,
-    disableClose = false
+    disableClose = false,
+    callBack
 }: AppWindowProps) {
     const location = useLocation();
     useEscape(hideWindow, !disableClose);
 
     useEffect(() => {
+        const path = location.pathname.split("/").slice(0, 2).join("/");
         invoke("set_current_route", {
-            route: location.pathname,
+            route: path,
         });
     }, [location.pathname]);
 
@@ -57,16 +74,16 @@ export default function AppWindow({
                 {icon && <IconLucide
                     name={icon}
                 />}
-                <span
+                {title && <span
                     data-tauri-drag-region
                     className="cursor-pointer flex-1 text-sm font-semibold text-gray-800"
                 >
                     {title}
-                </span>
+                </span>}
                 {content}
                 {!disableClose && <Button
                     // disabled={disableClose}
-                    onClick={hideWindow} variant="ghost"
+                    onClick={() => hideWindow(callBack)} variant="ghost"
                     iconOnly icon={<X size={15} />}
                 />}
             </header>
