@@ -302,6 +302,16 @@ impl Database {
 
             CREATE INDEX IF NOT EXISTS idx_sync_invoices_tax_upload_status
                 ON sync_invoices (tax_code, upload_status);
+
+
+            CREATE INDEX IF NOT EXISTS idx_sync_invoices_pending_details
+                ON sync_invoices(detail_status)
+                WHERE detail_status <> 'completed';
+
+            CREATE INDEX IF NOT EXISTS idx_sync_invoices_pending_upload
+                ON sync_invoices(upload_status)
+                WHERE upload_status <> 'completed';
+
             ",
         )
         .map_err(|e| TaxSyncError::Database(e.to_string()))?;
