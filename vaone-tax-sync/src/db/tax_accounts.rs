@@ -311,11 +311,12 @@ impl Database {
             app_auth_blocked = 0,
 
             -- Reset trạng thái đồng bộ gần nhất
-            last_sync_at = NULL,
+            last_sync_at = CASE
+                WHEN start_date IS NOT ?4 THEN NULL
+                ELSE last_sync_at
+            END,
             last_sync_status = 'pending',
-            last_sync_error = NULL,
-
-            updated_at = CURRENT_TIMESTAMP
+            last_sync_error = NULL
         WHERE tax_code = ?1
         ",
             params![
@@ -406,9 +407,7 @@ impl Database {
                 last_app_login_at = NULL,
                 last_app_auth_error = NULL,
                 app_auth_fail_count = 0,
-                app_auth_blocked = 0,
-
-                updated_at = CURRENT_TIMESTAMP
+                app_auth_blocked = 0
              WHERE tax_code = ?3",
                 rusqlite::params![enabled, auto_sync, tax_code],
             )
@@ -727,6 +726,46 @@ impl Database {
 
         rows.collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|e| TaxSyncError::Database(e.to_string()))
+    }
+
+    pub fn has_pending_updates(&self) -> Result<bool> {
+        let conn = self.connect()?;
+
+        let has_pending: bool = conn
+            .query_row(
+                "
+            SELECT EXISTS (
+                SELECT 1
+                FROM sync_invoices
+                WHERE detail_status <> 'completed'
+            )
+            ",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(db_error)?;
+
+        Ok(has_pending)
+    }
+
+    pub fn has_pending_uploads(&self) -> Result<bool> {
+        let conn = self.connect()?;
+
+        let has_pending: bool = conn
+            .query_row(
+                "
+            SELECT EXISTS (
+                SELECT 1
+                FROM sync_invoices
+                WHERE upload_status <> 'completed'
+            )
+            ",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(db_error)?;
+
+        Ok(has_pending)
     }
 
     pub fn upsert_tax_account(

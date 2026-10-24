@@ -8,7 +8,7 @@ use vaone_tax_sync::{
     secret_store::SecretStore,
 };
 
-use crate::commands::system::predict_captcha;
+use crate::{commands::system::predict_captcha, services::worker_manage::TaxSyncWorkerManager};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,11 +38,21 @@ pub fn create_tax_account(
 #[tauri::command]
 pub fn update_tax_account(
     db: State<'_, Database>,
+    manager: State<'_, TaxSyncWorkerManager>,
     tax_code: String,
     input: TaxAccountInput,
 ) -> Result<TaxAccount, String> {
-    db.update_tax_account(&tax_code, &input)
-        .map_err(|e| e.to_string())
+    let should_notify_upload = input.auto_sync;
+
+    let account = db
+        .update_tax_account(&tax_code, &input)
+        .map_err(|e| e.to_string())?;
+
+    if should_notify_upload {
+        manager.notify_upload();
+    }
+
+    Ok(account)
 }
 
 #[tauri::command]

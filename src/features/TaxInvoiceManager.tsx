@@ -130,6 +130,7 @@ export function TaxInvoiceManager() {
     const { taxCode } = useParams<{ taxCode: string }>();
     const {
         accounts,
+        loadAccounts
     } = useTaxAccounts();
 
     const account = useMemo(() => accounts.find(acc => acc.tax_code === taxCode), [taxCode]);
@@ -242,6 +243,11 @@ export function TaxInvoiceManager() {
         }));
     };
 
+    const onRefreshAll = async () => {
+        await loadAccounts();
+        await loadStats();
+        await loadInvoices(filters, 1);
+    }
     const applyFilters = () => {
         void loadInvoices(filters, 1);
     };
@@ -313,7 +319,7 @@ export function TaxInvoiceManager() {
                         variant="ghost"
                         className="h-6"
                         icon={<RefreshCcw size={18} />}
-                        onClick={() => void applyFilters()}
+                        onClick={() => onRefreshAll()}
                         disabled={statsLoading || invoicesLoading}
                     >
                         Làm mới dữ liệu

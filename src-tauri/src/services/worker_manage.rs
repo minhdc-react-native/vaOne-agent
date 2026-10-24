@@ -74,4 +74,17 @@ impl TaxSyncWorkerManager {
     pub fn is_running(&self) -> bool {
         self.running.load(Ordering::SeqCst)
     }
+
+    pub fn notify_upload(&self) {
+        self.worker.notify_upload();
+    }
+
+    pub fn notify_update(&self) {
+        self.worker.notify_update();
+    }
+
+    pub fn notify_all(&self) {
+        self.worker.notify_update();
+        self.worker.notify_upload();
+    }
 }

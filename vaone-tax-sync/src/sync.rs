@@ -16,6 +16,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
 };
+use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 pub trait SyncObserver: Send + Sync {
     fn on_started(&self, total: usize);
@@ -26,13 +27,21 @@ pub trait SyncObserver: Send + Sync {
 pub struct TaxSyncService {
     client: TaxClient,
     db: Database,
+    upload_notify: Arc<Notify>,
+    update_notify: Arc<Notify>,
 }
 
 impl TaxSyncService {
-    pub fn new(db: Database) -> Result<Self> {
+    pub fn new(
+        db: Database,
+        upload_notify: Arc<Notify>,
+        update_notify: Arc<Notify>,
+    ) -> Result<Self> {
         Ok(Self {
             client: TaxClient::new()?,
             db,
+            upload_notify,
+            update_notify,
         })
     }
 
@@ -60,21 +69,6 @@ impl TaxSyncService {
         }
 
         let dates = dates_between(&request.from_date, &request.to_date)?;
-
-        for date in &dates {
-            if cancel.is_cancelled() {
-                return Ok(SyncSummary {
-                    cancelled: true,
-                    ..Default::default()
-                });
-            }
-
-            self.db
-                .ensure_sync_day(&request.tax_code, request.invoice_type, date)?;
-
-            self.db
-                .set_day_running(&request.tax_code, request.invoice_type, date)?;
-        }
 
         // Bước 1: Lấy danh sách hóa đơn.
         let invoices = match self
@@ -158,9 +152,6 @@ impl TaxSyncService {
             let result = (|| -> Result<(String, String)> {
                 let date = invoice_date_vietnam(item)?;
 
-                self.db
-                    .ensure_sync_day(&request.tax_code, request.invoice_type, &date)?;
-
                 let is_today = date == today.format("%Y-%m-%d").to_string();
 
                 let key = self.db.save_invoice_summary(
@@ -169,6 +160,8 @@ impl TaxSyncService {
                     item,
                     is_today,
                 )?;
+
+                self.update_notify.notify_one();
 
                 Ok((date, key))
             })();
@@ -271,7 +264,6 @@ impl TaxSyncService {
                     &detail,
                     &xml,
                 )?;
-
                 Ok::<(), anyhow::Error>(())
             }
             .await;
@@ -279,6 +271,7 @@ impl TaxSyncService {
             match result {
                 Ok(()) => {
                     completed += 1;
+                    self.upload_notify.notify_one();
                 }
                 Err(err) => {
                     // Nếu worker bị hủy, không tự đánh dấu hóa đơn thất bại

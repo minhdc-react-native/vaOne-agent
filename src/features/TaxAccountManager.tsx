@@ -3,7 +3,6 @@ import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "re
 import {
     Building2,
     Check,
-    CircleAlert,
     Clock,
     History,
     KeyRound,
@@ -11,12 +10,11 @@ import {
     Loader,
     MessageCircleMore,
     MessageCircleWarning,
-    Pencil,
     Plus,
     RefreshCw,
+    RotateCw,
     Save,
     Trash2,
-    X,
 } from "lucide-react";
 import Input from "../components/Input";
 import { DateInput } from "../components/Date/DateInput";
@@ -36,6 +34,7 @@ import { useLatest } from "../hook/useLatest";
 import { usePauseTaxSyncWorker } from "../hook/usePauseTaxSyncWorker";
 import { isEmpty } from "../lib/utils";
 import { ComboPopup } from "../components/Select/ComboPopup";
+import { BusinessInfo } from "./BusinessInfo";
 const ROW_HEIGHT = 180;
 type AuthStatus = "pending" | "authenticated" | "failed";
 type SyncStatus = "pending" | "running" | "completed" | "failed";
@@ -217,12 +216,12 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
             handleNew();
             return;
         }
-        setForm({
+        const newForm: ITaxAccount = {
             ...account,
             password_key: "",
             pass_app_key: "",
-        });
-        console.log('org_unit account>>', account.org_unit);
+        };
+        setForm(newForm);
         refSecretKeys.current = {
             taxPasswordKey: account.password_key,
             appPasswordKey: account.pass_app_key,
@@ -249,24 +248,29 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
     const [orgUnits, setOrgUnits] = useState<{ id: string, value: string, tax_code: string }[]>([]);
 
     useEffect(() => {
-        setOrgUnits([]);
+        if (form.auto_sync) {
+            handleCheckLoginApp();
+        } else {
+            setOrgUnits([]);
+        }
     }, [
         form.tax_code,
         form.access_code
     ])
 
     const handleCheckLoginApp = async () => {
-        const password = refSecretKeys.current?.appPasswordKey || form.pass_app_key;
-        if (isEmpty(form.access_code) || isEmpty(form.user_app) || isEmpty(password)) {
+        const _form = form;
+        const password = refSecretKeys.current?.appPasswordKey || _form.pass_app_key;
+        if (isEmpty(_form.access_code) || isEmpty(_form.user_app) || isEmpty(password)) {
             showNotification({
                 type: "warning",
                 message: "Bạn cần nhập đủ thông tin đăng nhập"
             });
             return;
         }
-        const taxCode = form.tax_code.trim();
+        const taxCode = _form.tax_code.trim();
         const nextAccount: ITaxAccount = {
-            ...form,
+            ..._form,
             tax_code: taxCode,
             username: taxCode,
         };
@@ -277,14 +281,16 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                 pass_app_key: refSecretKeys.current?.appPasswordKey ?? null
             },
             passwords: {
-                taxPassword: form.password_key,
-                appPassword: form.pass_app_key
+                taxPassword: _form.password_key,
+                appPassword: _form.pass_app_key
             },
         };
         setLocalError("");
         try {
             const response = await checkLoginApp(checkData);
-            setOrgUnits(response.org_units || []);
+            const orgUnits = response.org_units || [];
+            setOrgUnits(orgUnits);
+            if (isEmpty(_form.org_unit)) updateField("org_unit", orgUnits.length > 0 ? orgUnits[0].id : "");
         } catch (error) {
             setLocalError(
                 error instanceof Error ? error.message : String(error),
@@ -732,11 +738,11 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                                                     updateField("org_unit", item.id)
                                                 }}
                                                 renderDisplay={(item) => <span className="text-xs px-2">{form.org_unit}</span>}
-                                                renderItem={(item) => <div key={item?.id} className="text-xs"><span className="text-blue-500">{item?.tax_code}</span> - {item?.value}</div>}
+                                                renderItem={(item) => <BusinessInfo id={item?.id} value={item?.value} tax_code={item?.tax_code} />}
                                             />
                                             <Tooltip title="Lấy danh sách đơn vị"><Button variant="secondary" icon={
-                                                <RefreshCw size={15} className={isCheckingLoginApp ? "animate-spin" : undefined} />
-                                            } disabled={isCheckingLoginApp} iconOnly={true} onClick={handleCheckLoginApp} /></Tooltip>
+                                                <RotateCw size={15} className={isCheckingLoginApp ? "animate-spin" : undefined} />
+                                            } disabled={isCheckingLoginApp} iconOnly={true} onClick={() => handleCheckLoginApp()} /></Tooltip>
                                         </div>
                                     </div> : <div />}
                             </div>

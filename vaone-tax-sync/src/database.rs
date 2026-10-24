@@ -1,11 +1,12 @@
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Duration, FixedOffset, NaiveDate, Utc};
 use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::Value;
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::{
     error::{Result, TaxSyncError},
-    models::{InvoiceDetailRetry, TaxAccount},
+    models::InvoiceDetailRetry,
 };
 
 const STATUS_PENDING: &str = "pending";
@@ -301,7 +302,6 @@ impl Database {
 
             CREATE INDEX IF NOT EXISTS idx_sync_invoices_tax_upload_status
                 ON sync_invoices (tax_code, upload_status);
-
             ",
         )
         .map_err(|e| TaxSyncError::Database(e.to_string()))?;
@@ -572,8 +572,6 @@ impl Database {
         Ok(())
     }
 
-    /// Chỉ gọi sau khi đã lấy thành công tất cả các trang danh sách
-    /// hóa đơn của ngày tương ứng.
     pub fn mark_day_list_completed(
         &self,
         tax_code: &str,
