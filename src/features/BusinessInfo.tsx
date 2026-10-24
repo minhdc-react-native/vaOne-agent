@@ -14,11 +14,11 @@ export function BusinessInfo({
     className,
 }: BusinessInfoProps) {
     return (
-        <div className={`flex min-w-0 flex-col gap-1 px-1 ${className ?? ""}`}>
-            <div className="flex min-w-0 items-center gap-2">
+        <div className={`flex max-w-100 flex-col gap-1 p-1 ${className ?? ""}`}>
+            <div className="flex min-w-0 items-start gap-2">
                 <Building2 className="size-4 shrink-0 text-muted-foreground" />
 
-                <span className="truncate text-xs font-medium text-foreground">
+                <span className="text-xs font-medium">
                     {value || "Chưa có tên doanh nghiệp"}
                 </span>
 

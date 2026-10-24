@@ -210,7 +210,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
         setIsEdit(false);
         setLocalError("");
     };
-
+    const refSelect = useRef<ITaxAccount>(null);
     const handleSelect = (account?: ITaxAccount) => {
         if (!account) {
             handleNew();
@@ -221,6 +221,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
             password_key: "",
             pass_app_key: "",
         };
+        refSelect.current = newForm;
         setForm(newForm);
         refSecretKeys.current = {
             taxPasswordKey: account.password_key,
@@ -248,8 +249,9 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
     const [orgUnits, setOrgUnits] = useState<{ id: string, value: string, tax_code: string }[]>([]);
 
     useEffect(() => {
-        if (form.auto_sync) {
-            handleCheckLoginApp();
+        if (form.auto_sync && refSelect.current) {
+            handleCheckLoginApp(refSelect.current);
+            refSelect.current = null;
         } else {
             setOrgUnits([]);
         }
@@ -258,8 +260,8 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
         form.access_code
     ])
 
-    const handleCheckLoginApp = async () => {
-        const _form = form;
+    const handleCheckLoginApp = async (newForm?: ITaxAccount) => {
+        const _form = newForm || form;
         const password = refSecretKeys.current?.appPasswordKey || _form.pass_app_key;
         if (isEmpty(_form.access_code) || isEmpty(_form.user_app) || isEmpty(password)) {
             showNotification({
@@ -737,6 +739,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                                                 onSelect={(item) => {
                                                     updateField("org_unit", item.id)
                                                 }}
+
                                                 renderDisplay={(item) => <span className="text-xs px-2">{form.org_unit}</span>}
                                                 renderItem={(item) => <BusinessInfo id={item?.id} value={item?.value} tax_code={item?.tax_code} />}
                                             />

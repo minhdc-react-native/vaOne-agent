@@ -168,7 +168,9 @@ const ComboPopupImpl = <T,>(
                                     </div>
                                     {iconPosition === "right" && <IconLucide name={isOption ? (isActive ? "CircleCheckBig" : "Circle") : "Check"} size={16} className={clsx("mr-1", isActive ? "text-red-500" : (isOption ? "text-gray-300" : "text-transparent"))} />}
                                 </div>
-                                {idx !== filteredData.length - 1 && <Line />}
+                                {idx !== filteredData.length - 1 && (
+                                    <div className="h-px w-full shrink-0 bg-gray-300" />
+                                )}
                             </React.Fragment>
                         );
                     })}
