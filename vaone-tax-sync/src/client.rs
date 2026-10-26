@@ -192,6 +192,8 @@ impl TaxClient {
                         .append_pair("cvalue", cvalue);
 
                     request_url = url.to_string();
+
+                    print!("request_url captcha>> {request_url}");
                 }
 
                 // Nếu request đang chờ HTTP, cần timeout hoặc truyền cancel

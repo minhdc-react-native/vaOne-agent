@@ -844,7 +844,7 @@ impl Database {
             "
             UPDATE sync_invoices
             SET detail_status = 'failed',
-                attempt_count = attempt_count + 1,
+                detail_attempt_count = detail_attempt_count + 1,
                 detail_error = ?4,
                 updated_at = CURRENT_TIMESTAMP
             WHERE tax_code = ?1
@@ -902,7 +902,7 @@ impl Database {
             "
             UPDATE sync_invoices
             SET upload_status = 'failed',
-                attempt_count = attempt_count + 1,
+                upload_attempt_count = upload_attempt_count + 1,
                 detail_error = ?4,
                 updated_at = CURRENT_TIMESTAMP
             WHERE tax_code = ?1
@@ -939,7 +939,7 @@ impl Database {
                     xml_data,
                     detail_status,
                     upload_status,
-                    attempt_count,
+                    detail_attempt_count,
                     detail_error
                 FROM sync_invoices
                 WHERE tax_code = ?1

@@ -252,19 +252,15 @@ impl TaxSyncService {
                 break;
             }
 
-            // Có thể dừng ngay trong thời gian chờ, không phải chờ hết delay.
             tokio::select! {
                 _ = cancel.cancelled() => break,
                 _ = request_delay(delay_ms) => {}
             }
 
-            // Kiểm tra lại sau delay, trước khi bắt đầu request.
             if cancel.is_cancelled() {
                 break;
             }
 
-            // Không hủy request đang chạy giữa chừng.
-            // Chờ kết quả để cập nhật SQLite nhất quán.
             let result = async {
                 let (detail, xml) = self
                     .client
@@ -285,6 +281,7 @@ impl TaxSyncService {
                     &detail,
                     &xml,
                 )?;
+
                 Ok::<(), anyhow::Error>(())
             }
             .await;
@@ -295,8 +292,6 @@ impl TaxSyncService {
                     self.upload_notify.notify_one();
                 }
                 Err(err) => {
-                    // Nếu worker bị hủy, không tự đánh dấu hóa đơn thất bại
-                    // chỉ vì tiến trình cần dừng.
                     if cancel.is_cancelled() {
                         break;
                     }
@@ -305,6 +300,7 @@ impl TaxSyncService {
 
                     let message = err.to_string();
 
+                    // Chỉ cập nhật trạng thái lỗi, không trả lỗi ra ngoài.
                     if let Err(db_err) = self.db.set_detail_failed(
                         tax_code,
                         invoice_type,
@@ -312,15 +308,10 @@ impl TaxSyncService {
                         &message,
                     ) {
                         eprintln!(
-                        "[tax-sync] Cannot mark detail failed: tax_code={}, type={}, key={}, error={}",
-                        tax_code, invoice_type, invoice.invoice_key, db_err
-                    );
+                            "[tax-sync] Cannot mark detail failed: tax_code={}, type={}, key={}, error={}",
+                            tax_code, invoice_type, invoice.invoice_key, db_err
+                        );
                     }
-
-                    eprintln!(
-                        "[tax-sync] Detail retry failed: tax_code={}, type={}, key={}: {}",
-                        tax_code, invoice_type, invoice.invoice_key, message
-                    );
                 }
             }
         }
