@@ -68,7 +68,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
                 <div
                     className={cn(
-                        "flex w-full min-w-0 items-center border bg-white px-3",
+                        "flex w-full h-6 min-w-0 items-center border bg-white px-3",
                         "transition-colors",
                         "focus-within:border-(--primary)",
                         error ? "border-red-500" : "border-(--border)",

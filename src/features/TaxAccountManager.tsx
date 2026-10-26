@@ -249,12 +249,13 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
     const [orgUnits, setOrgUnits] = useState<{ id: string, value: string, tax_code: string }[]>([]);
 
     useEffect(() => {
-        if (form.auto_sync && refSelect.current) {
-            handleCheckLoginApp(refSelect.current);
-            refSelect.current = null;
-        } else {
-            setOrgUnits([]);
-        }
+        setOrgUnits([]);
+        // if (form.auto_sync && refSelect.current) {
+        //     handleCheckLoginApp(refSelect.current);
+        //     refSelect.current = null;
+        // } else {
+        //     setOrgUnits([]);
+        // }
     }, [
         form.tax_code,
         form.access_code
@@ -573,7 +574,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                         </button>
                     </div>
 
-                    <div className="min-h-0 flex-1 space-y-1 p-4">
+                    <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4 scrollbar-hide">
                         {/* Tax credentials */}
                         <div className="space-y-3">
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

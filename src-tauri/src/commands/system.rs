@@ -76,18 +76,24 @@ pub fn page_ready(name: String, show: Option<bool>) {
             if show {
                 if let Some(monitor) = window.current_monitor().unwrap() {
                     let scale = monitor.scale_factor();
-                    let monitor_size = monitor.size();
 
-                    let monitor_width = monitor_size.width as f64 / scale;
-                    let monitor_height = monitor_size.height as f64 / scale;
+                    // Vùng làm việc, đã loại trừ taskbar/Dock.
+                    let work_area = monitor.work_area();
 
-                    width = width.min(monitor_width * 0.9);
-                    height = height.min(monitor_height * 0.9);
+                    let work_x = work_area.position.x as f64 / scale;
+                    let work_y = work_area.position.y as f64 / scale;
+                    let work_width = work_area.size.width as f64 / scale;
+                    let work_height = work_area.size.height as f64 / scale;
+
+                    // Giới hạn kích thước cửa sổ trong vùng làm việc.
+                    width = width.min(work_width * 0.9);
+                    height = height.min(work_height * 0.9);
 
                     let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
 
-                    let x = (monitor_width - width) / 2.0;
-                    let y = (monitor_height - height) / 2.0;
+                    // Căn giữa trong vùng làm việc.
+                    let x = work_x + (work_width - width) / 2.0;
+                    let y = work_y + (work_height - height) / 2.0;
 
                     let _ = window.set_position(Position::Logical(LogicalPosition { x, y }));
                 }
