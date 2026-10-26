@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     useGetInvoiceStats,
+    useGetSyncDays,
     useGetSyncInvoices,
     useResetSyncStatus,
 } from "../hook/useSyncInvoices";
@@ -11,6 +12,7 @@ import type {
     IPaginatedResult,
     ISyncInvoice,
     ISyncConfig,
+    ISyncDay,
 } from "../service/syncInvoicesService";
 import { useTaxAccounts } from "../hook/useTaxAccounts";
 import StatusBadge, { StatusType } from "../components/StatusBadge";
@@ -29,6 +31,7 @@ import Switch from "../components/Switch";
 import { showNotification } from "../lib/notification";
 import clsx from "clsx";
 import Input from "../components/Input";
+import { SyncDaysError } from "./SyncDaysErrorItem";
 
 
 const PAGE_SIZE = 100;
@@ -141,6 +144,10 @@ export function TaxInvoiceManager() {
     } = useGetInvoiceStats();
 
     const {
+        mutateAsync: getSyncDays
+    } = useGetSyncDays();
+
+    const {
         mutateAsync: getInvoices,
         isPending: invoicesLoading,
     } = useGetSyncInvoices();
@@ -157,8 +164,8 @@ export function TaxInvoiceManager() {
         tax_code: taxCode,
     });
 
-
     const [stats, setStats] = useState<IInvoiceStats | null>(null);
+    const [syncDays, setSyncDays] = useState<ISyncDay[]>([]);
 
     const [invoicePage, setInvoicePage] =
         useState<IPaginatedResult<ISyncInvoice> | null>(null);
@@ -178,6 +185,16 @@ export function TaxInvoiceManager() {
             setLocalError(String(error));
         }
     }, [taxCode, getStats]);
+
+    const loadSyncDays = useCallback(async () => {
+        if (!taxCode) return;
+        try {
+            const result = await getSyncDays({ taxCode, isSuccess: false });
+            setSyncDays(result);
+        } catch (error) {
+            setLocalError(String(error));
+        }
+    }, [taxCode, setSyncDays]);
 
     const loadInvoices = useCallback(
         async (
@@ -220,6 +237,7 @@ export function TaxInvoiceManager() {
         if (!taxCode) return;
 
         void loadStats();
+        void loadSyncDays();
         void loadInvoices(initialFilters, 1);
     }, [taxCode]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -246,6 +264,7 @@ export function TaxInvoiceManager() {
     const onRefreshAll = async () => {
         await loadAccounts();
         await loadStats();
+        await loadSyncDays();
         await loadInvoices(filters, 1);
     }
     const applyFilters = () => {
@@ -254,7 +273,14 @@ export function TaxInvoiceManager() {
 
     useEffect(() => {
         applyFilters();
-    }, [filters])
+    }, [filters]);
+
+    // useEffect(() => {
+    //     const timer = setTimeout(() => {
+    //         applyFilters();
+    //     }, 500);
+    //     return () => clearTimeout(timer);
+    // }, [filters]);
 
     const handleReset = async () => {
         if (!filters.from_date || !filters.to_date) {
@@ -596,10 +622,19 @@ export function TaxInvoiceManager() {
                     <section className="min-w-0 min-h-0 flex flex-col overflow-hidden rounded border border-gray-200 bg-white xl:col-span-2">
                         {/* Header: giữ nguyên chiều cao */}
                         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-3 py-3">
-                            <h3 className="font-semibold">Danh sách hóa đơn</h3>
-
-                            <span className="text-xs text-gray-500">
-                                {(invoicePage?.total ?? 0).toLocaleString("vi-VN")} hóa đơn
+                            <h3 className="flex-1 font-semibold">Danh sách hóa đơn</h3>
+                            <div className="flex gap-1 items-center">
+                                <ComboPopup
+                                    data={syncDays}
+                                    renderDisplay={(item) => <div className="px-2">{`Lỗi đồng bộ theo ngày:`}<span className="ml-2 text-sm font-semibold text-red-500">{syncDays.length}</span></div>}
+                                    renderItem={(item) => <SyncDaysError key={item?.id} item={item} />}
+                                />
+                            </div>
+                            <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                                <span className="text-sm font-bold tabular-nums">
+                                    {(invoicePage?.total ?? 0).toLocaleString("vi-VN")}
+                                </span>
+                                hóa đơn
                             </span>
                         </div>
 

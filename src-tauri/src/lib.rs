@@ -8,14 +8,13 @@ mod utils;
 mod window_config;
 use crate::api::http::wait;
 use crate::models::system::AppState;
-use crate::services::tct::tax_sync_adapter::{
-    ConsoleSyncObserver, LocalCaptchaSolver, MacOsPasswordProvider,
-};
+use crate::services::tct::tax_sync_adapter::{ConsoleSyncObserver, LocalCaptchaSolver};
 use crate::services::update::check_update_on_startup;
 use crate::services::worker_manage::TaxSyncWorkerManager;
 use crate::state::{APP_STATE, SYNC_MENU};
 use crate::state::{CURRENT_ROUTE, ONLINE_MENU};
 use crate::utils::public::navigate_to_route;
+use serde_json::Value;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::{
@@ -23,9 +22,11 @@ use tauri::{
     tray::TrayIconBuilder,
     App, Manager,
 };
+use tauri_plugin_notification::NotificationExt;
 use vaone_tax_sync::database::Database;
 use vaone_tax_sync::worker::TaxSyncWorkerConfig;
 use vaone_tax_sync::TaxSyncWorker;
+
 const LINE_TEXT: &str = "------------------------------";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -97,7 +98,7 @@ pub fn run() {
                 ],
             )?;
 
-            let _tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::with_id("main")
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
                 .show_menu_on_left_click(false)
@@ -129,6 +130,23 @@ pub fn run() {
                 }
             });
 
+            app.notification().on_action(|event| {
+                // Chỉ xử lý khi người dùng nhấn vào notification.
+                if event.action_id() != "tap" {
+                    return;
+                }
+
+                let Some(notification) = event.notification() else {
+                    return;
+                };
+
+                match notification.id() {
+                    1001 => {
+                        let _ = navigate_to_route("/tax-config");
+                    }
+                    _ => {}
+                }
+            })?;
             // khởi tạo dữ liệu SQLite
             let app_data_dir = app.path().app_data_dir()?;
 

@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { IGetSyncInvoicesParams, ISyncConfig, syncInvoiceService } from "../service/syncInvoicesService";
+import { IGetSyncDaysParams, IGetSyncInvoicesParams, ISyncConfig, syncInvoiceService } from "../service/syncInvoicesService";
 
 export const useGetInvoiceStats = () =>
     useMutation({
@@ -9,8 +9,8 @@ export const useGetInvoiceStats = () =>
 
 export const useGetSyncDays = () =>
     useMutation({
-        mutationFn: (taxCode: string) =>
-            syncInvoiceService.getSyncDays(taxCode),
+        mutationFn: ({ taxCode, isSuccess }: IGetSyncDaysParams) =>
+            syncInvoiceService.getSyncDays(taxCode, isSuccess),
     });
 
 export const useGetSyncInvoices = () =>

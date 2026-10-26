@@ -632,7 +632,7 @@ impl Database {
         .map_err(db_error)
     }
 
-    pub fn get_enabled_tax_accounts(&self) -> Result<Vec<TaxAccount>> {
+    pub fn get_enabled_tax_accounts(&self, is_error: bool) -> Result<Vec<TaxAccount>> {
         let conn = self.connect()?;
 
         let mut stmt = conn
@@ -676,14 +676,18 @@ impl Database {
                 last_app_auth_error
             FROM tax_accounts
             WHERE enabled = 1
-                AND auth_blocked = 0 
+                AND (
+                    (?1 = 1 AND (auth_blocked = 1 OR app_auth_blocked = 1))
+                    OR
+                    (?1 = 0 AND auth_blocked = 0)
+                )
             ORDER BY tax_code
             ",
             )
             .map_err(db_error)?;
 
         let rows = stmt
-            .query_map([], |row| {
+            .query_map([is_error], |row| {
                 Ok(TaxAccount {
                     tax_code: row.get(0)?,
                     username: row.get(1)?,

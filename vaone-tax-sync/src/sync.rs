@@ -1,7 +1,8 @@
 use crate::client::request_delay;
-use crate::database::invoice_key;
+use crate::database::{invoice_date_vietnam, invoice_key};
 use crate::error::TaxSyncError;
-use crate::worker::vietnam_today;
+use crate::models::TaxAccount;
+use crate::worker::{vietnam_today, CaptchaSolver};
 use crate::{
     client::TaxClient,
     database::Database,
@@ -10,18 +11,15 @@ use crate::{
 
 use anyhow::{anyhow, Result};
 
-use chrono::{DateTime, FixedOffset, NaiveDate};
-use serde_json::Value;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Arc,
-};
+use chrono::NaiveDate;
+use std::sync::Arc;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 pub trait SyncObserver: Send + Sync {
     fn on_started(&self, total: usize);
     fn on_invoice(&self, progress: InvoiceProgress);
     fn on_finished(&self, summary: &SyncSummary);
+    fn on_notification(&self, tax_accounts: &Vec<TaxAccount>);
 }
 
 pub struct TaxSyncService {
@@ -29,6 +27,7 @@ pub struct TaxSyncService {
     db: Database,
     upload_notify: Arc<Notify>,
     update_notify: Arc<Notify>,
+    captcha_solver: Arc<dyn CaptchaSolver>,
 }
 
 impl TaxSyncService {
@@ -36,12 +35,14 @@ impl TaxSyncService {
         db: Database,
         upload_notify: Arc<Notify>,
         update_notify: Arc<Notify>,
+        captcha_solver: Arc<dyn CaptchaSolver>,
     ) -> Result<Self> {
         Ok(Self {
             client: TaxClient::new()?,
             db,
             upload_notify,
             update_notify,
+            captcha_solver,
         })
     }
 
@@ -70,6 +71,8 @@ impl TaxSyncService {
 
         let dates = dates_between(&request.from_date, &request.to_date)?;
 
+        let solver = Arc::clone(&self.captcha_solver);
+
         // Bước 1: Lấy danh sách hóa đơn.
         let invoices = match self
             .client
@@ -80,13 +83,23 @@ impl TaxSyncService {
                 &request.token,
                 request.delay_ms,
                 cancel.clone(),
+                move |captcha_content| {
+                    let solver = Arc::clone(&solver);
+                    let svg = captcha_content.to_string();
+
+                    async move {
+                        solver
+                            .solve(&svg)
+                            .map_err(TaxSyncError::Authentication)
+                            .map_err(anyhow::Error::from)
+                    }
+                },
             )
             .await
         {
             Ok(invoices) => invoices,
 
             Err(err) => {
-                // Phân biệt cancellation với lỗi đồng bộ thực sự.
                 if cancel.is_cancelled() {
                     return Ok(SyncSummary {
                         cancelled: true,
@@ -124,6 +137,8 @@ impl TaxSyncService {
             ..Default::default()
         };
 
+        let today = vietnam_today().await?;
+
         for item in &invoices {
             if cancel.is_cancelled() {
                 summary.cancelled = true;
@@ -141,8 +156,6 @@ impl TaxSyncService {
             if exists {
                 continue;
             }
-
-            let today = vietnam_today().await?;
 
             if cancel.is_cancelled() {
                 summary.cancelled = true;
@@ -194,9 +207,17 @@ impl TaxSyncService {
                 break;
             }
 
-            self.db
-                .mark_day_list_completed(&request.tax_code, request.invoice_type, date)?;
+            let is_today = date == today.format("%Y-%m-%d").to_string().as_str();
 
+            self.db.mark_day_list_completed(
+                &request.tax_code,
+                request.invoice_type,
+                date,
+                &is_today,
+            )?;
+            if (is_today) {
+                continue;
+            }
             self.db
                 .delete_invoices_today_by_date(&request.tax_code, request.invoice_type, date)?;
         }
@@ -332,20 +353,4 @@ fn dates_between(from: &str, to: &str) -> Result<Vec<String>> {
     }
 
     Ok(dates)
-}
-
-fn invoice_date_vietnam(invoice: &Value) -> Result<String> {
-    let timestamp = invoice["tdlap"]
-        .as_str()
-        .ok_or_else(|| anyhow!("Invoice is missing tdlap"))?;
-
-    let parsed = DateTime::parse_from_rfc3339(timestamp)?;
-
-    let vietnam_offset =
-        FixedOffset::east_opt(7 * 60 * 60).ok_or_else(|| anyhow!("Invalid Vietnam timezone"))?;
-
-    Ok(parsed
-        .with_timezone(&vietnam_offset)
-        .format("%Y-%m-%d")
-        .to_string())
 }

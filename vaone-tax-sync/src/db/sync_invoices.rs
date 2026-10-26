@@ -96,7 +96,7 @@ impl Database {
         })
     }
 
-    pub fn get_sync_days(&self, tax_code: &str) -> Result<Vec<SyncDay>> {
+    pub fn get_sync_days(&self, tax_code: &str, is_success: Option<bool>) -> Result<Vec<SyncDay>> {
         let tax_code = tax_code.trim();
 
         if tax_code.is_empty() {
@@ -104,41 +104,50 @@ impl Database {
                 "Mã số thuế không được để trống".to_string(),
             ));
         }
-
         let conn = self.connect()?;
 
         let mut stmt = conn
             .prepare(
                 "SELECT
-                tax_code,
-                invoice_type,
-                sync_date,
-                list_status,
-                status,
-                last_error,
-                attempt_count,
-                started_at,
-                completed_at,
-                updated_at
-             FROM sync_days
-             WHERE tax_code = ?1
-             ORDER BY invoice_type ASC, sync_date DESC",
+            ROW_NUMBER() OVER (
+                ORDER BY sync_date DESC, invoice_type ASC
+            ) AS id,
+            tax_code,
+            invoice_type,
+            sync_date,
+            list_status,
+            status,
+            last_error,
+            attempt_count,
+            started_at,
+            completed_at,
+            updated_at
+         FROM sync_days
+         WHERE tax_code = ?1
+            AND sync_date <> date('now', 'localtime')
+            AND (
+                ?2 IS NULL
+                OR (?2 = 1 AND list_status = 'completed')
+                OR (?2 = 0 AND list_status <> 'completed')
+           )
+         ORDER BY sync_date DESC, invoice_type ASC",
             )
             .map_err(db_error)?;
 
         let rows = stmt
-            .query_map(params![tax_code], |row| {
+            .query_map(params![tax_code, is_success], |row| {
                 Ok(SyncDay {
-                    tax_code: row.get(0)?,
-                    invoice_type: row.get(1)?,
-                    sync_date: row.get(2)?,
-                    list_status: row.get(3)?,
-                    status: row.get(4)?,
-                    last_error: row.get(5)?,
-                    attempt_count: row.get(6)?,
-                    started_at: row.get(7)?,
-                    completed_at: row.get(8)?,
-                    updated_at: row.get(9)?,
+                    id: row.get(0)?,
+                    tax_code: row.get(1)?,
+                    invoice_type: row.get(2)?,
+                    sync_date: row.get(3)?,
+                    list_status: row.get(4)?,
+                    status: row.get(5)?,
+                    last_error: row.get(6)?,
+                    attempt_count: row.get(7)?,
+                    started_at: row.get(8)?,
+                    completed_at: row.get(9)?,
+                    updated_at: row.get(10)?,
                 })
             })
             .map_err(db_error)?;

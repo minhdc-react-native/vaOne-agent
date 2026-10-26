@@ -587,20 +587,23 @@ impl Database {
         tax_code: &str,
         invoice_type: u8,
         sync_date: &str,
+        is_today: &bool,
     ) -> Result<()> {
         let conn = self.connect()?;
 
+        let list_status = if *is_today { "pending" } else { "completed" };
+
         conn.execute(
             "
-            UPDATE sync_days
-            SET list_status = 'completed',
-                last_error = NULL,
-                updated_at = CURRENT_TIMESTAMP
-            WHERE tax_code = ?1
-              AND invoice_type = ?2
-              AND sync_date = ?3
-            ",
-            params![tax_code, invoice_type, sync_date],
+        UPDATE sync_days
+        SET list_status = ?1,
+            last_error = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE tax_code = ?2
+          AND invoice_type = ?3
+          AND sync_date = ?4
+        ",
+            params![list_status, tax_code, invoice_type, sync_date],
         )
         .map_err(db_error)?;
 
@@ -1114,7 +1117,7 @@ pub fn validate_date(date: &str) -> Result<()> {
 }
 
 /// Chuyển tdlap về ngày lịch Việt Nam (UTC+7).
-fn invoice_date_vietnam(invoice: &Value) -> Result<String> {
+pub fn invoice_date_vietnam(invoice: &Value) -> Result<String> {
     let value = invoice
         .get("tdlap")
         .and_then(Value::as_str)

@@ -1,3 +1,4 @@
+use crate::auth::get_captcha;
 use crate::error::TaxSyncError;
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
@@ -6,6 +7,7 @@ use rand::RngExt;
 use regex::Regex;
 use reqwest::Client;
 use serde_json::{json, Value};
+use std::future::Future;
 use std::io::{Cursor, Read};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -90,7 +92,7 @@ impl TaxClient {
             .context("Invalid tax API JSON response")
     }
 
-    pub async fn fetch_all(
+    pub async fn fetch_all<F, Fut>(
         &self,
         invoice_type: u8,
         from_date: &str,
@@ -98,7 +100,12 @@ impl TaxClient {
         token: &str,
         delay_ms: u64,
         cancel: CancellationToken,
-    ) -> Result<Vec<Value>> {
+        solve_captcha: F,
+    ) -> Result<Vec<Value>>
+    where
+        F: FnOnce(&str) -> Fut,
+        Fut: Future<Output = Result<String>>,
+    {
         let mut result = Vec::new();
 
         let mut current = NaiveDate::parse_from_str(from_date, "%Y-%m-%d")?;
@@ -109,6 +116,22 @@ impl TaxClient {
                 TaxSyncError::InvalidDateRange("from_date must be <= to_date".to_string()).into(),
             );
         }
+
+        let captcha = if invoice_type == 3 || invoice_type == 4 {
+            let captcha = get_captcha(&self.http).await?;
+
+            // Giải captcha bằng hàm do ứng dụng cung cấp.
+            let captcha_value = solve_captcha(&captcha.cvalue).await?;
+            let captcha_value = captcha_value.trim();
+
+            if captcha_value.is_empty() {
+                return Err(TaxSyncError::Authentication("Đáp án captcha rỗng".to_string()).into());
+            }
+
+            Some((captcha.ckey, captcha_value.to_string()))
+        } else {
+            None
+        };
 
         while current <= end {
             if cancel.is_cancelled() {
@@ -158,6 +181,17 @@ impl TaxClient {
                         &url::form_urlencoded::byte_serialize(cursor.as_bytes())
                             .collect::<String>(),
                     );
+                }
+
+                if let Some((ckey, cvalue)) = captcha.as_ref() {
+                    let mut url = url::Url::parse(&request_url)
+                        .map_err(|e| TaxSyncError::Authentication(e.to_string()))?;
+
+                    url.query_pairs_mut()
+                        .append_pair("ckey", ckey)
+                        .append_pair("cvalue", cvalue);
+
+                    request_url = url.to_string();
                 }
 
                 // Nếu request đang chờ HTTP, cần timeout hoặc truyền cancel

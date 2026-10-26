@@ -10,6 +10,7 @@ use crate::state::APP_HANDLE;
 use crate::state::APP_STATE;
 use crate::state::CURRENT_ROUTE;
 use crate::utils::notification;
+use crate::utils::notification::NotificationType;
 use crate::utils::public::decompress_zstd_json;
 use axum::body::Body;
 use axum::http::HeaderMap;
@@ -56,7 +57,7 @@ pub async fn ping() -> Json<PingResponse> {
 }
 
 pub async fn message(Json(req): Json<MessageRequest>) -> Json<PingResponse> {
-    if let Err(err) = notification::show("vaOne", &req.message) {
+    if let Err(err) = notification::show(NotificationType::Normal.id(), "vaOne", &req.message) {
         eprintln!("Show notification failed: {}", err);
     }
     Json(PingResponse { success: true })

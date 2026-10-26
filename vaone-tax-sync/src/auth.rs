@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use crate::{
     error::{Result, TaxSyncError},
-    models::TaxAccount,
+    models::{Captcha, TaxAccount},
 };
 
 const CAPTCHA_URL: &str = "https://hoadondientu.gdt.gov.vn/api/captcha";
@@ -111,6 +111,32 @@ pub struct LoginResponse {
     pub name: String,
 }
 
+pub async fn get_captcha(http: &Client) -> Result<Captcha> {
+    let response = http
+        .get(CAPTCHA_URL)
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .map_err(|e| TaxSyncError::Authentication(format!("Không thể lấy captcha: {e}")))?
+        .error_for_status()
+        .map_err(|e| TaxSyncError::Authentication(format!("API captcha trả về HTTP lỗi: {e}")))?;
+
+    let captcha: CaptchaResponse = response.json().await.map_err(|e| {
+        TaxSyncError::Authentication(format!("Không thể đọc response captcha: {e}"))
+    })?;
+
+    if captcha.key.trim().is_empty() || captcha.content.trim().is_empty() {
+        return Err(TaxSyncError::Authentication(
+            "API captcha trả về dữ liệu không hợp lệ".to_string(),
+        ));
+    }
+
+    Ok(Captcha {
+        ckey: captcha.key,
+        cvalue: captcha.content,
+    })
+}
+
 pub struct TaxAuthService {
     http: Client,
 }
@@ -140,31 +166,10 @@ impl TaxAuthService {
         F: FnOnce(&str) -> Fut,
         Fut: Future<Output = Result<String>>,
     {
-        // 1. Lấy captcha.
-        let captcha_response = self
-            .http
-            .get(CAPTCHA_URL)
-            .header("Accept", "application/json")
-            .send()
-            .await
-            .map_err(|e| TaxSyncError::Authentication(format!("Không thể lấy captcha: {e}")))?
-            .error_for_status()
-            .map_err(|e| {
-                TaxSyncError::Authentication(format!("API captcha trả về HTTP lỗi: {e}"))
-            })?;
+        let captcha = get_captcha(&self.http).await?;
 
-        let captcha: CaptchaResponse = captcha_response.json().await.map_err(|e| {
-            TaxSyncError::Authentication(format!("Không thể đọc response captcha: {e}"))
-        })?;
-
-        if captcha.key.trim().is_empty() || captcha.content.trim().is_empty() {
-            return Err(TaxSyncError::Authentication(
-                "API captcha trả về dữ liệu không hợp lệ".to_string(),
-            ));
-        }
-
-        // 2. Giải captcha bằng hàm do ứng dụng cung cấp.
-        let captcha_value = solve_captcha(&captcha.content).await?;
+        // Giải captcha bằng hàm do ứng dụng cung cấp.
+        let captcha_value = solve_captcha(&captcha.cvalue).await?;
         let captcha_value = captcha_value.trim();
 
         if captcha_value.is_empty() {
@@ -177,7 +182,7 @@ impl TaxAuthService {
         let payload = LoginRequest {
             username: &account.username,
             password,
-            ckey: &captcha.key,
+            ckey: &captcha.ckey,
             cvalue: captcha_value,
         };
         // return Err(TaxSyncError::Authentication(format!(

@@ -20,6 +20,7 @@ export type InvoiceStatus =
     | "failed";
 
 export type ISyncDay = {
+    id: number;
     tax_code: string;
     invoice_type: number;
     sync_date: string;
@@ -96,6 +97,10 @@ export interface IGetSyncInvoicesParams {
     page_size: number;
 }
 
+export interface IGetSyncDaysParams {
+    taxCode: string;
+    isSuccess?: boolean
+}
 
 export interface ISyncConfig {
     taxCode: string,
@@ -109,8 +114,8 @@ export const syncInvoiceService = {
     getInvoiceStats: (taxCode: string) =>
         invoke<IInvoiceStats>("get_invoice_stats", { taxCode }),
 
-    getSyncDays: (taxCode: string) =>
-        invoke<ISyncDay[]>("get_sync_days", { taxCode }),
+    getSyncDays: (taxCode: string, isSuccess?: boolean) =>
+        invoke<ISyncDay[]>("get_sync_days", { taxCode, isSuccess }),
 
     getSyncInvoices: (
         filters: ISyncInvoiceFilters,

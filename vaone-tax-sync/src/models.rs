@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub struct Captcha {
+    pub ckey: String,
+    pub cvalue: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct SyncRequest {
     pub tax_code: String,
@@ -147,6 +152,7 @@ pub struct InvoiceStatsGroup {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SyncDay {
+    pub id: i64,
     pub tax_code: String,
     pub invoice_type: i64,
     pub sync_date: String,

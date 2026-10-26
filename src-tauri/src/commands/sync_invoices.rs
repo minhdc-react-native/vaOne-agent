@@ -17,9 +17,11 @@ pub fn get_invoice_stats(
 #[tauri::command]
 pub fn get_sync_days(
     tax_code: String,
+    is_success: Option<bool>,
     db: tauri::State<'_, Database>,
 ) -> std::result::Result<Vec<SyncDay>, String> {
-    db.get_sync_days(&tax_code).map_err(|e| e.to_string())
+    db.get_sync_days(&tax_code, is_success)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

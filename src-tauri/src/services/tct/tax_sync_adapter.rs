@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use keyring::Entry;
 
 use vaone_tax_sync::worker::{CaptchaSolver, PasswordProvider};
-
 pub struct MacOsPasswordProvider;
 
 impl PasswordProvider for MacOsPasswordProvider {
@@ -24,10 +23,12 @@ impl CaptchaSolver for LocalCaptchaSolver {
     }
 }
 
-use vaone_tax_sync::models::{InvoiceProgress, SyncSummary};
+use vaone_tax_sync::models::{InvoiceProgress, SyncSummary, TaxAccount};
 use vaone_tax_sync::sync::SyncObserver;
 
 use crate::commands::system::captcha_predict;
+use crate::state::APP_HANDLE;
+use crate::utils::notification::{show, NotificationType};
 
 pub struct ConsoleSyncObserver;
 
@@ -58,5 +59,33 @@ impl SyncObserver for ConsoleSyncObserver {
             "[tax-sync] Hoàn tất: tổng={}, thành công={}, lỗi={}, đã hủy={}",
             summary.total, summary.success, summary.failed, summary.cancelled
         );
+    }
+
+    fn on_notification(&self, tax_accounts: &Vec<TaxAccount>) {
+        let count = tax_accounts.len();
+        println!("count on_notification>>{}", count);
+
+        if count == 0 {
+            return;
+        }
+
+        let tax_codes = tax_accounts
+            .iter()
+            .take(3)
+            .map(|account| account.tax_code.as_str())
+            .collect::<Vec<_>>();
+
+        let mut message = format!("Tài khoản lỗi:\n{}", tax_codes.join("\n"));
+
+        if count > 3 {
+            message.push_str(&format!("\n... và {} mã khác", count - 3));
+        }
+
+        match show(NotificationType::TaxConfig.id(), "vaOne Plugin", &message) {
+            Ok(()) => println!("[notification] Gửi thành công"),
+            Err(error) => {
+                eprintln!("[notification] Gửi thất bại: {error}");
+            }
+        }
     }
 }

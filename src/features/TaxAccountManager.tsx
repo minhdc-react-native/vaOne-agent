@@ -1,7 +1,8 @@
 
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
     Building2,
+    CalendarSearch,
     Check,
     Clock,
     History,
@@ -27,7 +28,7 @@ import { Loading } from "../components/Loading";
 import InvoiceTypeCheckbox from "./InvoiceTypeCheckbox";
 import { Tooltip } from "../components/Tooltip/Tooltip";
 import { showNotification } from "../lib/notification";
-import { useNavigate, useParams } from "react-router-dom";
+import { data, useNavigate, useParams } from "react-router-dom";
 import { useVirtualized } from "../hook/useVirtualized";
 import { formatDate } from "../api/services/tct.service";
 import { useLatest } from "../hook/useLatest";
@@ -164,7 +165,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
     const { mutateAsync: checkLoginApp, isPending: isCheckingLoginApp } = useCheckLoginApp();
 
     const [form, setForm] = useState<ITaxAccount>(createEmptyAccount);
-    const [selectedTaxCode, setSelectedTaxCode] = useState<string | null>(null);
+    const [selectedTaxCode, setSelectedTaxCode] = useState<string | null>(taxCode ?? null);
     const [search, setSearch] = useState("");
     const [isError, setIsError] = useState(false);
     const [isEdit, setIsEdit] = useState(false);
@@ -211,6 +212,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
         setLocalError("");
     };
     const refSelect = useRef<ITaxAccount>(null);
+    const [currentIndex, setCurrentIndex] = useState(-1)
     const handleSelect = (account?: ITaxAccount) => {
         if (!account) {
             handleNew();
@@ -229,6 +231,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
         };
 
         setSelectedTaxCode(account.tax_code);
+        setCurrentIndex(filteredAccounts.findIndex(a => a.tax_code === account.tax_code));
         setIsEdit(true);
         setLocalError("");
     };
@@ -350,8 +353,8 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
             return;
         }
 
-        if (!/^\d{10}(\d{3})?$/.test(taxCode)) {
-            setLocalError("Mã số thuế phải có 10 hoặc 13 chữ số.");
+        if (!/^\d{10}(-\d{3})?$/.test(taxCode)) {
+            setLocalError("Mã số thuế phải có dạng 0123456789 hoặc 0123456789-001.");
             return;
         }
 
@@ -507,6 +510,29 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
         rowHeight: ROW_HEIGHT,
         containerRef,
     });
+
+    const saveScrollPosition = () => {
+        const container = containerRef.current?.parentElement;
+        if (!container) return;
+
+        sessionStorage.setItem(
+            "tax-account-scroll-top",
+            String(container.scrollTop)
+        );
+    };
+
+    useLayoutEffect(() => {
+        const container = containerRef.current?.parentElement;
+        if (!container) return;
+
+        const savedPosition = sessionStorage.getItem(
+            "tax-account-scroll-top"
+        );
+
+        if (savedPosition !== null) {
+            container.scrollTop = Number(savedPosition);
+        }
+    }, []);
 
     const tooltipContentError = useCallback((error1: string | null, error2: string | null): ReactNode => {
         return (
@@ -862,7 +888,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                                                     ? "border-[#e11c2a] bg-[#e11c2a]/[0.035]"
                                                     : "hover:border-border hover:bg-muted/40 bg-white"
                                                 }`}
-                                            style={{ height: ROW_HEIGHT }}
+                                        // style={{ height: ROW_HEIGHT }}
                                         >
                                             <div className="flex items-start gap-3">
                                                 <div className={`flex flex-col size-10 shrink-0
@@ -919,6 +945,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                                                             className="px-1 pb-1 bg-amber-50 rounded-full hover:cursor-pointer border border-gray-300"
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
+                                                                saveScrollPosition();
                                                                 onHistoryInvoice(account.tax_code);
                                                             }}
                                                         >
@@ -929,7 +956,9 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                                                             />
                                                         </Tooltip>
                                                     </div>
-                                                    <span className="text-xs truncate">{account.note}</span>
+                                                    <span className="text-xs line-clamp-2 wrap-break-word">
+                                                        {account.note}
+                                                    </span>
                                                     <div className="mt-3 flex flex-wrap
                                                         items-center gap-1.5">
                                                         <StatusBadge

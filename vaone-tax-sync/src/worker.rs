@@ -269,7 +269,7 @@ impl TaxSyncWorker {
             return Ok(false);
         }
 
-        let accounts = self.db.get_enabled_tax_accounts()?;
+        let accounts = self.db.get_enabled_tax_accounts(false)?;
 
         for account in accounts {
             if cancel.is_cancelled() {
@@ -334,7 +334,10 @@ impl TaxSyncWorker {
 
     /// Một lượt quét toàn bộ tài khoản thuế đang bật.
     pub async fn run_once(&self, cancel: CancellationToken) -> Result<()> {
-        let accounts = self.db.get_enabled_tax_accounts()?;
+        let accounts_error = self.db.get_enabled_tax_accounts(true)?;
+        let accounts = self.db.get_enabled_tax_accounts(false)?;
+        self.observer.on_notification(&accounts_error);
+
         for account in accounts {
             if cancel.is_cancelled() {
                 break;
@@ -357,7 +360,7 @@ impl TaxSyncWorker {
             return Ok(false);
         }
 
-        let accounts = self.db.get_enabled_tax_accounts()?;
+        let accounts = self.db.get_enabled_tax_accounts(false)?;
 
         for account in accounts {
             if cancel.is_cancelled() {
@@ -413,6 +416,7 @@ impl TaxSyncWorker {
             self.db.clone(),
             self.upload_notify.clone(),
             self.update_notify.clone(),
+            self.captcha_solver.clone(),
         )?;
 
         for invoice_type in &invoice_types {
@@ -426,7 +430,7 @@ impl TaxSyncWorker {
                     *invoice_type,
                     &token,
                     self.config.delay_ms,
-                    100, // Số hóa đơn mỗi batch
+                    500, // Số hóa đơn mỗi batch
                     cancel.clone(),
                 )
                 .await?;
@@ -475,22 +479,13 @@ impl TaxSyncWorker {
                 break;
             }
 
-            let today = vietnam_today().await?;
-
             if cancel.is_cancelled() {
                 break;
             }
 
-            let mut dates = self
+            let dates = self
                 .db
                 .get_incomplete_days(&account.tax_code, *invoice_type)?;
-
-            let today_str = today.format("%Y-%m-%d").to_string();
-
-            // Tránh thêm ngày hôm nay nhiều lần nếu đã có trong danh sách.
-            if !dates.contains(&today_str) {
-                dates.insert(0, today_str);
-            }
 
             for date in dates {
                 if cancel.is_cancelled() {
@@ -540,9 +535,9 @@ impl TaxSyncWorker {
     async fn seed_days(&self, account: &TaxAccount, invoice_types: &[u8]) -> Result<()> {
         let start = NaiveDate::parse_from_str(&account.start_date, "%Y-%m-%d")?;
 
-        let yesterday = vietnam_yesterday().await?;
+        let today = vietnam_today().await?;
 
-        if start > yesterday {
+        if start > today {
             // Chưa đến ngày cần đồng bộ, không tạo ngày.
             return Ok(());
         }
@@ -551,13 +546,13 @@ impl TaxSyncWorker {
 
         loop {
             let date_string = date.format("%Y-%m-%d").to_string();
-            println!("date_string= {date_string}");
+
             for invoice_type in invoice_types {
                 self.db
                     .ensure_sync_day(&account.tax_code, *invoice_type, &date_string)?;
             }
 
-            if date >= yesterday {
+            if date >= today {
                 break;
             }
 
@@ -779,6 +774,7 @@ impl TaxSyncWorker {
             self.db.clone(),
             self.upload_notify.clone(),
             self.update_notify.clone(),
+            self.captcha_solver.clone(),
         )?;
 
         let request = SyncRequest {
@@ -826,7 +822,7 @@ impl TaxSyncWorker {
         // let invoices = self.db.get_invoices_pending_upload(tax_code)?;
 
         let mut results = Vec::new();
-        const BATCH_SIZE: usize = 10;
+        const BATCH_SIZE: usize = 20;
 
         for batch in invoices.chunks(BATCH_SIZE) {
             // Không bắt đầu batch mới khi đã nhận yêu cầu dừng.
