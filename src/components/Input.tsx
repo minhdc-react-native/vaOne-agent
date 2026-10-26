@@ -98,6 +98,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                     {password && (
                         <button
                             type="button"
+                            tabIndex={-1}
                             onClick={() =>
                                 setShowPassword((v) => !v)
                             }
