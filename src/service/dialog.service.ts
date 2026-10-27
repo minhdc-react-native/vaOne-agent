@@ -1,5 +1,6 @@
 import { emit } from "@tauri-apps/api/event";
 import { DialogPayload } from "../components/GlobalDialog";
+import { ReactNode } from "react";
 
 type DialogType = "info" | "success" | "error" | "warning" | "question";
 
@@ -34,44 +35,49 @@ export const dialog = {
         text?: {
             confirmText?: string;
             cancelText?: string;
-        }
+        },
+        note?: string
     ) {
-        return dialog.open({ type: "info", message, title, text });
+        return dialog.open({ type: "info", message, title, text, note });
     },
 
     success(message: string, title = "Success",
         text?: {
             confirmText?: string;
             cancelText?: string;
-        }
+        },
+        note?: string
     ) {
-        return dialog.open({ type: "success", message, title, text });
+        return dialog.open({ type: "success", message, title, text, note });
     },
 
     error(message: string, title = "Error",
         text?: {
             confirmText?: string;
             cancelText?: string;
-        }
+        },
+        note?: string
     ) {
-        return dialog.open({ type: "error", message, title, text });
+        return dialog.open({ type: "error", message, title, text, note });
     },
 
     warning(message: string, title = "Warning",
         text?: {
             confirmText?: string;
             cancelText?: string;
-        }
+        },
+        note?: string
     ) {
-        return dialog.open({ type: "warning", message, title, text });
+        return dialog.open({ type: "warning", message, title, text, note });
     },
 
     question(message: string, title = "Confirm",
         text?: {
             confirmText?: string;
             cancelText?: string;
-        }
+        },
+        note?: string
     ) {
-        return dialog.open({ type: "question", message, title, text });
+        return dialog.open({ type: "question", message, title, text, note });
     },
 };

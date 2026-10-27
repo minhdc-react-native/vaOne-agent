@@ -36,6 +36,7 @@ import { usePauseTaxSyncWorker } from "../hook/usePauseTaxSyncWorker";
 import { isEmpty } from "../lib/utils";
 import { ComboPopup } from "../components/Select/ComboPopup";
 import { BusinessInfo } from "./BusinessInfo";
+import { KEY_TAX_ACCOUNT_SCROLL_TOP } from "../pages/TaxConfig";
 const ROW_HEIGHT = 180;
 type AuthStatus = "pending" | "authenticated" | "failed";
 type SyncStatus = "pending" | "running" | "completed" | "failed";
@@ -516,7 +517,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
         if (!container) return;
 
         sessionStorage.setItem(
-            "tax-account-scroll-top",
+            KEY_TAX_ACCOUNT_SCROLL_TOP,
             String(container.scrollTop)
         );
     };
@@ -526,7 +527,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
         if (!container) return;
 
         const savedPosition = sessionStorage.getItem(
-            "tax-account-scroll-top"
+            KEY_TAX_ACCOUNT_SCROLL_TOP
         );
 
         if (savedPosition !== null) {

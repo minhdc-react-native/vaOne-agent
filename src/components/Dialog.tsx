@@ -16,6 +16,7 @@ interface DialogProps {
     title?: string;
     message?: string;
     icon?: ReactNode;
+    note?: string;
     confirmText?: string;
     cancelText?: string;
     onConfirm?: () => void;
@@ -59,6 +60,7 @@ export default function Dialog({
     cancelText = "Cancel",
     onConfirm,
     onCancel,
+    note
 }: DialogProps) {
     if (!open) return null;
 
@@ -85,7 +87,9 @@ export default function Dialog({
                         {message}
                     </div>
                 )}
-
+                {note && <div className="py-2 px-10 flex text-center rounded-lg bg-amber-50 border border-amber-400">
+                    {note}
+                </div>}
                 {/* Actions */}
                 <div className="mt-5 flex justify-end gap-2">
                     {type === "question" && (

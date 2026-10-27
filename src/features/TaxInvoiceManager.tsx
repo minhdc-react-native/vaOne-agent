@@ -32,6 +32,7 @@ import { showNotification } from "../lib/notification";
 import clsx from "clsx";
 import Input from "../components/Input";
 import { SyncDaysError } from "./SyncDaysErrorItem";
+import { MaybeTooltip } from "../components/Tooltip/MaybeTooltip";
 
 
 const PAGE_SIZE = 100;
@@ -293,6 +294,8 @@ export function TaxInvoiceManager() {
         const confirmed = await dialog.question(
             `Bạn có chắc chắn đồng bộ lại dữ liệu của mã số thuế ${taxCode}?`,
             `Từ ngày: ${formatDate(filters.from_date)} đến ngày ${formatDate(filters.to_date)}`,
+            undefined,
+            syncConfig.taxSync ? "Dữ liệu sẽ bị xóa để đồng bộ lại, bạn hãy cẩn trọng" : undefined
         );
         if (!confirmed) return;
         resetSyncStatus({
@@ -744,17 +747,21 @@ export function TaxInvoiceManager() {
                                                         {formatNumber(invoice.tgtttbso, invoice.tgia !== 1 ? 2 : 0)}
                                                     </td>
                                                     <td className="px-2 py-1 text-center">
-                                                        <StatusBadge
-                                                            type={mapStatus[invoice.detail_status]}
-                                                            label={mapStatusLabel[invoice.detail_status]}
-                                                        />
+                                                        <MaybeTooltip enabled={!!invoice.detail_error} tooltip={invoice.detail_error!}>
+                                                            <StatusBadge
+                                                                type={mapStatus[invoice.detail_status]}
+                                                                label={mapStatusLabel[invoice.detail_status]}
+                                                            />
+                                                        </MaybeTooltip>
                                                     </td>
 
                                                     <td className="px-2 py-1 text-center">
-                                                        <StatusBadge
-                                                            type={mapStatus[invoice.upload_status]}
-                                                            label={mapStatusLabel[invoice.upload_status]}
-                                                        />
+                                                        <MaybeTooltip enabled={!!invoice.upload_error} tooltip={invoice.upload_error!}>
+                                                            <StatusBadge
+                                                                type={mapStatus[invoice.upload_status]}
+                                                                label={mapStatusLabel[invoice.upload_status]}
+                                                            />
+                                                        </MaybeTooltip>
                                                     </td>
                                                     <td className="px-2 py-1 text-center">
                                                         <StatusBadge

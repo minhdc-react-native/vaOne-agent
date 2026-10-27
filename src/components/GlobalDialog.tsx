@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import Dialog from "./Dialog";
 import { dialog } from "../service/dialog.service";
@@ -11,7 +11,8 @@ export type DialogPayload = {
     text?: {
         confirmText?: string;
         cancelText?: string;
-    }
+    },
+    note?: string
 };
 
 export function GlobalDialog() {
@@ -48,6 +49,7 @@ export function GlobalDialog() {
                 dialog.resolve(current.id, true);
                 setCurrent(null);
             }}
+            note={current.note}
         />
     );
 }

@@ -246,7 +246,6 @@ impl TaxSyncService {
 
         let mut completed = 0;
         let mut failed = 0;
-
         for invoice in invoices {
             if cancel.is_cancelled() {
                 break;
@@ -271,6 +270,7 @@ impl TaxSyncService {
                         invoice.khmshdon,
                         invoice_type,
                         token,
+                        delay_ms,
                     )
                     .await?;
 
@@ -290,6 +290,10 @@ impl TaxSyncService {
                 Ok(()) => {
                     completed += 1;
                     self.upload_notify.notify_one();
+                    // println!(
+                    //     "[tax-sync] Detail retry success: tax_code={}, invoice={}",
+                    //     tax_code, invoice.shdon
+                    // );
                 }
                 Err(err) => {
                     if cancel.is_cancelled() {

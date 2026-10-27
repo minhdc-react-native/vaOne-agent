@@ -170,35 +170,59 @@ impl TaxClient {
                     return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
                 }
 
-                let mut request_url = base_url.clone();
+                let mut url = url::Url::parse(&base_url)
+                    .map_err(|e| TaxSyncError::Authentication(e.to_string()))?;
 
-                if let Some(cursor) = &state {
-                    let separator = if request_url.contains('?') { '&' } else { '?' };
+                {
+                    let mut query = url.query_pairs_mut();
 
-                    request_url.push(separator);
-                    request_url.push_str("state=");
-                    request_url.push_str(
-                        &url::form_urlencoded::byte_serialize(cursor.as_bytes())
-                            .collect::<String>(),
-                    );
+                    if let Some(cursor) = state.as_ref() {
+                        query.append_pair("state", cursor);
+                    }
+
+                    if let Some((ckey, cvalue)) = captcha.as_ref() {
+                        query.append_pair("ckey", ckey);
+                        query.append_pair("cvalue", cvalue);
+                    }
                 }
 
-                if let Some((ckey, cvalue)) = captcha.as_ref() {
-                    let mut url = url::Url::parse(&request_url)
-                        .map_err(|e| TaxSyncError::Authentication(e.to_string()))?;
+                let request_url = url.to_string();
 
-                    url.query_pairs_mut()
-                        .append_pair("ckey", ckey)
-                        .append_pair("cvalue", cvalue);
+                // let mut request_url = base_url.clone();
 
-                    request_url = url.to_string();
+                // if let Some(cursor) = &state {
+                //     let separator = if request_url.contains('?') { '&' } else { '?' };
 
-                    print!("request_url captcha>> {request_url}");
-                }
+                //     request_url.push(separator);
+                //     request_url.push_str("state=");
+                //     request_url.push_str(
+                //         &url::form_urlencoded::byte_serialize(cursor.as_bytes())
+                //             .collect::<String>(),
+                //     );
+                // }
+
+                // if let Some((ckey, cvalue)) = captcha.as_ref() {
+                //     let mut url = url::Url::parse(&request_url)
+                //         .map_err(|e| TaxSyncError::Authentication(e.to_string()))?;
+
+                //     url.query_pairs_mut()
+                //         .append_pair("ckey", ckey)
+                //         .append_pair("cvalue", cvalue);
+
+                //     request_url = url.to_string();
+
+                //     print!("request_url captcha>> {request_url}");
+                // }
 
                 // Nếu request đang chờ HTTP, cần timeout hoặc truyền cancel
                 // trực tiếp vào get_json() để có thể dừng nhanh.
-                let response = self.get_json(&request_url, token).await?;
+                let response = match self.get_json(&request_url, token).await {
+                    Ok(response) => response,
+                    Err(err) => {
+                        eprintln!("Request URL: {request_url}");
+                        return Err(err);
+                    }
+                };
 
                 if cancel.is_cancelled() {
                     return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
@@ -237,6 +261,7 @@ impl TaxClient {
         &self,
         invoice: &Value,
         token: &str,
+        delay_ms: u64,
     ) -> Result<(Option<Value>, Option<String>)> {
         let xml = self.fetch_xml(invoice, token).await?;
 
@@ -244,7 +269,7 @@ impl TaxClient {
             return Ok((None, xml));
         }
 
-        request_delay(2000).await;
+        request_delay(delay_ms).await;
 
         let detail = self.fetch_detail(invoice, token).await?;
 
@@ -292,6 +317,7 @@ impl TaxClient {
         khmshdon: i64,
         invoice_type: u8,
         token: &str,
+        delay_ms: u64,
     ) -> Result<(Option<Value>, Option<String>)> {
         let xml = self
             .fetch_xml_by_key(nbmst, khhdon, shdon, khmshdon, invoice_type, token)
@@ -300,7 +326,9 @@ impl TaxClient {
         if xml.is_some() {
             return Ok((None, xml));
         }
-        request_delay(2000).await;
+
+        request_delay(delay_ms).await;
+
         let detail = self
             .fetch_detail_by_key(nbmst, khhdon, shdon, khmshdon, token)
             .await?;

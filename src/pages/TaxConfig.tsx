@@ -8,7 +8,7 @@ import Button from "../components/Button";
 import { Tooltip } from "../components/Tooltip/Tooltip";
 import { useLatest } from "../hook/useLatest";
 import { dialog } from "../service/dialog.service";
-
+export const KEY_TAX_ACCOUNT_SCROLL_TOP = 'tax-account-scroll-top'
 export const TaxConfig = () => {
     const { loading,
         isRunning,
@@ -19,6 +19,10 @@ export const TaxConfig = () => {
 
     useEffect(() => {
         invoke("page_ready", { name: "taxConfig" });
+
+        return () => {
+            sessionStorage.removeItem(KEY_TAX_ACCOUNT_SCROLL_TOP);
+        }
     }, []);
 
     const onConfirm = async () => {

@@ -430,7 +430,7 @@ impl TaxSyncWorker {
                     *invoice_type,
                     &token,
                     self.config.delay_ms,
-                    500, // Số hóa đơn mỗi batch
+                    1000, // Số hóa đơn mỗi batch
                     cancel.clone(),
                 )
                 .await?;

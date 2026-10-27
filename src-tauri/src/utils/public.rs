@@ -16,7 +16,7 @@ pub fn navigate_to_route(route: &str) {
                     "#,
                     route
                 )) {
-                    Ok(_) => println!("eval ok"),
+                    Ok(_) => println!("eval ok {route}"),
                     Err(e) => println!("eval err: {:?}", e),
                 }
             }
