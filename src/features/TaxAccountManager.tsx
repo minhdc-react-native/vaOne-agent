@@ -204,13 +204,15 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
         taxPasswordKey: string;
         appPasswordKey: string | null;
     } | null>(null);
-
+    const refInput = useRef<HTMLInputElement>(null);
     const handleNew = () => {
         setForm(createEmptyAccount());
         setSelectedTaxCode(null);
         refSecretKeys.current = null;
         setIsEdit(false);
         setLocalError("");
+        requestAnimationFrame(() => refInput.current?.focus());
+
     };
     const refSelect = useRef<ITaxAccount>(null);
     const [currentIndex, setCurrentIndex] = useState(-1)
@@ -606,10 +608,10 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                         <div className="space-y-3">
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <Input
+                                    ref={refInput}
                                     label="Mã số thuế"
                                     disabled={isEdit}
                                     sizeInput="xs"
-                                    autoFocus
                                     required
                                     value={form.tax_code}
                                     onChange={(e) =>
@@ -825,8 +827,8 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                         <div className="w-45">
                             <Input
                                 placeholder="Tìm mã số thuế..."
+                                autoFocus
                                 sizeInput="xs"
-                                required
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                             />

@@ -50,7 +50,8 @@ export default function AppWindow({
     setFullScreen
 }: AppWindowProps) {
     const location = useLocation();
-    useEscape(hideWindow, !disableClose);
+
+    // useEscape(hideWindow, !disableClose, callBack);
 
     useEffect(() => {
         const path = location.pathname.split("/").slice(0, 2).join("/");

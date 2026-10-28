@@ -275,7 +275,7 @@ impl Database {
                AND (?7 IS NULL OR invoice_date <= ?7)
                AND (?8 IS NULL OR detail_status = ?8)
                AND (?9 IS NULL OR upload_status = ?9)
-             ORDER BY invoice_date DESC, invoice_key DESC
+             ORDER BY invoice_date DESC, khhdon DESC, shdon DESC
              LIMIT ?10 OFFSET ?11",
             )
             .map_err(db_error)?;

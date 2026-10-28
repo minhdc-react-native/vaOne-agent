@@ -15,8 +15,6 @@ export const TaxConfig = () => {
         setWorkerRunning
     } = usePauseTaxSyncWorker();
 
-    const refIsRunning = useLatest(isRunning);
-
     useEffect(() => {
         invoke("page_ready", { name: "taxConfig" });
 

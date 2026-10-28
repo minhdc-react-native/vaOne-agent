@@ -22,7 +22,7 @@ import AppWindow from "../components/AppWindow";
 import { ComboPopup } from "../components/Select/ComboPopup";
 import { DateInput } from "../components/Date/DateInput";
 import { formatNumber, getCurrentMonthDateRange } from "../lib/utils";
-import { ChevronLeft, ChevronRight, Clock, CloudSync, List, Loader, RefreshCcw, Search } from "lucide-react";
+import { Cable, ChevronLeft, ChevronRight, Clock, CloudSync, List, Loader, RefreshCcw, Search, Unplug } from "lucide-react";
 import Button from "../components/Button";
 import { formatDate } from "../api/services/tct.service";
 import { dialog } from "../service/dialog.service";
@@ -36,6 +36,7 @@ import { MaybeTooltip } from "../components/Tooltip/MaybeTooltip";
 import { TaxAccountItem } from "./TaxAccountItem";
 import { ITaxAccount } from "../service/taxAccountService";
 import { Tooltip } from "../components/Tooltip/Tooltip";
+import { Line } from "../components/Line";
 
 
 const PAGE_SIZE = 100;
@@ -49,8 +50,8 @@ const INVOICE_TYPES = [
 const mapInvoiceType: Record<number, string> = {
     1: "Mua vào",
     2: "Bán ra",
-    3: "Mua vào",
-    4: "Bán ra"
+    3: "Mua vào MTT",
+    4: "Bán ra MTT"
 }
 
 const mapInvoiceStatus: Record<number, string> = {
@@ -100,14 +101,14 @@ const initialFilters: ISyncInvoiceFilters = {
     khhdon: undefined,
     shdon: undefined,
     invoice_type: undefined,
-    from_date: dateMonth.fromDate,
+    from_date: dateMonth.toDate,
     to_date: dateMonth.toDate,
     detail_status: undefined,
     upload_status: undefined,
 };
 const initialSync: ISyncConfig = {
     taxCode: "",
-    fromDate: dateMonth.fromDate,
+    fromDate: dateMonth.toDate,
     toDate: dateMonth.toDate,
     taxSync: false,
     appSync: true,
@@ -285,16 +286,23 @@ export function TaxInvoiceManager() {
     };
 
     const onRefreshAll = async () => {
-        await loadAccounts();
-        await loadStats();
-        await loadSyncDays();
-        await loadInvoices(filters, 1);
+        void loadAccounts();
+        void loadStats();
+        void loadSyncDays();
+        void applyFilters();
     }
     const applyFilters = () => {
         void loadInvoices(filters, 1);
     };
 
     useEffect(() => {
+        if (filters.from_date && filters.to_date && filters.from_date > filters.to_date) {
+            showNotification({
+                type: "warning",
+                message: `Đến ngày ${formatDate(filters.to_date)} phải nhỏ hơn từ ngày ${formatDate(filters.from_date)}!`
+            });
+            return;
+        };
         applyFilters();
     }, [filters]);
 
@@ -313,18 +321,34 @@ export function TaxInvoiceManager() {
             });
             return;
         };
+        if (filters.from_date > filters.to_date) {
+            showNotification({
+                type: "warning",
+                message: `Đến ngày ${formatDate(filters.to_date)} phải nhỏ hơn từ ngày ${formatDate(filters.from_date)}!`
+            });
+            return;
+        };
+        if (!syncConfig.taxSync && !syncConfig.appSync) {
+            showNotification({
+                type: "warning",
+                message: "Bạn phải chọn ít nhất 1 chức năng!"
+            });
+            return;
+        };
         const confirmed = await dialog.question(
-            `Mã số thuế: ${taxCodeSelect} bạn có muốn?`,
+            `Mã số thuế: ${taxCodeSelect} muốn trong khoảng thời gian này thực hiện?`,
             `Từ ngày: ${formatDate(filters.from_date)} đến ngày ${formatDate(filters.to_date)}`,
-            undefined,
+            {
+                confirmText: "Xác nhận"
+            },
             <div className="mt-2 rounded-sm border border-gray-300 px-2.5 py-2 text-xs">
                 <div className="italic leading-relaxed">
                     {syncConfig.taxSync && <i className="block">
-                        - Bạn muốn quét lại từ cơ quan thuế những dữ liệu còn thiếu.
+                        1. Quét lại dữ liệu từ <span className="font-bold text-red-700">cơ quan thuế</span> những dữ liệu còn thiếu và cập nhật thông tin mới nhất.
                     </i>}
 
                     {syncConfig.appSync && <i className="block">
-                        - Bạn muốn đồng bộ lại sang ứng dụng đích.
+                        {syncConfig.taxSync ? '2.' : '1.'} Đồng bộ lại sang ứng <span className="font-bold text-red-700">{account?.type_app}</span> tất cả hóa đơn trong khoảng thời gian này.
                     </i>}
                 </div>
             </div>
@@ -355,6 +379,7 @@ export function TaxInvoiceManager() {
 
     const [fullScreen, setFullScreen] = useState(false);
     const navigate = useNavigate();
+
     useEffect(() => {
         invoke("page_ready", { name: "historyInvoice", show: true, fullScreen });
     }, [fullScreen]);
@@ -426,17 +451,22 @@ export function TaxInvoiceManager() {
                 <div className="flex gap-1">
                     <div className="flex flex-col gap-1 w-70 shrink-0">
                         <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
-                            <Clock className="h-6 w-6 shrink-0 text-gray-500" />
-
-                            <span className="text-sm text-gray-500">
-                                Đồng bộ
-                            </span>
-
-                            <span className="text-sm font-medium text-gray-800">
-                                {account?.updated_at
-                                    ? formatDate(account.updated_at, true)
-                                    : "Chưa đồng bộ"}
-                            </span>
+                            <Clock className="h-10 w-10 shrink-0 text-gray-500" />
+                            <div className="space-y-1">
+                                <div className="flex gap-1 justify-between text-gray-500">
+                                    <span>Ngày bắt đầu: </span>
+                                    <span>{formatDate(account?.start_date)}</span>
+                                </div>
+                                <Line />
+                                <div className="w-full flex gap-1 justify-between">
+                                    <Cable size={15} className="text-red-700" />
+                                    <span className="text-sm font-bold text-gray-800">
+                                        {account?.updated_at
+                                            ? formatDate(account.updated_at, true)
+                                            : "Chưa đồng bộ"}
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                         <div className="grid grid-cols-2 gap-1 flex-1">
                             <StatCard
@@ -501,7 +531,7 @@ export function TaxInvoiceManager() {
                                                             item.id,
                                                         )
                                                     }}
-                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40 shrink-0">{item?.label}</div>}
+                                                    renderItem={(item) => <div key={item?.id} className="text-sm px-2 w-40 shrink-0">{item?.label}</div>}
                                                 />
                                             </div>
                                             <div className="w-57.5 shrink-0">
@@ -552,7 +582,7 @@ export function TaxInvoiceManager() {
                                                             item.id,
                                                         )
                                                     }}
-                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40 shrink-0">{item?.label}</div>}
+                                                    renderItem={(item) => <div key={item?.id} className="text-sm px-2 w-40 shrink-0">{item?.label}</div>}
                                                 />
                                             </div>
 
@@ -574,7 +604,7 @@ export function TaxInvoiceManager() {
                                                             item.id,
                                                         )
                                                     }}
-                                                    renderItem={(item) => <div key={item?.id} className="px-2 w-40 shrink-0">{item?.label}</div>}
+                                                    renderItem={(item) => <div key={item?.id} className="text-sm px-2 w-40 shrink-0">{item?.label}</div>}
                                                 />
                                             </div>
                                         </div>
@@ -582,6 +612,7 @@ export function TaxInvoiceManager() {
                                             <div className="flex-1 w-58 shrink-0">
                                                 <Input
                                                     label="MST"
+                                                    autoFocus
                                                     labelPosition="left"
                                                     labelWidth={53}
                                                     value={filters.nbmst ?? ""}
@@ -710,139 +741,154 @@ export function TaxInvoiceManager() {
 
                         {/* Chỉ chiếm phần không gian còn lại */}
                         <div className="flex-1 min-h-0 overflow-auto">
-                            {invoicesLoading ? (
-                                <div className="p-4 text-gray-500">
-                                    Đang tải danh sách hóa đơn...
-                                </div>
-                            ) : invoiceItems.length === 0 ? (
-                                <div className="p-4 text-gray-500">
-                                    Không có hóa đơn phù hợp.
-                                </div>
-                            ) : (
-                                <div className="min-w-full w-max">
-                                    <table className="w-full min-w-max border-collapse text-left">
-                                        <thead className="sticky top-0 z-10 bg-gray-100">
+
+                            <div className="min-w-full w-max">
+                                <table className="w-full min-w-max border-collapse text-left">
+                                    <thead className="sticky top-0 z-10 bg-gray-100">
+                                        <tr>
+                                            <th className="w-14 px-2 py-1 font-medium">#</th>
+                                            <th className="w-30 px-2 py-1 font-medium">
+                                                {[1, 3].includes(filters.invoice_type ?? 0)
+                                                    ? "MST người bán"
+                                                    : [2, 4].includes(filters.invoice_type ?? 0)
+                                                        ? "MST người mua"
+                                                        : "MST bán/mua"}
+                                            </th>
+
+                                            <th className="w-25 px-2 py-1 font-medium">
+                                                Phân loại
+                                            </th>
+
+                                            <th className="w-20 px-2 py-1 font-medium">
+                                                Ký hiệu
+                                            </th>
+
+                                            <th className="w-25 px-2 py-1 font-medium text-right">
+                                                Số HĐ
+                                            </th>
+                                            <th className="w-28 px-2 py-1 font-medium text-center">
+                                                Ngày lập
+                                            </th>
+                                            <th className="px-2 py-1 font-medium">
+                                                {[1, 3].includes(filters.invoice_type ?? 0)
+                                                    ? "Tên người bán"
+                                                    : [2, 4].includes(filters.invoice_type ?? 0)
+                                                        ? "Tên người mua"
+                                                        : "Tên người bán/mua"}
+                                            </th>
+                                            <th className="w-18 px-2 py-1 font-medium">
+                                                Tiền tệ
+                                            </th>
+                                            <th className="w-32 px-2 py-1 font-medium text-right">
+                                                Tiền hàng
+                                            </th>
+                                            <th className="w-25 px-2 py-1 font-medium text-right">
+                                                Thuế
+                                            </th>
+                                            <th className="w-32 px-2 py-1 font-medium text-right">
+                                                Tổng tiền
+                                            </th>
+                                            <th className="w-35 px-2 py-1 font-medium">
+                                                Dữ liệu
+                                            </th>
+                                            <th className="w-35 px-2 py-1 font-medium">
+                                                Đồng bộ
+                                            </th>
+                                            <th className="w-50 px-2 py-1 font-medium">
+                                                Trạng thái
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {invoiceItems.length === 0 ? (
                                             <tr>
-                                                <th className="w-14 px-2 py-1 font-medium">#</th>
-                                                <th className="w-30 px-2 py-1 font-medium">
-                                                    MST bán/mua
-                                                </th>
-
-                                                <th className="w-20 px-2 py-1 font-medium">
-                                                    Loại
-                                                </th>
-
-                                                <th className="w-20 px-2 py-1 font-medium">
-                                                    Ký hiệu
-                                                </th>
-
-                                                <th className="w-25 px-2 py-1 font-medium text-right">
-                                                    Số HĐ
-                                                </th>
-                                                <th className="w-28 px-2 py-1 font-medium text-center">
-                                                    Ngày lập
-                                                </th>
-                                                <th className="px-2 py-1 font-medium">
-                                                    Tên người bán/mua
-                                                </th>
-                                                <th className="w-18 px-2 py-1 font-medium">
-                                                    Tiền tệ
-                                                </th>
-                                                <th className="w-32 px-2 py-1 font-medium text-right">
-                                                    Tiền hàng
-                                                </th>
-                                                <th className="w-25 px-2 py-1 font-medium text-right">
-                                                    Thuế
-                                                </th>
-                                                <th className="w-32 px-2 py-1 font-medium text-right">
-                                                    Tổng tiền
-                                                </th>
-                                                <th className="w-35 px-2 py-1 font-medium">
-                                                    Dữ liệu
-                                                </th>
-                                                <th className="w-35 px-2 py-1 font-medium">
-                                                    Đồng bộ
-                                                </th>
-                                                <th className="w-50 px-2 py-1 font-medium">
-                                                    Trạng thái
-                                                </th>
+                                                <td colSpan={14} className="py-10 text-center">
+                                                    <div className="flex flex-col items-center justify-center gap-2 text-gray-400">
+                                                        <i className="ki-duotone ki-file-deleted text-3xl">
+                                                            <span className="path1" />
+                                                            <span className="path2" />
+                                                        </i>
+                                                        <span className="text-sm font-medium">
+                                                            Không có dữ liệu hóa đơn
+                                                        </span>
+                                                        <span className="text-xs">
+                                                            Vui lòng thay đổi điều kiện tìm kiếm.
+                                                        </span>
+                                                    </div>
+                                                </td>
                                             </tr>
-                                        </thead>
+                                        ) : (invoiceItems.map((invoice, index) => (
+                                            <tr
+                                                key={`${invoice.tax_code}-${invoice.invoice_type}-${invoice.invoice_key}`}
+                                                className="border-t border-gray-100 hover:bg-gray-50 font-xs"
+                                            >
+                                                <td className="whitespace-nowrap px-2 py-1">
+                                                    {index + 1 + (PAGE_SIZE * (page - 1))}
+                                                </td>
 
-                                        <tbody>
-                                            {invoiceItems.map((invoice, index) => (
-                                                <tr
-                                                    key={`${invoice.tax_code}-${invoice.invoice_type}-${invoice.invoice_key}`}
-                                                    className="border-t border-gray-100 hover:bg-gray-50 font-xs"
-                                                >
-                                                    <td className="whitespace-nowrap px-2 py-1">
-                                                        {index + 1 + (PAGE_SIZE * (page - 1))}
-                                                    </td>
+                                                <td className="whitespace-nowrap px-2 py-1">
+                                                    {invoice.nbnmmst}
+                                                </td>
 
-                                                    <td className="whitespace-nowrap px-2 py-1">
-                                                        {invoice.nbnmmst}
-                                                    </td>
+                                                <td className="whitespace-nowrap px-2 py-1">
+                                                    {mapInvoiceType[invoice.invoice_type]}
+                                                </td>
 
-                                                    <td className="whitespace-nowrap px-2 py-1">
-                                                        {mapInvoiceType[invoice.invoice_type]}
-                                                    </td>
+                                                <td className="whitespace-nowrap px-2 py-1 text-green-700">
+                                                    {invoice.khhdon ?? "—"}
+                                                </td>
 
-                                                    <td className="whitespace-nowrap px-2 py-1 text-green-700">
-                                                        {invoice.khhdon ?? "—"}
-                                                    </td>
+                                                <td className="whitespace-nowrap px-2 py-1 text-right text-blue-700">
+                                                    {invoice.shdon ?? "—"}
+                                                </td>
+                                                <td className="whitespace-nowrap px-2 py-1 text-center">
+                                                    {formatDate(invoice.invoice_date)}
+                                                </td>
+                                                <td className="whitespace-nowrap px-2 py-1">
+                                                    {invoice.nbnmten}
+                                                </td>
 
-                                                    <td className="whitespace-nowrap px-2 py-1 text-right text-blue-700">
-                                                        {invoice.shdon ?? "—"}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-2 py-1 text-center">
-                                                        {formatDate(invoice.invoice_date)}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-2 py-1">
-                                                        {invoice.nbnmten}
-                                                    </td>
-
-                                                    <td className="whitespace-nowrap px-2 py-1">
-                                                        {invoice.dvtte ?? "—"}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
-                                                        {formatNumber(invoice.tgtcthue, invoice.tgia !== 1 ? 2 : 0)}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
-                                                        {formatNumber(invoice.tgtthue, invoice.tgia !== 1 ? 2 : 0)}
-                                                    </td>
-                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
-                                                        {formatNumber(invoice.tgtttbso, invoice.tgia !== 1 ? 2 : 0)}
-                                                    </td>
-                                                    <td className="px-2 py-1">
-                                                        <MaybeTooltip enabled={!!invoice.detail_error} tooltip={invoice.detail_error!}>
-                                                            <StatusBadge
-                                                                type={mapStatus[invoice.detail_status]}
-                                                                label={mapStatusLabel[invoice.detail_status]}
-                                                            />
-                                                        </MaybeTooltip>
-                                                    </td>
-
-                                                    <td className="px-2 py-1">
-                                                        <MaybeTooltip enabled={!!invoice.upload_error} tooltip={invoice.upload_error!}>
-                                                            <StatusBadge
-                                                                type={mapStatus[invoice.upload_status]}
-                                                                label={mapStatusLabel[invoice.upload_status]}
-                                                            />
-                                                        </MaybeTooltip>
-                                                    </td>
-                                                    <td className="px-2 py-1">
+                                                <td className="whitespace-nowrap px-2 py-1">
+                                                    {invoice.dvtte ?? "—"}
+                                                </td>
+                                                <td className="whitespace-nowrap px-2 py-1 text-right">
+                                                    {formatNumber(invoice.tgtcthue, (invoice.tgia ?? 1) !== 1 ? 2 : 0)}
+                                                </td>
+                                                <td className="whitespace-nowrap px-2 py-1 text-right">
+                                                    {formatNumber(invoice.tgtthue, (invoice.tgia ?? 1) !== 1 ? 2 : 0)}
+                                                </td>
+                                                <td className="whitespace-nowrap px-2 py-1 text-right">
+                                                    {formatNumber(invoice.tgtttbso, (invoice.tgia ?? 1) !== 1 ? 2 : 0)}
+                                                </td>
+                                                <td className="px-2 py-1">
+                                                    <MaybeTooltip enabled={!!invoice.detail_error} tooltip={invoice.detail_error!}>
                                                         <StatusBadge
-                                                            variant="text"
-                                                            type={mapInvoiceStyle[invoice.tthai as any]}
-                                                            label={mapInvoiceStatus[invoice.tthai as any]}
+                                                            type={mapStatus[invoice.detail_status]}
+                                                            label={mapStatusLabel[invoice.detail_status]}
                                                         />
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
+                                                    </MaybeTooltip>
+                                                </td>
+
+                                                <td className="px-2 py-1">
+                                                    <MaybeTooltip enabled={!!invoice.upload_error} tooltip={invoice.upload_error!}>
+                                                        <StatusBadge
+                                                            type={mapStatus[invoice.upload_status]}
+                                                            label={mapStatusLabel[invoice.upload_status]}
+                                                        />
+                                                    </MaybeTooltip>
+                                                </td>
+                                                <td className="px-2 py-1">
+                                                    <StatusBadge
+                                                        variant="text"
+                                                        type={mapInvoiceStyle[invoice.tthai as any]}
+                                                        label={mapInvoiceStatus[invoice.tthai as any]}
+                                                    />
+                                                </td>
+                                            </tr>
+                                        )))}
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
 
                         {/* Pagination */}
