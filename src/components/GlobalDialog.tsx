@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import Dialog from "./Dialog";
-import { dialog } from "../service/dialog.service";
+import { contents, dialog, listeners } from "../service/dialog.service";
 
 export type DialogPayload = {
     id: string;
@@ -12,27 +12,42 @@ export type DialogPayload = {
         confirmText?: string;
         cancelText?: string;
     },
-    note?: string
+    content?: ReactNode
 };
 
 export function GlobalDialog() {
     const [current, setCurrent] = useState<DialogPayload | null>(null);
 
     useEffect(() => {
-        console.log("🔔 Dialog listener mounted");
+        let unlisten: (() => void) | undefined;
+        let disposed = false;
 
-        const unlistenPromise = listen("dialog:open", (event: any) => {
-            console.log("📩 received dialog:", event.payload);
+        listen("dialog:open", (event: any) => {
             setCurrent(event.payload);
+        }).then((fn) => {
+            if (disposed) {
+                fn();
+            } else {
+                unlisten = fn;
+            }
         });
 
         return () => {
-            unlistenPromise.then((f) => f());
+            disposed = true;
+            unlisten?.();
         };
     }, []);
 
+    function closeDialog(id: string, result: boolean) {
+        const resolve = listeners.get(id);
+        listeners.delete(id);
+        resolve?.(result);
+        setCurrent(null);
+    }
+
     if (!current) return null;
 
+    const content = contents.get(current.id);
     return (
         <Dialog
             open={true}
@@ -42,14 +57,12 @@ export function GlobalDialog() {
             confirmText={current.text?.confirmText ?? "Đồng ý"}
             cancelText={current.text?.cancelText ?? "Hủy bỏ"}
             onCancel={() => {
-                dialog.resolve(current.id, false);
-                setCurrent(null);
+                closeDialog(current.id, false);
             }}
             onConfirm={() => {
-                dialog.resolve(current.id, true);
-                setCurrent(null);
+                closeDialog(current.id, true);
             }}
-            note={current.note}
+            content={content}
         />
     );
 }

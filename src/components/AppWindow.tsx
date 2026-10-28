@@ -1,11 +1,12 @@
 import { useEffect, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { Maximize, Minimize, X } from "lucide-react";
 import Button from "./Button";
 import { trayApi } from "../api/axios/axiosClient";
 import { useEscape } from "../hook/useEscape";
 import { useLocation } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { IconLucide, IconName } from "./IconLucide";
+import { Tooltip } from "./Tooltip/Tooltip";
 
 interface AppWindowProps {
     icon?: IconName,
@@ -17,6 +18,8 @@ interface AppWindowProps {
         onConfirm?: () => Promise<boolean>;
         onClose?: () => void;
     }
+    fullScreen?: boolean;
+    setFullScreen?: (fullScreen: boolean) => void;
 }
 export const hideWindow = async (callBack?: {
     onConfirm?: () => Promise<boolean>;
@@ -42,7 +45,9 @@ export default function AppWindow({
     children,
     content,
     disableClose = false,
-    callBack
+    callBack,
+    fullScreen,
+    setFullScreen
 }: AppWindowProps) {
     const location = useLocation();
     useEscape(hideWindow, !disableClose);
@@ -81,11 +86,18 @@ export default function AppWindow({
                     {title}
                 </span>}
                 {content}
-                {!disableClose && <Button
+                {fullScreen !== undefined && <Tooltip title={fullScreen ? "Thu nhỏ" : "Toàn màn hình"}><Button
+                    onClick={() => setFullScreen?.(!fullScreen)} variant="ghost"
+                    iconOnly icon={fullScreen ? <Minimize size={15} /> : <Maximize size={15} />}
+                /></Tooltip>}
+                {!disableClose && <Tooltip title="Thoát"><Button
                     // disabled={disableClose}
-                    onClick={() => hideWindow(callBack)} variant="ghost"
+                    onClick={() => {
+                        if (fullScreen) setFullScreen?.(false);
+                        hideWindow(callBack);
+                    }} variant="ghost"
                     iconOnly icon={<X size={15} />}
-                />}
+                /></Tooltip>}
             </header>
 
             {/* Content */}

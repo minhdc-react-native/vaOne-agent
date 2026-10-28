@@ -4,7 +4,9 @@ import { ReactNode } from "react";
 
 type DialogType = "info" | "success" | "error" | "warning" | "question";
 
-const listeners: Map<string, (result: boolean) => void> = new Map();
+export const contents = new Map<string, ReactNode>();
+
+export const listeners: Map<string, (result: boolean) => void> = new Map();
 
 function uuid() {
     return Math.random().toString(36).substring(2);
@@ -17,9 +19,15 @@ export const dialog = {
         return new Promise<boolean>((resolve) => {
             listeners.set(id, resolve);
 
+            if (payload.content !== undefined) {
+                contents.set(id, payload.content);
+            }
+
+            const { content, ...eventPayload } = payload;
+
             emit("dialog:open", {
                 id,
-                ...payload,
+                ...eventPayload,
             });
         });
     },
@@ -28,6 +36,7 @@ export const dialog = {
         const cb = listeners.get(id);
         if (cb) cb(result);
         listeners.delete(id);
+        contents.delete(id);
     },
 
     // shortcuts
@@ -36,9 +45,9 @@ export const dialog = {
             confirmText?: string;
             cancelText?: string;
         },
-        note?: string
+        content?: ReactNode
     ) {
-        return dialog.open({ type: "info", message, title, text, note });
+        return dialog.open({ type: "info", message, title, text, content });
     },
 
     success(message: string, title = "Success",
@@ -46,9 +55,9 @@ export const dialog = {
             confirmText?: string;
             cancelText?: string;
         },
-        note?: string
+        content?: ReactNode
     ) {
-        return dialog.open({ type: "success", message, title, text, note });
+        return dialog.open({ type: "success", message, title, text, content });
     },
 
     error(message: string, title = "Error",
@@ -56,9 +65,9 @@ export const dialog = {
             confirmText?: string;
             cancelText?: string;
         },
-        note?: string
+        content?: ReactNode
     ) {
-        return dialog.open({ type: "error", message, title, text, note });
+        return dialog.open({ type: "error", message, title, text, content });
     },
 
     warning(message: string, title = "Warning",
@@ -66,9 +75,9 @@ export const dialog = {
             confirmText?: string;
             cancelText?: string;
         },
-        note?: string
+        content?: ReactNode
     ) {
-        return dialog.open({ type: "warning", message, title, text, note });
+        return dialog.open({ type: "warning", message, title, text, content });
     },
 
     question(message: string, title = "Confirm",
@@ -76,8 +85,8 @@ export const dialog = {
             confirmText?: string;
             cancelText?: string;
         },
-        note?: string
+        content?: ReactNode
     ) {
-        return dialog.open({ type: "question", message, title, text, note });
+        return dialog.open({ type: "question", message, title, text, content });
     },
 };

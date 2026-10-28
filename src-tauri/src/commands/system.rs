@@ -68,42 +68,59 @@ pub fn get_agent_info() -> AgentInfo {
     }
 }
 #[tauri::command]
-pub fn page_ready(name: String, show: Option<bool>) {
+pub fn page_ready(name: String, show: Option<bool>, full_screen: Option<bool>) {
     if let Some(app) = APP_HANDLE.get() {
         if let Some(window) = app.get_webview_window("main") {
             let show = show.unwrap_or(true);
+            let full_screen = full_screen.unwrap_or(false);
+
             let (mut width, mut height) = window_config::get_window_size(&name).unwrap();
+
             if show {
-                if let Some(monitor) = window.current_monitor().unwrap() {
-                    let scale = monitor.scale_factor();
+                if full_screen {
+                    // Bật chế độ toàn màn hình.
+                    let _ = window.set_fullscreen(true);
+                } else {
+                    // Đảm bảo thoát toàn màn hình nếu trước đó đã bật.
+                    let _ = window.set_fullscreen(false);
 
-                    // Vùng làm việc, đã loại trừ taskbar/Dock.
-                    let work_area = monitor.work_area();
+                    if let Some(monitor) = window.current_monitor().unwrap() {
+                        let scale = monitor.scale_factor();
 
-                    let work_x = work_area.position.x as f64 / scale;
-                    let work_y = work_area.position.y as f64 / scale;
-                    let work_width = work_area.size.width as f64 / scale;
-                    let work_height = work_area.size.height as f64 / scale;
+                        // Vùng làm việc, đã loại trừ taskbar/Dock.
+                        let work_area = monitor.work_area();
 
-                    // Giới hạn kích thước cửa sổ trong vùng làm việc.
-                    width = width.min(work_width * 0.9);
-                    height = height.min(work_height * 0.9);
+                        let work_x = work_area.position.x as f64 / scale;
+                        let work_y = work_area.position.y as f64 / scale;
+                        let work_width = work_area.size.width as f64 / scale;
+                        let work_height = work_area.size.height as f64 / scale;
 
-                    let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
+                        // Giới hạn kích thước cửa sổ trong vùng làm việc.
+                        width = width.min(work_width * 0.9);
+                        height = height.min(work_height * 0.9);
 
-                    // Căn giữa trong vùng làm việc.
-                    let x = work_x + (work_width - width) / 2.0;
-                    let y = work_y + (work_height - height) / 2.0;
+                        let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
 
-                    let _ = window.set_position(Position::Logical(LogicalPosition { x, y }));
+                        // Căn giữa trong vùng làm việc.
+                        let x = work_x + (work_width - width) / 2.0;
+                        let y = work_y + (work_height - height) / 2.0;
+
+                        let _ = window.set_position(Position::Logical(LogicalPosition { x, y }));
+                    }
                 }
+
                 let can_resize = matches!(name.as_str(), "report" | "historyInvoice");
+
                 let _ = window.set_resizable(can_resize);
 
                 let _ = window.show();
                 let _ = window.set_focus();
             } else {
                 let _ = window.hide();
+
+                // Khôi phục kích thước mặc định khi ẩn cửa sổ.
+                let _ = window.set_fullscreen(false);
+
                 let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
             }
         }

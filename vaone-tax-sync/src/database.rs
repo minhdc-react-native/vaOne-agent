@@ -194,12 +194,13 @@ impl Database {
                 dvtte TEXT,
                 tgia REAL,
                 nbmst TEXT,
-                nbten TEXT,
                 khhdon TEXT,
                 shdon INTEGER,
                 khmshdon INTEGER,
                 invoice_date TEXT NOT NULL,
 
+                nbnmmst TEXT,
+                nbnmten TEXT,
                 tgtcthue REAL,
                 tgtthue REAL,
                 tgtttbso REAL,
@@ -659,6 +660,12 @@ impl Database {
         let summary_json = serde_json::to_string(summary)
             .map_err(|e| TaxSyncError::InvalidInvoice(e.to_string()))?;
 
+        let (nbnmmst, nbnmten) = if invoice_type == 1 || invoice_type == 3 {
+            (summary["nbmst"].as_str(), summary["nbten"].as_str())
+        } else {
+            (summary["nmmst"].as_str(), summary["nmten"].as_str())
+        };
+
         let mut conn = self.connect()?;
         let tx = conn.transaction().map_err(db_error)?;
 
@@ -667,13 +674,13 @@ impl Database {
         INSERT INTO sync_invoices (
             tax_code, invoice_type, invoice_key, invoice_date,
             dvtte, tgia, nbmst, khhdon, shdon, khmshdon,
-            tgtcthue, tgtthue, tgtttbso, tthai, ttxly, nbten,
+            tgtcthue, tgtthue, tgtttbso, tthai, ttxly, nbnmmst, nbnmten,
             summary_json, detail_status, upload_status
         )
         VALUES (
             ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
             ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-            ?16, ?17, 'pending', 'pending'
+            ?16, ?17, ?18, 'pending', 'pending'
         )
         ON CONFLICT(tax_code, invoice_type, invoice_key)
         DO UPDATE SET
@@ -689,7 +696,8 @@ impl Database {
             tgtttbso = excluded.tgtttbso,
             tthai = excluded.tthai,
             ttxly = excluded.ttxly,
-            nbten = excluded.nbten,
+            nbnmmst = excluded.nbnmmst,
+            nbnmten = excluded.nbnmten,
             summary_json = excluded.summary_json,
             updated_at = CURRENT_TIMESTAMP
         ",
@@ -709,7 +717,8 @@ impl Database {
                 summary["tgtttbso"].as_f64(),
                 summary["tthai"].as_i64(),
                 summary["ttxly"].as_i64(),
-                summary["nbten"].as_str(),
+                nbnmmst,
+                nbnmten,
                 summary_json,
             ],
         )

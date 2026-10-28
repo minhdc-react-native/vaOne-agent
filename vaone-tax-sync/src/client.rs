@@ -39,6 +39,7 @@ pub struct TaxClient {
 impl TaxClient {
     pub fn new() -> Result<Self> {
         let http = Client::builder()
+            .cookie_store(true)
             .timeout(TokioDuration::from_secs(60))
             .build()?;
         let request_id = uuid::Uuid::new_v4().to_string();
@@ -70,15 +71,25 @@ impl TaxClient {
         ))
     }
 
-    async fn get_json(&self, url: &str, token: &str) -> Result<Value> {
-        let response = self
+    async fn get_json(
+        &self,
+        url: &str,
+        token: &str,
+        headers: Option<&[(&str, &str)]>,
+    ) -> Result<Value> {
+        let mut request = self
             .http
             .get(url)
-            .header("request-id", self.request_id.clone())
-            .bearer_auth(token)
-            .send()
-            .await
-            .context("Tax API request failed")?;
+            .header("request-id", uuid::Uuid::new_v4().to_string())
+            .bearer_auth(token);
+
+        if let Some(headers) = headers {
+            for (name, value) in headers {
+                request = request.header(*name, *value);
+            }
+        }
+
+        let response = request.send().await.context("Tax API request failed")?;
 
         let status = response.status();
 
@@ -103,7 +114,7 @@ impl TaxClient {
         solve_captcha: F,
     ) -> Result<Vec<Value>>
     where
-        F: FnOnce(&str) -> Fut,
+        F: Fn(&str) -> Fut,
         Fut: Future<Output = Result<String>>,
     {
         let mut result = Vec::new();
@@ -116,23 +127,6 @@ impl TaxClient {
                 TaxSyncError::InvalidDateRange("from_date must be <= to_date".to_string()).into(),
             );
         }
-
-        let captcha = if invoice_type == 3 || invoice_type == 4 {
-            let captcha = get_captcha(&self.http).await?;
-
-            // Giải captcha bằng hàm do ứng dụng cung cấp.
-            let captcha_value = solve_captcha(&captcha.cvalue).await?;
-            let captcha_value = captcha_value.trim();
-
-            if captcha_value.is_empty() {
-                return Err(TaxSyncError::Authentication("Đáp án captcha rỗng".to_string()).into());
-            }
-
-            Some((captcha.ckey, captcha_value.to_string()))
-        } else {
-            None
-        };
-
         while current <= end {
             if cancel.is_cancelled() {
                 return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
@@ -170,6 +164,32 @@ impl TaxClient {
                     return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
                 }
 
+                let captcha = if invoice_type == 3 || invoice_type == 4 {
+                    let captcha = get_captcha(&self.http).await?;
+
+                    // Giải captcha bằng hàm do ứng dụng cung cấp.
+                    let captcha_value = solve_captcha(&captcha.cvalue).await?;
+                    let captcha_value = captcha_value.trim();
+
+                    if captcha_value.is_empty() {
+                        return Err(TaxSyncError::Authentication(
+                            "Đáp án captcha rỗng".to_string(),
+                        )
+                        .into());
+                    }
+
+                    Some((captcha.ckey, captcha_value.to_string()))
+                } else {
+                    None
+                };
+
+                let captcha_headers: Vec<(&str, &str)> = match captcha.as_ref() {
+                    Some((ckey, cvalue)) => {
+                        vec![("ckey", ckey.as_str()), ("cvalue", cvalue.as_str())]
+                    }
+                    None => vec![],
+                };
+
                 let mut url = url::Url::parse(&base_url)
                     .map_err(|e| TaxSyncError::Authentication(e.to_string()))?;
 
@@ -188,38 +208,16 @@ impl TaxClient {
 
                 let request_url = url.to_string();
 
-                // let mut request_url = base_url.clone();
-
-                // if let Some(cursor) = &state {
-                //     let separator = if request_url.contains('?') { '&' } else { '?' };
-
-                //     request_url.push(separator);
-                //     request_url.push_str("state=");
-                //     request_url.push_str(
-                //         &url::form_urlencoded::byte_serialize(cursor.as_bytes())
-                //             .collect::<String>(),
-                //     );
-                // }
-
-                // if let Some((ckey, cvalue)) = captcha.as_ref() {
-                //     let mut url = url::Url::parse(&request_url)
-                //         .map_err(|e| TaxSyncError::Authentication(e.to_string()))?;
-
-                //     url.query_pairs_mut()
-                //         .append_pair("ckey", ckey)
-                //         .append_pair("cvalue", cvalue);
-
-                //     request_url = url.to_string();
-
-                //     print!("request_url captcha>> {request_url}");
-                // }
-
                 // Nếu request đang chờ HTTP, cần timeout hoặc truyền cancel
                 // trực tiếp vào get_json() để có thể dừng nhanh.
-                let response = match self.get_json(&request_url, token).await {
+                let response = match self
+                    .get_json(&request_url, token, Some(&captcha_headers))
+                    .await
+                {
                     Ok(response) => response,
                     Err(err) => {
                         eprintln!("Request URL: {request_url}");
+                        eprintln!("Captcha headers: {:?}", captcha_headers);
                         return Err(err);
                     }
                 };
@@ -353,7 +351,7 @@ impl TaxClient {
             .append_pair("shdon", &shdon.to_string())
             .append_pair("khmshdon", &khmshdon.to_string());
 
-        self.get_json(url.as_str(), token).await
+        self.get_json(url.as_str(), token, None).await
     }
 
     pub async fn fetch_xml_by_key(
@@ -378,7 +376,7 @@ impl TaxClient {
             let response = self
                 .http
                 .get(base_url)
-                .header("request-id", self.request_id.clone())
+                .header("request-id", uuid::Uuid::new_v4().to_string())
                 .query(&[
                     ("nbmst", nbmst),
                     ("khhdon", khhdon),

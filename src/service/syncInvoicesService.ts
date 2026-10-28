@@ -41,7 +41,8 @@ export interface ISyncInvoice {
     dvtte: string | null;
     tgia: number | null;
     nbmst: string | null;
-    nbten: string | null;
+    nbnmmst: string | null;
+    nbnmten: string | null;
     khhdon: string | null;
     shdon: number | null;
     khmshdon: number | null;

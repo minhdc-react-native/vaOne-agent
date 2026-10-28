@@ -33,7 +33,7 @@ struct TimeApiResponse {
 }
 
 const DEFAULT_POLL_INTERVAL_SECS: u64 = 60;
-const DEFAULT_DELAY_MS: u64 = 2 * 1000;
+const DEFAULT_DELAY_MS: u64 = 3 * 1000;
 const TOKEN_LIFETIME_HOURS: i64 = 24;
 
 fn parse_invoice_types(raw: &str) -> Result<Vec<u8>> {
@@ -177,6 +177,8 @@ impl TaxSyncWorker {
             if cancel.is_cancelled() {
                 break;
             }
+
+            // self.run_update(cancel.clone()).await;
 
             tokio::select! {
                 _ = cancel.cancelled() => break,

@@ -18,6 +18,7 @@ export interface InputProps
     icon?: ReactNode;
     password?: boolean;
     sizeInput?: 'sm' | 'xs';
+    classInput?: string;
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -33,6 +34,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             type,
             disabled,
             sizeInput = 'sm',
+            classInput,
             required,
             ...props
         },
@@ -73,7 +75,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                         "focus-within:border-(--primary)",
                         error ? "border-red-500" : "border-(--border)",
                         disabled && "opacity-60",
-                        sizeInput === "sm" ? "rounded-sm h-7" : "rounded-sm h-7"
+                        sizeInput === "sm" ? "rounded-sm h-7" : "rounded-sm h-7",
+                        classInput
                     )}
                 >
                     {icon && (

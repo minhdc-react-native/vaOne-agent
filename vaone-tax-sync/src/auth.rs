@@ -841,10 +841,10 @@ impl TaxAuthService {
 
                     request = request.header("x-tenant-name", tenant_id);
 
-                    eprintln!(
-                        "URL ={} access_token={},tenant_id={:?}",
-                        url, access_token, tenant_id
-                    );
+                    // eprintln!(
+                    //     "URL ={} access_token={},tenant_id={:?}",
+                    //     url, access_token, tenant_id
+                    // );
                 }
             }
             TypeApp::VaOne => {

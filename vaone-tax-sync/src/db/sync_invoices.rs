@@ -215,7 +215,7 @@ impl Database {
              FROM sync_invoices
              WHERE (?1 IS NULL OR tax_code = ?1)
                AND (?2 IS NULL OR invoice_type = ?2)
-               AND (?3 IS NULL OR nbmst = ?3)
+               AND (?3 IS NULL OR nbnmmst = ?3)
                AND (?4 IS NULL OR khhdon = ?4)
                AND (?5 IS NULL OR shdon = ?5)
                AND (?6 IS NULL OR invoice_date >= ?6)
@@ -263,11 +263,12 @@ impl Database {
                 upload_error,
                 updated_at,
                 completed_at,
-                nbten
+                nbnmmst,
+                nbnmten
              FROM sync_invoices
              WHERE (?1 IS NULL OR tax_code = ?1)
                AND (?2 IS NULL OR invoice_type = ?2)
-               AND (?3 IS NULL OR nbmst = ?3)
+               AND (?3 IS NULL OR nbnmmst = ?3)
                AND (?4 IS NULL OR khhdon = ?4)
                AND (?5 IS NULL OR shdon = ?5)
                AND (?6 IS NULL OR invoice_date >= ?6)
@@ -319,7 +320,8 @@ impl Database {
                         upload_error: row.get(20)?,
                         updated_at: row.get(21)?,
                         completed_at: row.get(22)?,
-                        nbten: row.get(23)?,
+                        nbnmmst: row.get(23)?,
+                        nbnmten: row.get(24)?,
                     })
                 },
             )
@@ -426,37 +428,14 @@ impl Database {
         let tx = conn.transaction().map_err(db_error)?;
 
         if tax_sync {
-            // Xóa hóa đơn theo mã số thuế và ngày hóa đơn.
+            // Đánh dấu danh sách hóa đơn cần đồng bộ lại.
             tx.execute(
                 r#"
-            DELETE FROM sync_invoices
+            UPDATE sync_invoices_today
+            SET list_status = 'pending'
             WHERE tax_code = ?1
               AND invoice_date >= ?2
               AND invoice_date <= ?3
-            "#,
-                params![tax_code, from_date, to_date],
-            )
-            .map_err(db_error)?;
-
-            // Xóa hóa đơn today
-            tx.execute(
-                r#"
-            DELETE FROM sync_invoices_today
-            WHERE tax_code = ?1
-              AND invoice_date >= ?2
-              AND invoice_date <= ?3
-            "#,
-                params![tax_code, from_date, to_date],
-            )
-            .map_err(db_error)?;
-
-            // Xóa trạng thái đồng bộ danh sách theo ngày.
-            tx.execute(
-                r#"
-            DELETE FROM sync_days
-            WHERE tax_code = ?1
-              AND sync_date >= ?2
-              AND sync_date <= ?3
             "#,
                 params![tax_code, from_date, to_date],
             )
@@ -466,8 +445,7 @@ impl Database {
             tx.execute(
                 r#"
             UPDATE sync_invoices
-            SET
-                upload_status = 'pending'
+            SET upload_status = 'pending'
             WHERE tax_code = ?1
               AND invoice_date >= ?2
               AND invoice_date <= ?3

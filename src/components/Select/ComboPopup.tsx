@@ -28,6 +28,7 @@ type IComboPopupProps<T> = {
     disabled?: boolean;
     clearable?: boolean;
     onClear?: () => void;
+    filedId?: string;
 };
 export interface ComboPopupRef {
     setOpen: (open: boolean) => void;
@@ -59,6 +60,7 @@ const ComboPopupImpl = <T,>(
         iconPosition = 'none',
         disabled = false,
         onClear,
+        filedId = "id"
     }: IComboPopupProps<T>,
     ref: React.ForwardedRef<ComboPopupRef>
 ) => {
@@ -148,15 +150,15 @@ const ComboPopupImpl = <T,>(
                     )}
                     {filteredData.map((item, idx) => {
                         const isActive =
-                            (value as any)?.id === (item as any).id;
+                            (value as any)?.[filedId] === (item as any)[filedId];
                         return (
-                            <React.Fragment key={(item as any).id}>
+                            <React.Fragment key={(item as any)[filedId]}>
                                 <div
                                     ref={isActive ? activeItemRef : null}
                                     className={clsx("flex min-w-0 items-center gap-2 p-1 justify-between hover:cursor-pointer hover:bg-gray-100",
-                                        (value as any)?.id === (item as any).id ? "bg-amber-50" : ""
+                                        (value as any)?.[filedId] === (item as any)[filedId] ? "bg-amber-50" : ""
                                     )}
-                                    key={(item as any).id}
+                                    key={(item as any)[filedId]}
                                     onClick={(e) => {
                                         setOpen(false);
                                         if (!disabled) onSelect?.(item);

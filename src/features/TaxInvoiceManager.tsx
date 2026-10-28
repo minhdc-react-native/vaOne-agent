@@ -22,7 +22,7 @@ import AppWindow from "../components/AppWindow";
 import { ComboPopup } from "../components/Select/ComboPopup";
 import { DateInput } from "../components/Date/DateInput";
 import { formatNumber, getCurrentMonthDateRange } from "../lib/utils";
-import { ChevronLeft, ChevronRight, Clock, CloudSync, Loader, RefreshCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, CloudSync, List, Loader, RefreshCcw, Search } from "lucide-react";
 import Button from "../components/Button";
 import { formatDate } from "../api/services/tct.service";
 import { dialog } from "../service/dialog.service";
@@ -33,6 +33,9 @@ import clsx from "clsx";
 import Input from "../components/Input";
 import { SyncDaysError } from "./SyncDaysErrorItem";
 import { MaybeTooltip } from "../components/Tooltip/MaybeTooltip";
+import { TaxAccountItem } from "./TaxAccountItem";
+import { ITaxAccount } from "../service/taxAccountService";
+import { Tooltip } from "../components/Tooltip/Tooltip";
 
 
 const PAGE_SIZE = 100;
@@ -96,7 +99,7 @@ const initialFilters: ISyncInvoiceFilters = {
     nbmst: undefined,
     khhdon: undefined,
     shdon: undefined,
-    invoice_type: 1,
+    invoice_type: undefined,
     from_date: dateMonth.fromDate,
     to_date: dateMonth.toDate,
     detail_status: undefined,
@@ -132,12 +135,31 @@ function StatCard({
 export function TaxInvoiceManager() {
 
     const { taxCode } = useParams<{ taxCode: string }>();
+
+    const [taxCodeSelect, setTaxCodeSelect] = useState(taxCode);
     const {
         accounts,
         loadAccounts
     } = useTaxAccounts();
 
-    const account = useMemo(() => accounts.find(acc => acc.tax_code === taxCode), [taxCode]);
+    const [search, setSearch] = useState("");
+
+    const filteredAccounts = useMemo(() => {
+        const keyword = search.trim().toLowerCase();
+
+        return accounts.filter((item) => {
+            const matchesKeyword = [
+                item.tax_code,
+                item.username,
+                item.user_app ?? "",
+                item.org_unit ?? "",
+            ].some((value) => value.toLowerCase().includes(keyword));
+
+            return matchesKeyword;
+        });
+    }, [accounts, search]);
+
+    const account = useMemo(() => accounts.find(acc => acc.tax_code === taxCodeSelect), [taxCodeSelect]);
 
     const {
         mutateAsync: getStats,
@@ -157,12 +179,12 @@ export function TaxInvoiceManager() {
 
     const [syncConfig, setSyncConfig] = useState({
         ...initialSync,
-        taxCode: taxCode ?? ""
+        taxCode: taxCodeSelect ?? ""
     });
 
     const [filters, setFilters] = useState<ISyncInvoiceFilters>({
         ...initialFilters,
-        tax_code: taxCode,
+        tax_code: taxCodeSelect,
     });
 
     const [stats, setStats] = useState<IInvoiceStats | null>(null);
@@ -177,51 +199,51 @@ export function TaxInvoiceManager() {
     const [localError, setLocalError] = useState<string | null>(null);
 
     const loadStats = useCallback(async () => {
-        if (!taxCode) return;
+        if (!taxCodeSelect) return;
 
         try {
-            const result = await getStats(taxCode);
+            const result = await getStats(taxCodeSelect);
             setStats(result);
         } catch (error) {
             setLocalError(String(error));
         }
-    }, [taxCode, getStats]);
+    }, [taxCodeSelect, getStats]);
 
     const loadSyncDays = useCallback(async () => {
-        if (!taxCode) return;
+        if (!taxCodeSelect) return;
         try {
-            const result = await getSyncDays({ taxCode, isSuccess: false });
+            const result = await getSyncDays({ taxCode: taxCodeSelect, isSuccess: false });
             setSyncDays(result);
         } catch (error) {
             setLocalError(String(error));
         }
-    }, [taxCode, setSyncDays]);
+    }, [taxCodeSelect, setSyncDays]);
 
     const loadInvoices = useCallback(
         async (
             nextFilters: ISyncInvoiceFilters,
             nextPage: number,
         ) => {
-            if (!taxCode) return;
+            if (!taxCodeSelect) return;
 
             try {
                 setLocalError(null);
                 const result = await getInvoices({
                     filters: {
                         ...nextFilters,
-                        tax_code: taxCode,
+                        tax_code: taxCodeSelect,
                     },
                     page: nextPage,
                     page_size: PAGE_SIZE,
                 });
-
+                console.log('result>>', result);
                 setInvoicePage(result);
                 setPage(nextPage);
             } catch (error) {
                 setLocalError(String(error));
             }
         },
-        [taxCode, getInvoices],
+        [taxCodeSelect, getInvoices],
     );
 
     // Tải dữ liệu khi tax_code thay đổi.
@@ -232,15 +254,15 @@ export function TaxInvoiceManager() {
 
         setFilters({
             ...initialFilters,
-            tax_code: taxCode
+            tax_code: taxCodeSelect
         });
 
-        if (!taxCode) return;
+        if (!taxCodeSelect) return;
 
         void loadStats();
         void loadSyncDays();
         void loadInvoices(initialFilters, 1);
-    }, [taxCode]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [taxCodeSelect]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const updateFilter = <K extends keyof ISyncInvoiceFilters>(
         key: K,
@@ -292,10 +314,21 @@ export function TaxInvoiceManager() {
             return;
         };
         const confirmed = await dialog.question(
-            `Bạn có chắc chắn đồng bộ lại dữ liệu của mã số thuế ${taxCode}?`,
+            `Mã số thuế: ${taxCodeSelect} bạn có muốn?`,
             `Từ ngày: ${formatDate(filters.from_date)} đến ngày ${formatDate(filters.to_date)}`,
             undefined,
-            syncConfig.taxSync ? "Dữ liệu sẽ bị xóa để đồng bộ lại, bạn hãy cẩn trọng" : undefined
+            <div className="mt-2 rounded-sm border border-gray-300 px-2.5 py-2 text-xs">
+                <div className="italic leading-relaxed">
+                    {syncConfig.taxSync && <i className="block">
+                        - Bạn muốn quét lại từ cơ quan thuế những dữ liệu còn thiếu.
+                    </i>}
+
+                    {syncConfig.appSync && <i className="block">
+                        - Bạn muốn đồng bộ lại sang ứng dụng đích.
+                    </i>}
+                </div>
+            </div>
+
         );
         if (!confirmed) return;
         resetSyncStatus({
@@ -320,14 +353,20 @@ export function TaxInvoiceManager() {
     const totalPages = invoicePage?.total_pages ?? 0;
     const invoiceItems = invoicePage?.items ?? [];
 
+    const [fullScreen, setFullScreen] = useState(false);
     const navigate = useNavigate();
     useEffect(() => {
-        invoke("page_ready", { name: "historyInvoice", show: true });
-    }, []);
+        invoke("page_ready", { name: "historyInvoice", show: true, fullScreen });
+    }, [fullScreen]);
 
     const onClose = useCallback(() => {
-        navigate(`/tax-config/${taxCode}`);
-    }, [])
+        navigate(`/tax-config/${taxCodeSelect}`);
+    }, [taxCodeSelect])
+
+    const handleSelect = useCallback((account: ITaxAccount) => {
+        if (account.tax_code === taxCodeSelect) return;
+        setTaxCodeSelect(account.tax_code);
+    }, [taxCodeSelect])
 
     useEffect(() => {
         if (localError) dialog.info(
@@ -336,14 +375,40 @@ export function TaxInvoiceManager() {
         );
     }, [localError]);
     const [tab, setTab] = useState(0);
+
     return (
-        <AppWindow icon="History"
+        <AppWindow
+            fullScreen={fullScreen}
+            setFullScreen={setFullScreen}
             content={
                 <div data-tauri-drag-region className="cursor-pointer flex-1 flex flex-wrap items-center justify-between gap-3">
-                    <div data-tauri-drag-region className="mt-1 text-sm font-semibold">
-                        <span data-tauri-drag-region className="text-red-600">{taxCode}</span>
+                    <ComboPopup
+                        value={filteredAccounts.find(i => i.tax_code === taxCodeSelect)}
+                        data={filteredAccounts}
+                        onSelect={(item) => {
+                            setTaxCodeSelect(item.tax_code)
+                        }}
+                        addToolbar={
+                            <div className="w-full flex gap-2 items-center">
+                                <span className="flex-1 font-medium text-sm">Danh sách tài khoản:</span>
+                                <div className="w-40">
+                                    <Input autoFocus classInput="rounded-full" icon={<Search size={15} />} value={search} onChange={(e) => setSearch(e.target.value)} />
+                                </div>
+                            </div>
+                        }
+                        hiddenArrow={true}
+                        haveBorder={false}
+                        filedId="tax_code"
+                        backdrop={true}
+                        className="w-6"
+                        renderDisplay={(item) => <Tooltip title="Danh sách tài khoản"><Button iconOnly={true} variant="ghost" icon={<List size={15} />} /></Tooltip>}
+                        renderItem={(account, _isSelected, index) => <TaxAccountItem index={index} account={account} handleSelect={handleSelect} />}
+                    />
+                    <div data-tauri-drag-region className="flex-1 mt-1 text-sm font-semibold">
+                        <span data-tauri-drag-region className="text-red-600">{taxCodeSelect}</span>
                         {" - "}{account?.note}
                     </div>
+
                     <Button
                         variant="ghost"
                         className="h-6"
@@ -439,9 +504,10 @@ export function TaxInvoiceManager() {
                                                     renderItem={(item) => <div key={item?.id} className="px-2 w-40 shrink-0">{item?.label}</div>}
                                                 />
                                             </div>
-                                            <div className="w-50 shrink-0">
+                                            <div className="w-57.5 shrink-0">
                                                 <DateInput
                                                     label="Từ ngày"
+                                                    labelWidth={100}
                                                     labelPosition="left"
                                                     value={filters.from_date ?? ""}
                                                     onChange={(value) =>
@@ -452,9 +518,10 @@ export function TaxInvoiceManager() {
                                                     }
                                                 />
                                             </div>
-                                            <div className="w-50 shrink-0">
+                                            <div className="w-55 shrink-0">
                                                 <DateInput
                                                     label="Đến ngày"
+                                                    labelWidth={130}
                                                     labelPosition="left"
                                                     value={filters.to_date ?? ""}
                                                     onChange={(value) =>
@@ -468,7 +535,7 @@ export function TaxInvoiceManager() {
                                         </div>
                                         <div className="flex gap-1">
                                             <div className="flex-1 flex gap-1 items-center">
-                                                <span className="w-12 shrink-0">Chi tiết</span>
+                                                <span className="w-12 shrink-0">Dữ liệu</span>
                                                 <ComboPopup
                                                     value={DETAIL_STATUSES.find(i => i.id === filters.detail_status)}
                                                     data={DETAIL_STATUSES}
@@ -657,46 +724,46 @@ export function TaxInvoiceManager() {
                                         <thead className="sticky top-0 z-10 bg-gray-100">
                                             <tr>
                                                 <th className="w-14 px-2 py-1 font-medium">#</th>
-                                                <th className="w-40 px-2 py-1 font-medium">
-                                                    Mã số thuế
+                                                <th className="w-30 px-2 py-1 font-medium">
+                                                    MST bán/mua
                                                 </th>
 
-                                                <th className="w-36 px-2 py-1 font-medium">
+                                                <th className="w-20 px-2 py-1 font-medium">
                                                     Loại
                                                 </th>
 
-                                                <th className="w-32 px-2 py-1 font-medium">
+                                                <th className="w-20 px-2 py-1 font-medium">
                                                     Ký hiệu
                                                 </th>
 
-                                                <th className="w-32 px-2 py-1 font-medium text-right">
-                                                    Số hóa đơn
+                                                <th className="w-25 px-2 py-1 font-medium text-right">
+                                                    Số HĐ
                                                 </th>
-                                                <th className="w-32 px-2 py-1 font-medium text-center">
+                                                <th className="w-28 px-2 py-1 font-medium text-center">
                                                     Ngày lập
                                                 </th>
                                                 <th className="px-2 py-1 font-medium">
-                                                    Tên người bán
+                                                    Tên người bán/mua
                                                 </th>
-                                                <th className="w-28 px-2 py-1 font-medium">
+                                                <th className="w-18 px-2 py-1 font-medium">
                                                     Tiền tệ
                                                 </th>
-                                                <th className="w-28 px-2 py-1 font-medium text-right">
+                                                <th className="w-32 px-2 py-1 font-medium text-right">
                                                     Tiền hàng
                                                 </th>
-                                                <th className="w-28 px-2 py-1 font-medium text-right">
+                                                <th className="w-25 px-2 py-1 font-medium text-right">
                                                     Thuế
                                                 </th>
-                                                <th className="w-28 px-2 py-1 font-medium text-right">
+                                                <th className="w-32 px-2 py-1 font-medium text-right">
                                                     Tổng tiền
                                                 </th>
-                                                <th className="w-35 px-2 py-1 font-medium text-center">
+                                                <th className="w-35 px-2 py-1 font-medium">
                                                     Dữ liệu
                                                 </th>
-                                                <th className="w-35 px-2 py-1 font-medium text-center">
+                                                <th className="w-35 px-2 py-1 font-medium">
                                                     Đồng bộ
                                                 </th>
-                                                <th className="w-50 px-2 py-1 font-medium text-center">
+                                                <th className="w-50 px-2 py-1 font-medium">
                                                     Trạng thái
                                                 </th>
                                             </tr>
@@ -713,25 +780,25 @@ export function TaxInvoiceManager() {
                                                     </td>
 
                                                     <td className="whitespace-nowrap px-2 py-1">
-                                                        {invoice.nbmst}
+                                                        {invoice.nbnmmst}
                                                     </td>
 
                                                     <td className="whitespace-nowrap px-2 py-1">
                                                         {mapInvoiceType[invoice.invoice_type]}
                                                     </td>
 
-                                                    <td className="whitespace-nowrap px-2 py-1">
+                                                    <td className="whitespace-nowrap px-2 py-1 text-green-700">
                                                         {invoice.khhdon ?? "—"}
                                                     </td>
 
-                                                    <td className="whitespace-nowrap px-2 py-1 text-right">
+                                                    <td className="whitespace-nowrap px-2 py-1 text-right text-blue-700">
                                                         {invoice.shdon ?? "—"}
                                                     </td>
                                                     <td className="whitespace-nowrap px-2 py-1 text-center">
                                                         {formatDate(invoice.invoice_date)}
                                                     </td>
                                                     <td className="whitespace-nowrap px-2 py-1">
-                                                        {invoice.nbten}
+                                                        {invoice.nbnmten}
                                                     </td>
 
                                                     <td className="whitespace-nowrap px-2 py-1">
@@ -746,7 +813,7 @@ export function TaxInvoiceManager() {
                                                     <td className="whitespace-nowrap px-2 py-1 text-right">
                                                         {formatNumber(invoice.tgtttbso, invoice.tgia !== 1 ? 2 : 0)}
                                                     </td>
-                                                    <td className="px-2 py-1 text-center">
+                                                    <td className="px-2 py-1">
                                                         <MaybeTooltip enabled={!!invoice.detail_error} tooltip={invoice.detail_error!}>
                                                             <StatusBadge
                                                                 type={mapStatus[invoice.detail_status]}
@@ -755,7 +822,7 @@ export function TaxInvoiceManager() {
                                                         </MaybeTooltip>
                                                     </td>
 
-                                                    <td className="px-2 py-1 text-center">
+                                                    <td className="px-2 py-1">
                                                         <MaybeTooltip enabled={!!invoice.upload_error} tooltip={invoice.upload_error!}>
                                                             <StatusBadge
                                                                 type={mapStatus[invoice.upload_status]}
@@ -763,7 +830,7 @@ export function TaxInvoiceManager() {
                                                             />
                                                         </MaybeTooltip>
                                                     </td>
-                                                    <td className="px-2 py-1 text-center">
+                                                    <td className="px-2 py-1">
                                                         <StatusBadge
                                                             variant="text"
                                                             type={mapInvoiceStyle[invoice.tthai as any]}

@@ -42,7 +42,8 @@ export const DateInput = forwardRef<
         mode = "date",
         width,
         sizeInput = "sm",
-        className
+        className,
+        labelWidth
     } = props;
 
     const mergedRef = useCallback(
@@ -175,6 +176,7 @@ export const DateInput = forwardRef<
                     name={name}
                     width={width}
                     sizeInput={sizeInput}
+                    labelWidth={labelWidth}
                     autoFocus={autoFocus}
                     required={required}
                     disabled={disabled}
