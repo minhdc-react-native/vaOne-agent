@@ -182,8 +182,8 @@ pub async fn open_history_invoice_window(app: AppHandle, tax_code: String) -> Re
         .initialization_script(&init_script)
         .on_page_load(|window, payload| {
             if matches!(payload.event(), PageLoadEvent::Finished) {
-                let _ = window.show();
-                let _ = window.set_focus();
+                // let _ = window.show();
+                // let _ = window.set_focus();
             }
         })
         .build()

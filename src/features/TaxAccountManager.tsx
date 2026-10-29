@@ -485,6 +485,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
             console.error("Không thể mở cửa sổ lịch sử hóa đơn:", error);
         }
     };
+
     const handleDelete = async (taxCode: string) => {
         if (isRunning) {
             showNotification({
