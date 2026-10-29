@@ -176,7 +176,7 @@ pub async fn open_history_invoice_window(app: AppHandle, tax_code: String) -> Re
         .inner_size(1050.0, 800.0)
         .resizable(true)
         .decorations(false)
-        .always_on_top(true)
+        // .always_on_top(true)
         .center()
         .visible(false)
         .initialization_script(&init_script)
