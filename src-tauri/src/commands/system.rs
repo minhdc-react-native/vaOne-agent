@@ -156,40 +156,34 @@ pub fn captcha_predict(svg: String) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn open_history_invoice_window(app: AppHandle, tax_code: String) -> Result<(), String> {
-    let tax_code = tax_code.trim().to_string();
-
-    // Kiểm tra mã số thuế trước khi dùng làm window label.
-    if tax_code.is_empty() || !tax_code.bytes().all(|b| b.is_ascii_digit() || b == b'-') {
-        return Err("Mã số thuế không hợp lệ".to_string());
-    }
-
-    // Mỗi mã số thuế có một cửa sổ riêng.
     let label = format!("history-invoice-{tax_code}");
+    let route = format!("/history-invoice/{tax_code}");
 
-    // Nếu cửa sổ đã tồn tại thì hiện lại và focus,
-    // không tạo cửa sổ trùng.
+    // Nếu cửa sổ đã tồn tại thì hiện lại và focus.
     if let Some(window) = app.get_webview_window(&label) {
         window.show().map_err(|e| e.to_string())?;
         window.set_focus().map_err(|e| e.to_string())?;
         return Ok(());
     }
 
-    let route = format!("/history-invoice/{tax_code}");
-    let js_hash = format!("window.location.hash = {:?};", route);
+    // Serialize để tạo chuỗi JavaScript an toàn.
+    let route_js = serde_json::to_string(&route).map_err(|e| e.to_string())?;
+
+    let init_script = format!("window.location.hash = {};", route_js);
 
     WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
         .title(format!("Lịch sử hóa đơn - {tax_code}"))
         .inner_size(1050.0, 800.0)
         .resizable(true)
         .decorations(false)
-        .visible(true)
-        // .always_on_top(true)
+        .always_on_top(true)
         .center()
-        .on_page_load(move |window, payload| {
+        .visible(false)
+        .initialization_script(&init_script)
+        .on_page_load(|window, payload| {
             if matches!(payload.event(), PageLoadEvent::Finished) {
-                if let Err(error) = window.eval(&js_hash) {
-                    eprintln!("Không thể điều hướng đến {route}: {error}");
-                }
+                let _ = window.show();
+                let _ = window.set_focus();
             }
         })
         .build()
