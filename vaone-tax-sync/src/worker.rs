@@ -35,8 +35,9 @@ struct TimeApiResponse {
 }
 
 const DEFAULT_POLL_INTERVAL_SECS: u64 = 60;
-const DEFAULT_DELAY_MS: u64 = 3 * 1000;
+const DEFAULT_DELAY_MS: u64 = 2 * 1000;
 const TOKEN_LIFETIME_HOURS: i64 = 24;
+const BATCH_SIZE: u32 = 100;
 
 fn parse_invoice_types(raw: &str) -> Result<Vec<u8>> {
     let types: Vec<u8> = serde_json::from_str(raw)?;
@@ -225,7 +226,7 @@ impl TaxSyncWorker {
                     tokio::select! {
                         _ = cancel.cancelled() => break,
                         _ = self.upload_notify.notified() => {},
-                        _ = sleep(Duration::from_secs(30)) => {},
+                        _ = sleep(Duration::from_secs(5)) => {},
                     }
                 }
             }
@@ -263,7 +264,7 @@ impl TaxSyncWorker {
                     // thử lại sau 30 giây.
                     tokio::select! {
                         _ = cancel.cancelled() => break,
-                        _ = sleep(Duration::from_secs(30)) => {},
+                        _ = sleep(Duration::from_secs(5)) => {},
                         _ = self.update_notify.notified() => {},
                     }
                 }
@@ -291,7 +292,7 @@ impl TaxSyncWorker {
             let invoice_db =
                 InvoiceDatabase::open_existing(&self.invoice_db_dir, &account.tax_code)?;
 
-            let invoices = invoice_db.get_invoices_pending_upload(&account.tax_code)?;
+            let invoices = invoice_db.get_invoices_pending_upload(&account.tax_code, BATCH_SIZE)?;
 
             if invoices.is_empty() {
                 continue;
@@ -492,7 +493,7 @@ impl TaxSyncWorker {
                     *invoice_type,
                     &token,
                     self.config.delay_ms,
-                    1000, // Số hóa đơn mỗi batch
+                    BATCH_SIZE, // Số hóa đơn mỗi batch
                     cancel.clone(),
                 )
                 .await?;

@@ -1207,22 +1207,28 @@ impl InvoiceDatabase {
         })
     }
 
-    pub fn get_invoices_pending_upload(&self, tax_code: &str) -> Result<Vec<InvoiceUpload>> {
+    pub fn get_invoices_pending_upload(
+        &self,
+        tax_code: &str,
+        limit: u32,
+    ) -> Result<Vec<InvoiceUpload>> {
         self.check_tax_code(tax_code)?;
+
         let conn = self.connect()?;
         let mut stmt = conn
             .prepare(
                 "SELECT tax_code, invoice_key, invoice_type, summary_json, xml_data
-                 FROM sync_invoices
-                 WHERE tax_code = ?1
-                   AND detail_status = 'completed'
-                   AND upload_status <> 'completed'
-                 ORDER BY invoice_type, invoice_key",
+             FROM sync_invoices
+             WHERE tax_code = ?1
+               AND detail_status = 'completed'
+               AND upload_status <> 'completed'
+             ORDER BY invoice_type, invoice_key
+             LIMIT ?2",
             )
             .map_err(db_error)?;
 
         let rows = stmt
-            .query_map(params![tax_code], |row| {
+            .query_map(params![tax_code, limit], |row| {
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
@@ -1234,9 +1240,11 @@ impl InvoiceDatabase {
             .map_err(db_error)?;
 
         let mut invoices = Vec::new();
+
         for row in rows {
             let (tax_code, invoice_key, invoice_type, summary_json, xml_data) =
                 row.map_err(db_error)?;
+
             let invoice: Value = serde_json::from_str(&summary_json).map_err(|e| {
                 TaxSyncError::Database(format!(
                     "Không thể parse summary_json của hóa đơn {invoice_key}: {e}"
@@ -1251,6 +1259,7 @@ impl InvoiceDatabase {
                 xml_data,
             });
         }
+
         Ok(invoices)
     }
 
