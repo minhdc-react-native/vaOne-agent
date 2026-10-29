@@ -10,6 +10,11 @@ use captcha_db::DATABASE_NAME;
 use serde::Serialize;
 use serde_json::Value;
 use std::sync::Mutex;
+use tauri::webview::PageLoadEvent;
+use tauri::AppHandle;
+use tauri::WebviewUrl;
+use tauri::WebviewWindow;
+use tauri::WebviewWindowBuilder;
 use tauri::{LogicalPosition, LogicalSize, Manager, Position, Size};
 
 #[tauri::command]
@@ -68,62 +73,60 @@ pub fn get_agent_info() -> AgentInfo {
     }
 }
 #[tauri::command]
-pub fn page_ready(name: String, show: Option<bool>, full_screen: Option<bool>) {
-    if let Some(app) = APP_HANDLE.get() {
-        if let Some(window) = app.get_webview_window("main") {
-            let show = show.unwrap_or(true);
-            let full_screen = full_screen.unwrap_or(false);
+pub fn page_ready(
+    window: WebviewWindow,
+    name: String,
+    show: Option<bool>,
+    full_screen: Option<bool>,
+) {
+    let show = show.unwrap_or(true);
+    let full_screen = full_screen.unwrap_or(false);
 
-            let (mut width, mut height) = window_config::get_window_size(&name).unwrap();
+    let (mut width, mut height) = window_config::get_window_size(&name).unwrap();
 
-            if show {
-                let can_resize = matches!(name.as_str(), "report" | "historyInvoice");
-                let _ = window.set_resizable(can_resize);
+    if show {
+        let can_resize = matches!(name.as_str(), "report" | "historyInvoice");
+        let _ = window.set_resizable(can_resize);
 
-                if let Ok(Some(monitor)) = window.current_monitor() {
-                    let scale = monitor.scale_factor();
-                    let work_area = monitor.work_area();
+        if let Ok(Some(monitor)) = window.current_monitor() {
+            let scale = monitor.scale_factor();
+            let work_area = monitor.work_area();
 
-                    let work_x = work_area.position.x as f64 / scale;
-                    let work_y = work_area.position.y as f64 / scale;
-                    let work_width = work_area.size.width as f64 / scale;
-                    let work_height = work_area.size.height as f64 / scale;
+            let work_x = work_area.position.x as f64 / scale;
+            let work_y = work_area.position.y as f64 / scale;
+            let work_width = work_area.size.width as f64 / scale;
+            let work_height = work_area.size.height as f64 / scale;
 
-                    if full_screen {
-                        // Chiếm toàn bộ work_area, không bật fullscreen hệ thống.
-                        width = work_width;
-                        height = work_height;
+            if full_screen {
+                width = work_width;
+                height = work_height;
 
-                        let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
-
-                        let _ = window.set_position(Position::Logical(LogicalPosition {
-                            x: work_x,
-                            y: work_y,
-                        }));
-                    } else {
-                        // Thoát fullscreen hệ thống nếu cửa sổ trước đó đang dùng.
-                        let _ = window.set_fullscreen(false);
-
-                        width = width.min(work_width * 0.9);
-                        height = height.min(work_height * 0.9);
-
-                        let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
-
-                        let x = work_x + (work_width - width) / 2.0;
-                        let y = work_y + (work_height - height) / 2.0;
-
-                        let _ = window.set_position(Position::Logical(LogicalPosition { x, y }));
-                    }
-                }
-
-                let _ = window.show();
-                let _ = window.set_focus();
+                let _ = window.set_fullscreen(false);
+                let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
+                let _ = window.set_position(Position::Logical(LogicalPosition {
+                    x: work_x,
+                    y: work_y,
+                }));
             } else {
-                let _ = window.hide();
+                let _ = window.set_fullscreen(false);
+
+                width = width.min(work_width * 0.9);
+                height = height.min(work_height * 0.9);
 
                 let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
+
+                let x = work_x + (work_width - width) / 2.0;
+                let y = work_y + (work_height - height) / 2.0;
+
+                let _ = window.set_position(Position::Logical(LogicalPosition { x, y }));
             }
         }
+
+        let _ = window.show();
+        let _ = window.set_focus();
+    } else {
+        let _ = window.hide();
+        let _ = window.set_size(Size::Logical(LogicalSize { width, height }));
     }
 }
 
@@ -149,6 +152,50 @@ use captcha_db::{svg::parse_svg, Database, Matcher};
 #[tauri::command]
 pub fn captcha_predict(svg: String) -> Result<String, String> {
     predict_captcha(&svg)
+}
+
+#[tauri::command]
+pub async fn open_history_invoice_window(app: AppHandle, tax_code: String) -> Result<(), String> {
+    let tax_code = tax_code.trim().to_string();
+
+    // Kiểm tra mã số thuế trước khi dùng làm window label.
+    if tax_code.is_empty() || !tax_code.bytes().all(|b| b.is_ascii_digit() || b == b'-') {
+        return Err("Mã số thuế không hợp lệ".to_string());
+    }
+
+    // Mỗi mã số thuế có một cửa sổ riêng.
+    let label = format!("history-invoice-{tax_code}");
+
+    // Nếu cửa sổ đã tồn tại thì hiện lại và focus,
+    // không tạo cửa sổ trùng.
+    if let Some(window) = app.get_webview_window(&label) {
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())?;
+        return Ok(());
+    }
+
+    let route = format!("/history-invoice/{tax_code}");
+    let js_hash = format!("window.location.hash = {:?};", route);
+
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+        .title(format!("Lịch sử hóa đơn - {tax_code}"))
+        .inner_size(1050.0, 800.0)
+        .resizable(true)
+        .decorations(false)
+        .visible(true)
+        // .always_on_top(true)
+        .center()
+        .on_page_load(move |window, payload| {
+            if matches!(payload.event(), PageLoadEvent::Finished) {
+                if let Err(error) = window.eval(&js_hash) {
+                    eprintln!("Không thể điều hướng đến {route}: {error}");
+                }
+            }
+        })
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 pub fn predict_captcha(svg: &str) -> Result<String, String> {

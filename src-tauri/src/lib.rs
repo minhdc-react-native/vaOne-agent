@@ -24,6 +24,7 @@ use tauri::{
 };
 use tauri_plugin_notification::NotificationExt;
 use vaone_tax_sync::database::Database;
+use vaone_tax_sync::db::invoice_database::InvoiceDatabaseManager;
 use vaone_tax_sync::worker::TaxSyncWorkerConfig;
 use vaone_tax_sync::TaxSyncWorker;
 
@@ -156,14 +157,18 @@ pub fn run() {
             println!("Tax sync database: {}", db_path.display());
             let db = Database::new(db_path).map_err(|e| std::io::Error::other(e.to_string()))?;
 
+            let invoice_db_manager = InvoiceDatabaseManager::new(app_data_dir.join("invoices"));
+
             app.manage(db.clone());
+            app.manage(invoice_db_manager);
 
             let captcha_solver = Arc::new(LocalCaptchaSolver);
 
             let sync_observer = Arc::new(ConsoleSyncObserver);
 
             let worker = Arc::new(TaxSyncWorker::new(
-                db.clone(),
+                db,
+                app_data_dir.join("invoices"),
                 captcha_solver,
                 sync_observer,
                 TaxSyncWorkerConfig::new(),
@@ -220,6 +225,7 @@ pub fn run() {
             commands::invoice::start_m_invoice_sync,
             commands::system::captcha_train,
             commands::system::captcha_predict,
+            commands::system::open_history_invoice_window,
             commands::tax_accounts::get_tax_accounts,
             commands::tax_accounts::create_tax_account,
             commands::tax_accounts::update_tax_account,

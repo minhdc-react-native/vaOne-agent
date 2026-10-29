@@ -3,6 +3,7 @@ use tauri::State;
 use vaone_tax_sync::{
     auth::{ApplicationLoginResponse, LoginResponse, TaxAuthService, TypeApp},
     database::Database,
+    db::invoice_database::InvoiceDatabaseManager,
     error::TaxSyncError,
     models::{TaxAccount, TaxAccountInput},
     secret_store::SecretStore,
@@ -29,10 +30,29 @@ pub fn get_tax_accounts(
 
 #[tauri::command]
 pub fn create_tax_account(
-    db: State<'_, Database>,
     input: TaxAccountInput,
-) -> Result<TaxAccount, String> {
-    db.create_tax_account(&input).map_err(|e| e.to_string())
+    db: tauri::State<'_, Database>,
+    invoice_manager: tauri::State<'_, InvoiceDatabaseManager>,
+) -> std::result::Result<TaxAccount, String> {
+    let tax_code = input.tax_code.trim().to_string();
+
+    // Tạo database hóa đơn trước.
+    invoice_manager
+        .initialize_tax_code(&tax_code)
+        .map_err(|e| e.to_string())?;
+
+    // Sau đó tạo tài khoản trên database chính.
+    match db.create_tax_account(&input) {
+        Ok(account) => Ok(account),
+        Err(error) => {
+            // Có thể dọn file vừa tạo nếu việc tạo tài khoản thất bại.
+            if let Err(cleanup_error) = invoice_manager.delete_tax_code(&tax_code) {
+                eprintln!("[tax-sync] Không thể dọn database hóa đơn: {cleanup_error}");
+            }
+
+            Err(error.to_string())
+        }
+    }
 }
 
 #[tauri::command]
@@ -67,8 +87,25 @@ pub fn update_auto_sync(
 }
 
 #[tauri::command]
-pub fn delete_tax_account(db: State<'_, Database>, tax_code: String) -> Result<(), String> {
-    db.delete_tax_account(&tax_code).map_err(|e| e.to_string())
+pub fn delete_tax_account(
+    db: State<'_, Database>,
+    invoice_manager: State<'_, InvoiceDatabaseManager>,
+    tax_code: String,
+) -> Result<(), String> {
+    // 1. Xóa tài khoản trong database chính.
+    db.delete_tax_account(&tax_code)
+        .map_err(|e| e.to_string())?;
+
+    // 2. Xóa database hóa đơn riêng của mã số thuế.
+    invoice_manager.delete_tax_code(&tax_code).map_err(|e| {
+        eprintln!(
+            "[tax-sync] Đã xóa tài khoản {}, nhưng không xóa được database hóa đơn: {}",
+            tax_code, e
+        );
+        e.to_string()
+    })?;
+
+    Ok(())
 }
 
 #[tauri::command]

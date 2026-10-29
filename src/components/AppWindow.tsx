@@ -7,6 +7,7 @@ import { useLocation } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { IconLucide, IconName } from "./IconLucide";
 import { Tooltip } from "./Tooltip/Tooltip";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface AppWindowProps {
     icon?: IconName,
@@ -27,14 +28,22 @@ export const hideWindow = async (callBack?: {
 }) => {
     if (callBack?.onConfirm) {
         const confirmed = await callBack.onConfirm();
-
         if (!confirmed) return;
     }
 
-    await trayApi.post("/open_tray_page", {
-        route: "/blank",
-        data: {},
-    });
+    const currentWindow = getCurrentWindow();
+
+    if (currentWindow.label === "main") {
+        // Giữ cơ chế cũ cho cửa sổ chính.
+        await trayApi.post("/open_tray_page", {
+            route: "/blank",
+            data: {},
+        });
+    } else {
+        console.log('currentWindow>>', currentWindow);
+        // Đóng đúng cửa sổ hiện tại, không tác động main.
+        await currentWindow.close();
+    }
 
     callBack?.onClose?.();
 };

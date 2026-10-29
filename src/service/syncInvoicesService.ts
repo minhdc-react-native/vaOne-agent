@@ -93,6 +93,7 @@ export interface IPaginatedResult<T> {
 }
 
 export interface IGetSyncInvoicesParams {
+    taxCode: string;
     filters: ISyncInvoiceFilters;
     page: number;
     page_size: number;
@@ -119,11 +120,13 @@ export const syncInvoiceService = {
         invoke<ISyncDay[]>("get_sync_days", { taxCode, isSuccess }),
 
     getSyncInvoices: (
+        taxCode: string,
         filters: ISyncInvoiceFilters,
         page: number,
         page_size: number,
     ) =>
         invoke<IPaginatedResult<ISyncInvoice>>("get_sync_invoices", {
+            taxCode,
             filters,
             page,
             pageSize: page_size,

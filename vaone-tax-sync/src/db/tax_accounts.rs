@@ -485,20 +485,6 @@ impl Database {
             }
         }
 
-        // 1. Xóa dữ liệu đồng bộ hóa đơn
-        tx.execute(
-            "DELETE FROM sync_invoices WHERE tax_code = ?1",
-            params![tax_code],
-        )
-        .map_err(db_error)?;
-
-        // 2. Xóa trạng thái đồng bộ theo ngày
-        tx.execute(
-            "DELETE FROM sync_days WHERE tax_code = ?1",
-            params![tax_code],
-        )
-        .map_err(db_error)?;
-
         // 3. Xóa tài khoản thuế
         let changed = tx
             .execute(
@@ -730,46 +716,6 @@ impl Database {
 
         rows.collect::<std::result::Result<Vec<_>, _>>()
             .map_err(|e| TaxSyncError::Database(e.to_string()))
-    }
-
-    pub fn has_pending_updates(&self) -> Result<bool> {
-        let conn = self.connect()?;
-
-        let has_pending: bool = conn
-            .query_row(
-                "
-            SELECT EXISTS (
-                SELECT 1
-                FROM sync_invoices
-                WHERE detail_status <> 'completed'
-            )
-            ",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(db_error)?;
-
-        Ok(has_pending)
-    }
-
-    pub fn has_pending_uploads(&self) -> Result<bool> {
-        let conn = self.connect()?;
-
-        let has_pending: bool = conn
-            .query_row(
-                "
-            SELECT EXISTS (
-                SELECT 1
-                FROM sync_invoices
-                WHERE upload_status <> 'completed'
-            )
-            ",
-                [],
-                |row| row.get(0),
-            )
-            .map_err(db_error)?;
-
-        Ok(has_pending)
     }
 
     pub fn upsert_tax_account(

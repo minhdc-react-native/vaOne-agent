@@ -1,5 +1,5 @@
 use crate::client::request_delay;
-use crate::database::{invoice_date_vietnam, invoice_key};
+use crate::db::invoice_database::{invoice_date_vietnam, invoice_key, InvoiceDatabase};
 use crate::error::TaxSyncError;
 use crate::models::TaxAccount;
 use crate::worker::{vietnam_today, CaptchaSolver};
@@ -48,6 +48,7 @@ impl TaxSyncService {
 
     pub async fn run(
         &self,
+        invoice_db: &InvoiceDatabase,
         request: SyncRequest,
         observer: &dyn SyncObserver,
         cancel: CancellationToken,
@@ -110,7 +111,7 @@ impl TaxSyncService {
                 let message = err.to_string();
 
                 for date in &dates {
-                    let _ = self.db.set_day_list_failed(
+                    let _ = invoice_db.set_day_list_failed(
                         &request.tax_code,
                         request.invoice_type,
                         date,
@@ -147,7 +148,7 @@ impl TaxSyncService {
 
             let invoice_key = invoice_key(item)?;
 
-            let exists = self.db.invoice_today_exists(
+            let exists = invoice_db.invoice_today_exists(
                 &request.tax_code,
                 request.invoice_type,
                 &invoice_key,
@@ -167,7 +168,7 @@ impl TaxSyncService {
 
                 let is_today = date == today.format("%Y-%m-%d").to_string();
 
-                let key = self.db.save_invoice_summary(
+                let key = invoice_db.save_invoice_summary(
                     &request.tax_code,
                     request.invoice_type,
                     item,
@@ -209,7 +210,7 @@ impl TaxSyncService {
 
             let is_today = date == today.format("%Y-%m-%d").to_string().as_str();
 
-            self.db.mark_day_list_completed(
+            invoice_db.mark_day_list_completed(
                 &request.tax_code,
                 request.invoice_type,
                 date,
@@ -218,8 +219,11 @@ impl TaxSyncService {
             if (is_today) {
                 continue;
             }
-            self.db
-                .delete_invoices_today_by_date(&request.tax_code, request.invoice_type, date)?;
+            invoice_db.delete_invoices_today_by_date(
+                &request.tax_code,
+                request.invoice_type,
+                date,
+            )?;
         }
 
         observer.on_finished(&summary);
@@ -229,6 +233,7 @@ impl TaxSyncService {
 
     pub async fn retry_pending_details(
         &self,
+        invoice_db: &InvoiceDatabase,
         tax_code: &str,
         invoice_type: u8,
         token: &str,
@@ -240,9 +245,8 @@ impl TaxSyncService {
             return Ok((0, 0));
         }
 
-        let invoices = self
-            .db
-            .get_invoices_pending_detail(tax_code, invoice_type, batch_size)?;
+        let invoices =
+            invoice_db.get_invoices_pending_detail(tax_code, invoice_type, batch_size)?;
 
         let mut completed = 0;
         let mut failed = 0;
@@ -274,7 +278,7 @@ impl TaxSyncService {
                     )
                     .await?;
 
-                self.db.save_invoice_detail(
+                invoice_db.save_invoice_detail(
                     tax_code,
                     invoice_type,
                     &invoice.invoice_key,
@@ -305,7 +309,7 @@ impl TaxSyncService {
                     let message = err.to_string();
 
                     // Chỉ cập nhật trạng thái lỗi, không trả lỗi ra ngoài.
-                    if let Err(db_err) = self.db.set_detail_failed(
+                    if let Err(db_err) = invoice_db.set_detail_failed(
                         tax_code,
                         invoice_type,
                         &invoice.invoice_key,

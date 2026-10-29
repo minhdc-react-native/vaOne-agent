@@ -16,11 +16,12 @@ export const useGetSyncDays = () =>
 export const useGetSyncInvoices = () =>
     useMutation({
         mutationFn: ({
+            taxCode,
             filters,
             page,
             page_size,
         }: IGetSyncInvoicesParams) =>
-            syncInvoiceService.getSyncInvoices(filters, page, page_size),
+            syncInvoiceService.getSyncInvoices(taxCode, filters, page, page_size),
     });
 
 

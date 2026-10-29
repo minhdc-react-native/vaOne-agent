@@ -4,7 +4,8 @@
   "description": "Capability for the main window",
   "windows": [
     "main",
-    "splash_screen"
+    "splash_screen",
+    "history-invoice-*"
   ],
   "permissions": [
     "core:default",

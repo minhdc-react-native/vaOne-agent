@@ -1,4 +1,5 @@
 use crate::auth::VaOnlineOrgUnit;
+use crate::db::invoice_database::InvoiceDatabase;
 use crate::models::InvoiceUpload;
 use crate::{
     auth::{get_current_year, ApplicationLoginResponse, TaxAuthService, TypeApp},
@@ -14,6 +15,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{DateTime, Duration as ChronoDuration, NaiveDate, NaiveDateTime, Utc};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::path::PathBuf;
 use std::{
     collections::HashSet,
     sync::{
@@ -111,6 +113,7 @@ impl TaxSyncWorkerConfig {
 
 pub struct TaxSyncWorker {
     db: Database,
+    invoice_db_dir: PathBuf,
     auth: TaxAuthService,
     captcha_solver: Arc<dyn CaptchaSolver>,
     observer: Arc<dyn SyncObserver>,
@@ -122,6 +125,7 @@ pub struct TaxSyncWorker {
 impl TaxSyncWorker {
     pub fn new(
         db: Database,
+        invoice_db_dir: PathBuf,
         captcha_solver: Arc<dyn CaptchaSolver>,
         observer: Arc<dyn SyncObserver>,
         config: TaxSyncWorkerConfig,
@@ -138,6 +142,7 @@ impl TaxSyncWorker {
 
         Ok(Self {
             db,
+            invoice_db_dir,
             auth,
             captcha_solver,
             observer,
@@ -272,6 +277,7 @@ impl TaxSyncWorker {
         }
 
         let accounts = self.db.get_enabled_tax_accounts(false)?;
+        let mut has_pending = false;
 
         for account in accounts {
             if cancel.is_cancelled() {
@@ -282,7 +288,10 @@ impl TaxSyncWorker {
                 continue;
             }
 
-            let invoices = self.db.get_invoices_pending_upload(&account.tax_code)?;
+            let invoice_db =
+                InvoiceDatabase::open_existing(&self.invoice_db_dir, &account.tax_code)?;
+
+            let invoices = invoice_db.get_invoices_pending_upload(&account.tax_code)?;
 
             if invoices.is_empty() {
                 continue;
@@ -297,6 +306,7 @@ impl TaxSyncWorker {
                     let type_app = TypeApp::try_from(account.type_app.as_str())?;
 
                     self.invoices_pending_upload(
+                        &invoice_db,
                         &account.tax_code,
                         &invoices,
                         &token,
@@ -322,14 +332,15 @@ impl TaxSyncWorker {
                     );
                 }
             }
-        }
 
-        if cancel.is_cancelled() {
-            return Ok(false);
-        }
+            if cancel.is_cancelled() {
+                return Ok(false);
+            }
 
-        // Kiểm tra lại database sau khi xử lý.
-        let has_pending = self.db.has_pending_uploads()?;
+            if invoice_db.has_pending_uploads(&account.tax_code)? {
+                has_pending = true;
+            }
+        }
 
         Ok(has_pending)
     }
@@ -338,6 +349,7 @@ impl TaxSyncWorker {
     pub async fn run_once(&self, cancel: CancellationToken) -> Result<()> {
         let accounts_error = self.db.get_enabled_tax_accounts(true)?;
         let accounts = self.db.get_enabled_tax_accounts(false)?;
+
         self.observer.on_notification(&accounts_error);
 
         for account in accounts {
@@ -345,11 +357,45 @@ impl TaxSyncWorker {
                 break;
             }
 
+            // Cập nhật trạng thái/thời gian đồng bộ trong database chính.
             if let Err(err) = self.db.update_sync_time(&account.tax_code) {
-                eprintln!("[tax-sync] Update sync time failed: {err}");
+                eprintln!(
+                    "[tax-sync] Update sync time failed for {}: {err}",
+                    account.tax_code
+                );
             }
 
-            if let Err(error) = self.process_account(&account, cancel.clone()).await {
+            // Tạo database hóa đơn riêng cho từng mã số thuế.
+            let invoice_db =
+                match InvoiceDatabase::open_existing(&self.invoice_db_dir, &account.tax_code) {
+                    Ok(db) => db,
+                    Err(err) => {
+                        eprintln!(
+                            "[tax-sync] Open invoice database failed for {}: {err}",
+                            account.tax_code
+                        );
+                        continue;
+                    }
+                };
+
+            // Khởi tạo bảng và index nếu chưa tồn tại.
+            if let Err(err) = invoice_db.initialize() {
+                eprintln!(
+                    "[tax-sync] Initialize invoice database failed for {}: {err}",
+                    account.tax_code
+                );
+                continue;
+            }
+
+            if cancel.is_cancelled() {
+                break;
+            }
+
+            // Mọi thao tác hóa đơn của tài khoản này dùng invoice_db.
+            if let Err(error) = self
+                .process_account(&account, &invoice_db, cancel.clone())
+                .await
+            {
                 eprintln!("[tax-sync] Account {} failed: {error:#}", account.tax_code);
             }
         }
@@ -363,13 +409,20 @@ impl TaxSyncWorker {
         }
 
         let accounts = self.db.get_enabled_tax_accounts(false)?;
+        let mut has_pending = false;
 
         for account in accounts {
             if cancel.is_cancelled() {
                 return Ok(false);
             }
 
-            if let Err(error) = self.process_account_update(&account, cancel.clone()).await {
+            let invoice_db =
+                InvoiceDatabase::open_existing(&self.invoice_db_dir, &account.tax_code)?;
+
+            if let Err(error) = self
+                .process_account_update(&account, &invoice_db, cancel.clone())
+                .await
+            {
                 if cancel.is_cancelled() {
                     return Ok(false);
                 }
@@ -379,10 +432,15 @@ impl TaxSyncWorker {
                     account.tax_code
                 );
             }
-        }
 
-        // Kiểm tra lại trạng thái thực tế sau khi xử lý.
-        let has_pending = self.db.has_pending_updates()?;
+            if cancel.is_cancelled() {
+                return Ok(false);
+            }
+
+            if invoice_db.has_pending_updates(&account.tax_code)? {
+                has_pending = true;
+            }
+        }
 
         Ok(has_pending)
     }
@@ -390,6 +448,7 @@ impl TaxSyncWorker {
     async fn process_account_update(
         &self,
         account: &TaxAccount,
+        invoice_db: &InvoiceDatabase,
         cancel: CancellationToken,
     ) -> Result<()> {
         if cancel.is_cancelled() {
@@ -428,6 +487,7 @@ impl TaxSyncWorker {
 
             let (completed, failed) = service
                 .retry_pending_details(
+                    &invoice_db,
                     &account.tax_code,
                     *invoice_type,
                     &token,
@@ -450,7 +510,12 @@ impl TaxSyncWorker {
         Ok(())
     }
 
-    async fn process_account(&self, account: &TaxAccount, cancel: CancellationToken) -> Result<()> {
+    async fn process_account(
+        &self,
+        account: &TaxAccount,
+        invoice_db: &InvoiceDatabase,
+        cancel: CancellationToken,
+    ) -> Result<()> {
         // Không bắt đầu xử lý tài khoản mới nếu đã có yêu cầu dừng.
         if cancel.is_cancelled() {
             return Ok(());
@@ -470,7 +535,7 @@ impl TaxSyncWorker {
             return Ok(());
         }
 
-        self.seed_days(account, &invoice_types).await?;
+        self.seed_days(account, &invoice_db, &invoice_types).await?;
 
         if cancel.is_cancelled() {
             return Ok(());
@@ -485,9 +550,7 @@ impl TaxSyncWorker {
                 break;
             }
 
-            let dates = self
-                .db
-                .get_incomplete_days(&account.tax_code, *invoice_type)?;
+            let dates = invoice_db.get_incomplete_days(&account.tax_code, *invoice_type)?;
 
             for date in dates {
                 if cancel.is_cancelled() {
@@ -510,7 +573,14 @@ impl TaxSyncWorker {
                 }
 
                 if let Err(error) = self
-                    .sync_one_day(account, *invoice_type, &date, &token, cancel.clone())
+                    .sync_one_day(
+                        account,
+                        invoice_db,
+                        *invoice_type,
+                        &date,
+                        &token,
+                        cancel.clone(),
+                    )
                     .await
                 {
                     eprintln!(
@@ -534,7 +604,12 @@ impl TaxSyncWorker {
     ///
     /// ON CONFLICT DO NOTHING trong ensure_sync_day giúp giữ nguyên
     /// trạng thái của các ngày đã được xử lý trước đó.
-    async fn seed_days(&self, account: &TaxAccount, invoice_types: &[u8]) -> Result<()> {
+    async fn seed_days(
+        &self,
+        account: &TaxAccount,
+        invoice_db: &InvoiceDatabase,
+        invoice_types: &[u8],
+    ) -> Result<()> {
         let start = NaiveDate::parse_from_str(&account.start_date, "%Y-%m-%d")?;
 
         let today = vietnam_today().await?;
@@ -550,8 +625,7 @@ impl TaxSyncWorker {
             let date_string = date.format("%Y-%m-%d").to_string();
 
             for invoice_type in invoice_types {
-                self.db
-                    .ensure_sync_day(&account.tax_code, *invoice_type, &date_string)?;
+                invoice_db.ensure_sync_day(&account.tax_code, *invoice_type, &date_string)?;
             }
 
             if date >= today {
@@ -763,6 +837,7 @@ impl TaxSyncWorker {
     async fn sync_one_day(
         &self,
         account: &TaxAccount,
+        invoice_db: &InvoiceDatabase,
         invoice_type: u8,
         date: &str,
         token: &str,
@@ -790,19 +865,17 @@ impl TaxSyncWorker {
         if cancel.is_cancelled() {
             return Ok(());
         }
-        self.db
-            .set_day_running(&account.tax_code, invoice_type, date)?;
+        invoice_db.set_day_running(&account.tax_code, invoice_type, date)?;
 
         service
-            .run(request, self.observer.as_ref(), cancel.clone())
+            .run(&invoice_db, request, self.observer.as_ref(), cancel.clone())
             .await
             .map_err(|error| anyhow!(error.to_string()))?;
 
         if cancel.is_cancelled() {
             // Không đánh dấu completed nếu quá trình bị dừng.
             // Ngày cần được giữ ở trạng thái có thể retry.
-            self.db
-                .set_day_pending(&account.tax_code, invoice_type, date)?;
+            invoice_db.set_day_pending(&account.tax_code, invoice_type, date)?;
             return Ok(());
         }
 
@@ -811,6 +884,7 @@ impl TaxSyncWorker {
 
     async fn invoices_pending_upload(
         &self,
+        invoice_db: &InvoiceDatabase,
         tax_code: &str,
         invoices: &Vec<InvoiceUpload>,
         token: &ApplicationLoginResponse,
@@ -868,7 +942,7 @@ impl TaxSyncWorker {
             match self.auth.post_data(&payload, token, type_app).await {
                 Ok(result) => {
                     for invoice in batch {
-                        if let Err(err) = self.db.set_upload_completed(
+                        if let Err(err) = invoice_db.set_upload_completed(
                             tax_code,
                             invoice.invoice_type,
                             &invoice.invoice_key,
@@ -889,7 +963,7 @@ impl TaxSyncWorker {
                     let message = err.to_string();
 
                     for invoice in batch {
-                        if let Err(db_err) = self.db.set_upload_failed(
+                        if let Err(db_err) = invoice_db.set_upload_failed(
                             tax_code,
                             invoice.invoice_type,
                             &invoice.invoice_key,

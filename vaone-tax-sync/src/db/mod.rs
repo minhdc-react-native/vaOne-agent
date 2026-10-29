@@ -1,2 +1,2 @@
-pub mod sync_invoices;
+pub mod invoice_database;
 pub mod tax_accounts;

@@ -138,6 +138,7 @@ export function TaxInvoiceManager() {
     const { taxCode } = useParams<{ taxCode: string }>();
 
     const [taxCodeSelect, setTaxCodeSelect] = useState(taxCode);
+
     const {
         accounts,
         loadAccounts
@@ -160,7 +161,7 @@ export function TaxInvoiceManager() {
         });
     }, [accounts, search]);
 
-    const account = useMemo(() => accounts.find(acc => acc.tax_code === taxCodeSelect), [taxCodeSelect]);
+    const account = useMemo(() => accounts.find(acc => acc.tax_code === taxCodeSelect), [taxCodeSelect, accounts]);
 
     const {
         mutateAsync: getStats,
@@ -230,6 +231,7 @@ export function TaxInvoiceManager() {
             try {
                 setLocalError(null);
                 const result = await getInvoices({
+                    taxCode: taxCodeSelect,
                     filters: {
                         ...nextFilters,
                         tax_code: taxCodeSelect,
@@ -237,7 +239,6 @@ export function TaxInvoiceManager() {
                     page: nextPage,
                     page_size: PAGE_SIZE,
                 });
-                console.log('result>>', result);
                 setInvoicePage(result);
                 setPage(nextPage);
             } catch (error) {
@@ -385,7 +386,7 @@ export function TaxInvoiceManager() {
     }, [fullScreen]);
 
     const onClose = useCallback(() => {
-        navigate(`/tax-config/${taxCodeSelect}`);
+        // navigate(`/tax-config/${taxCodeSelect}`);
     }, [taxCodeSelect])
 
     const handleSelect = useCallback((account: ITaxAccount) => {
