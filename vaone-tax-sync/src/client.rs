@@ -1,5 +1,7 @@
 use crate::auth::get_captcha;
 use crate::error::TaxSyncError;
+use crate::global_request_queue::GlobalRequestQueue;
+use crate::models::FetchAllProgress;
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{Datelike, Duration, NaiveDate};
@@ -24,26 +26,39 @@ const URL_SCO_EXPORT_XML: &str =
 
 const PAGE_SIZE: usize = 50;
 
-pub async fn request_delay(delay_ms: u64) {
-    let duration =
-        rand::rng().random_range(delay_ms.saturating_sub(100)..=delay_ms.saturating_add(100));
+// pub async fn request_delay(delay_ms: u64) {
+//     let duration =
+//         rand::rng().random_range(delay_ms.saturating_sub(100)..=delay_ms.saturating_add(100));
 
-    tokio::time::sleep(std::time::Duration::from_millis(duration)).await;
-}
+//     tokio::time::sleep(std::time::Duration::from_millis(duration)).await;
+// }
 
 pub struct TaxClient {
     http: Client,
+    tax_code: String,
     request_id: String,
+    request_queue: Arc<GlobalRequestQueue>,
+    cancel: CancellationToken,
 }
 
 impl TaxClient {
-    pub fn new() -> Result<Self> {
+    pub fn new(
+        tax_code: String,
+        request_queue: Arc<GlobalRequestQueue>,
+        cancel: CancellationToken,
+    ) -> Result<Self> {
         let http = Client::builder()
             .cookie_store(true)
             .timeout(TokioDuration::from_secs(60))
             .build()?;
         let request_id = uuid::Uuid::new_v4().to_string();
-        Ok(Self { http, request_id })
+        Ok(Self {
+            http,
+            tax_code,
+            request_id,
+            request_queue,
+            cancel,
+        })
     }
 
     fn invoice_url(invoice_type: u8, from: &str, to: &str) -> Result<String> {
@@ -71,51 +86,142 @@ impl TaxClient {
         ))
     }
 
+    async fn get_bytes(
+        &self,
+        url: &str,
+        query: &[(&str, String)],
+        token: &str,
+    ) -> anyhow::Result<Vec<u8>> {
+        let url = url.to_string();
+        let query = query.to_vec();
+        let token = token.to_string();
+
+        let http = self.http.clone();
+        let queue = self.request_queue.clone();
+        let queue_for_429 = queue.clone();
+        let tax_code = self.tax_code.clone();
+        queue
+            .execute(&tax_code.clone(), &self.cancel, || async move {
+                let response = http
+                    .get(&url)
+                    .header("request-id", uuid::Uuid::new_v4().to_string())
+                    .query(&query)
+                    .bearer_auth(&token)
+                    .send()
+                    .await?;
+
+                let status = response.status();
+
+                if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                    let retry_after_secs = response
+                        .headers()
+                        .get(reqwest::header::RETRY_AFTER)
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(180)
+                        .max(180);
+
+                    let wait = TokioDuration::from_secs(retry_after_secs);
+
+                    queue_for_429
+                        .set_tax_code_cooldown(&tax_code.clone(), wait)
+                        .await;
+
+                    return Err(TaxSyncError::RateLimited {
+                        tax_code,
+                        retry_after_secs,
+                    }
+                    .into());
+                }
+
+                if !status.is_success() {
+                    anyhow::bail!("Tax API returned HTTP {}", status);
+                }
+
+                let bytes = response.bytes().await?.to_vec();
+                Ok(bytes)
+            })
+            .await
+    }
+
     async fn get_json(
         &self,
         url: &str,
         token: &str,
         headers: Option<&[(&str, &str)]>,
-    ) -> Result<Value> {
-        let mut request = self
-            .http
-            .get(url)
-            .header("request-id", uuid::Uuid::new_v4().to_string())
-            .bearer_auth(token);
+    ) -> anyhow::Result<Value> {
+        let url = url.to_string();
+        let token = token.to_string();
+        let headers = headers.map(|h| h.to_vec());
 
-        if let Some(headers) = headers {
-            for (name, value) in headers {
-                request = request.header(*name, *value);
-            }
-        }
+        let http = self.http.clone();
+        let queue = self.request_queue.clone();
+        let queue_for_429 = queue.clone();
+        let tax_code = self.tax_code.clone();
 
-        let response = request.send().await.context("Tax API request failed")?;
+        queue
+            .execute(&tax_code.clone(), &self.cancel, || async move {
+                let mut request = http
+                    .get(&url)
+                    .header("request-id", uuid::Uuid::new_v4().to_string())
+                    .bearer_auth(&token);
 
-        let status = response.status();
+                if let Some(headers) = headers {
+                    for (name, value) in headers {
+                        request = request.header(name, value);
+                    }
+                }
 
-        if !status.is_success() {
-            bail!("Tax API returned HTTP {}", status);
-        }
+                let response = request.send().await?;
+                let status = response.status();
 
-        response
-            .json::<Value>()
+                if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                    let retry_after_secs = response
+                        .headers()
+                        .get(reqwest::header::RETRY_AFTER)
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(180)
+                        .max(180);
+
+                    let wait = TokioDuration::from_secs(retry_after_secs);
+
+                    queue_for_429
+                        .set_tax_code_cooldown(&tax_code.clone(), wait)
+                        .await;
+
+                    return Err(TaxSyncError::RateLimited {
+                        tax_code,
+                        retry_after_secs,
+                    }
+                    .into());
+                }
+
+                if !status.is_success() {
+                    anyhow::bail!("Tax API returned HTTP {}", status);
+                }
+
+                response
+                    .json::<Value>()
+                    .await
+                    .context("Invalid tax API JSON response")
+            })
             .await
-            .context("Invalid tax API JSON response")
     }
 
-    pub async fn fetch_all<F, Fut>(
+    pub async fn fetch_all<F, Fut, P>(
         &self,
         invoice_type: u8,
         from_date: &str,
         to_date: &str,
         token: &str,
-        delay_ms: u64,
-        cancel: CancellationToken,
         solve_captcha: F,
+        mut on_progress: P,
     ) -> Result<Vec<Value>>
     where
         F: Fn(&str) -> Fut,
         Fut: Future<Output = Result<String>>,
+        P: FnMut(FetchAllProgress),
     {
         let mut result = Vec::new();
 
@@ -127,8 +233,25 @@ impl TaxClient {
                 TaxSyncError::InvalidDateRange("from_date must be <= to_date".to_string()).into(),
             );
         }
+
+        // Tính tổng số tháng cần đồng bộ.
+        let mut total_months = 0;
+        let mut temp_date = current;
+
+        while temp_date <= end {
+            total_months += 1;
+
+            temp_date = if temp_date.month() == 12 {
+                NaiveDate::from_ymd_opt(temp_date.year() + 1, 1, 1).unwrap()
+            } else {
+                NaiveDate::from_ymd_opt(temp_date.year(), temp_date.month() + 1, 1).unwrap()
+            };
+        }
+
+        let mut completed_months = 0;
+
         while current <= end {
-            if cancel.is_cancelled() {
+            if self.cancel.is_cancelled() {
                 return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
             }
 
@@ -146,23 +269,40 @@ impl TaxClient {
             let base_url = Self::invoice_url(invoice_type, &from, &to)?;
 
             let mut state: Option<String> = None;
+            let mut page = 0;
+
+            // Thông báo bắt đầu tải tháng.
+            on_progress(FetchAllProgress {
+                completed_months,
+                total_months,
+                total_invoices: result.len(),
+                current_from: from.clone(),
+                current_to: to.clone(),
+                page,
+                message: format!("Bắt đầu tải hóa đơn ngày {}", current.format("%d/%m/%Y"),),
+            });
 
             loop {
-                if cancel.is_cancelled() {
+                if self.cancel.is_cancelled() {
                     return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
                 }
 
-                // Có thể dừng ngay trong thời gian chờ delay.
-                tokio::select! {
-                    _ = cancel.cancelled() => {
-                        return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
-                    }
-                    _ = request_delay(delay_ms) => {}
-                }
+                page += 1;
 
-                if cancel.is_cancelled() {
-                    return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
-                }
+                // Thông báo đang tải trang API.
+                on_progress(FetchAllProgress {
+                    completed_months,
+                    total_months,
+                    total_invoices: result.len(),
+                    current_from: from.clone(),
+                    current_to: to.clone(),
+                    page,
+                    message: format!(
+                        "Đang tải trang {} ngày {}",
+                        page,
+                        current.format("%d/%m/%Y"),
+                    ),
+                });
 
                 let captcha = if invoice_type == 3 || invoice_type == 4 {
                     let captcha = get_captcha(&self.http).await?;
@@ -208,28 +348,53 @@ impl TaxClient {
 
                 let request_url = url.to_string();
 
-                // Nếu request đang chờ HTTP, cần timeout hoặc truyền cancel
-                // trực tiếp vào get_json() để có thể dừng nhanh.
+                // Gọi API.
                 let response = match self
                     .get_json(&request_url, token, Some(&captcha_headers))
                     .await
                 {
                     Ok(response) => response,
+
                     Err(err) => {
                         eprintln!("Request URL: {request_url}");
                         eprintln!("Captcha headers: {:?}", captcha_headers);
+
                         return Err(err);
                     }
                 };
 
-                if cancel.is_cancelled() {
+                if self.cancel.is_cancelled() {
                     return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
                 }
 
+                // Nhận dữ liệu hóa đơn của trang hiện tại.
+                let page_count = response["datas"]
+                    .as_array()
+                    .map(|items| items.len())
+                    .unwrap_or(0);
+
                 if let Some(items) = response["datas"].as_array() {
+                    // eprintln!("invoices: {:?}", items);
                     result.extend(items.iter().cloned());
                 }
 
+                // Cập nhật tiến trình sau mỗi trang.
+                on_progress(FetchAllProgress {
+                    completed_months,
+                    total_months,
+                    total_invoices: result.len(),
+                    current_from: from.clone(),
+                    current_to: to.clone(),
+                    page,
+                    message: format!(
+                        "Đã tải trang {} ngày {}. Nhận thêm {} hóa đơn",
+                        page,
+                        current.format("%d/%m/%Y"),
+                        page_count,
+                    ),
+                });
+
+                // Kiểm tra cursor phân trang.
                 match response["state"].as_str() {
                     Some(next) if !next.is_empty() => {
                         state = Some(next.to_owned());
@@ -238,13 +403,31 @@ impl TaxClient {
                 }
             }
 
+            // Hoàn thành tháng hiện tại.
+            completed_months += 1;
+
+            on_progress(FetchAllProgress {
+                completed_months,
+                total_months,
+                total_invoices: result.len(),
+                current_from: from.clone(),
+                current_to: to.clone(),
+                page,
+                message: format!(
+                    "Đã tải xong ngày {}. Tổng cộng {} hóa đơn",
+                    current.format("%d/%m/%Y"),
+                    result.len(),
+                ),
+            });
+
             current = first_next_month;
         }
 
-        if cancel.is_cancelled() {
+        if self.cancel.is_cancelled() {
             return Err(TaxSyncError::Api("Sync cancelled".to_string()).into());
         }
 
+        // Sắp xếp hóa đơn theo ngày lập.
         result.sort_by(|a, b| {
             a["tdlap"]
                 .as_str()
@@ -259,15 +442,12 @@ impl TaxClient {
         &self,
         invoice: &Value,
         token: &str,
-        delay_ms: u64,
     ) -> Result<(Option<Value>, Option<String>)> {
         let xml = self.fetch_xml(invoice, token).await?;
 
         if xml.is_some() {
             return Ok((None, xml));
         }
-
-        request_delay(delay_ms).await;
 
         let detail = self.fetch_detail(invoice, token).await?;
 
@@ -315,7 +495,6 @@ impl TaxClient {
         khmshdon: i64,
         invoice_type: u8,
         token: &str,
-        delay_ms: u64,
     ) -> Result<(Option<Value>, Option<String>)> {
         let xml = self
             .fetch_xml_by_key(nbmst, khhdon, shdon, khmshdon, invoice_type, token)
@@ -324,8 +503,6 @@ impl TaxClient {
         if xml.is_some() {
             return Ok((None, xml));
         }
-
-        request_delay(delay_ms).await;
 
         let detail = self
             .fetch_detail_by_key(nbmst, khhdon, shdon, khmshdon, token)
@@ -373,30 +550,18 @@ impl TaxClient {
         };
 
         let result: Result<Option<String>> = async {
-            let response = self
-                .http
-                .get(base_url)
-                .header("request-id", uuid::Uuid::new_v4().to_string())
-                .query(&[
-                    ("nbmst", nbmst),
-                    ("khhdon", khhdon),
-                    ("shdon", &shdon.to_string()),
-                    ("khmshdon", &khmshdon.to_string()),
-                ])
-                .bearer_auth(token)
-                .send()
+            let bytes = self
+                .get_bytes(
+                    base_url,
+                    &[
+                        ("nbmst", nbmst.to_string()),
+                        ("khhdon", khhdon.to_string()),
+                        ("shdon", shdon.to_string()),
+                        ("khmshdon", khmshdon.to_string()),
+                    ],
+                    token,
+                )
                 .await?;
-
-            let status = response.status();
-
-            if !status.is_success() {
-                return Err(TaxSyncError::Api(format!(
-                    "Lấy XML thất bại: HTTP {status}, shdon={shdon}"
-                ))
-                .into());
-            }
-
-            let bytes = response.bytes().await?;
 
             if bytes.len() < 4 || bytes[0..2] != [0x50, 0x4B] {
                 return Err(TaxSyncError::Api(format!(

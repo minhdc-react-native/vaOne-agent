@@ -17,6 +17,7 @@ import { useAppStore } from "./stores/app.store";
 import { invoke } from "@tauri-apps/api/core";
 import { TaxConfig } from "./pages/TaxConfig";
 import { TaxInvoiceManager } from "./features/TaxInvoiceManager";
+import ProgressTask from "./pages/ProgressTask";
 
 function App() {
   const navigate = useNavigate();
@@ -91,6 +92,7 @@ function App() {
       <Route path="/history-invoice/:taxCode" element={<TaxInvoiceManager />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/get-invoices" element={<GetInvoices />} />
+      <Route path="/progress-task" element={<ProgressTask />} />
       <Route path="/update" element={<UpdatePage />} />
       <Route path="/quit" element={<QuitPage />} />
     </Routes>

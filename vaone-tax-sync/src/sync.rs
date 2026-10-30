@@ -1,7 +1,7 @@
-use crate::client::request_delay;
 use crate::db::invoice_database::{invoice_date_vietnam, invoice_key, InvoiceDatabase};
 use crate::error::TaxSyncError;
-use crate::models::TaxAccount;
+use crate::global_request_queue::GlobalRequestQueue;
+use crate::models::{InvoiceTask, TaskProgress, TaskStatus, TaxAccount};
 use crate::worker::{vietnam_today, CaptchaSolver};
 use crate::{
     client::TaxClient,
@@ -12,37 +12,38 @@ use crate::{
 use anyhow::{anyhow, Result};
 
 use chrono::NaiveDate;
+use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Notify;
 use tokio_util::sync::CancellationToken;
 pub trait SyncObserver: Send + Sync {
-    fn on_started(&self, total: usize);
-    fn on_invoice(&self, progress: InvoiceProgress);
-    fn on_finished(&self, summary: &SyncSummary);
+    fn on_progress(&self, progress: TaskProgress);
     fn on_notification(&self, tax_accounts: &Vec<TaxAccount>);
 }
 
 pub struct TaxSyncService {
     client: TaxClient,
-    db: Database,
     upload_notify: Arc<Notify>,
     update_notify: Arc<Notify>,
     captcha_solver: Arc<dyn CaptchaSolver>,
+    cancel: CancellationToken,
 }
 
 impl TaxSyncService {
     pub fn new(
-        db: Database,
+        tax_code: String,
         upload_notify: Arc<Notify>,
         update_notify: Arc<Notify>,
         captcha_solver: Arc<dyn CaptchaSolver>,
+        request_queue: Arc<GlobalRequestQueue>,
+        cancel: CancellationToken,
     ) -> Result<Self> {
         Ok(Self {
-            client: TaxClient::new()?,
-            db,
+            client: TaxClient::new(tax_code, request_queue.clone(), cancel.clone())?,
             upload_notify,
             update_notify,
             captcha_solver,
+            cancel,
         })
     }
 
@@ -51,7 +52,6 @@ impl TaxSyncService {
         invoice_db: &InvoiceDatabase,
         request: SyncRequest,
         observer: &dyn SyncObserver,
-        cancel: CancellationToken,
     ) -> Result<SyncSummary> {
         if request.tax_code.trim().is_empty() {
             return Err(
@@ -63,7 +63,7 @@ impl TaxSyncService {
             return Err(TaxSyncError::InvalidConfig("token must not be empty".to_string()).into());
         }
 
-        if cancel.is_cancelled() {
+        if self.cancel.is_cancelled() {
             return Ok(SyncSummary {
                 cancelled: true,
                 ..Default::default()
@@ -72,9 +72,21 @@ impl TaxSyncService {
 
         let dates = dates_between(&request.from_date, &request.to_date)?;
 
+        // Bước 1: Thông báo bắt đầu lấy danh sách hóa đơn.
+        report_download_progress(
+            observer,
+            &request.tax_code,
+            TaskStatus::Running,
+            0,
+            None,
+            "Đang lấy danh sách hóa đơn từ cơ quan thuế",
+            None,
+            None,
+            None,
+        );
+
         let solver = Arc::clone(&self.captcha_solver);
 
-        // Bước 1: Lấy danh sách hóa đơn.
         let invoices = match self
             .client
             .fetch_all(
@@ -82,8 +94,6 @@ impl TaxSyncService {
                 &request.from_date,
                 &request.to_date,
                 &request.token,
-                request.delay_ms,
-                cancel.clone(),
                 move |captcha_content| {
                     let solver = Arc::clone(&solver);
                     let svg = captcha_content.to_string();
@@ -95,13 +105,41 @@ impl TaxSyncService {
                             .map_err(anyhow::Error::from)
                     }
                 },
+                |progress| {
+                    report_download_progress(
+                        observer,
+                        &request.tax_code,
+                        TaskStatus::Running,
+                        progress.completed_months,
+                        Some(progress.total_months),
+                        format!(
+                            "{} | Trang {} | Đã nhận {} hóa đơn",
+                            progress.message, progress.page, progress.total_invoices,
+                        ),
+                        None,
+                        None,
+                        None,
+                    );
+                },
             )
             .await
         {
             Ok(invoices) => invoices,
 
             Err(err) => {
-                if cancel.is_cancelled() {
+                if self.cancel.is_cancelled() {
+                    report_download_progress(
+                        observer,
+                        &request.tax_code,
+                        TaskStatus::Cancelled,
+                        0,
+                        None,
+                        "Đã hủy quá trình lấy danh sách hóa đơn",
+                        None,
+                        None,
+                        None,
+                    );
+
                     return Ok(SyncSummary {
                         cancelled: true,
                         ..Default::default()
@@ -119,35 +157,96 @@ impl TaxSyncService {
                     );
                 }
 
+                report_download_progress(
+                    observer,
+                    &request.tax_code,
+                    TaskStatus::Failed,
+                    0,
+                    None,
+                    "Không thể lấy danh sách hóa đơn",
+                    None,
+                    Some(false),
+                    Some(message),
+                );
+
                 return Err(err);
             }
         };
 
-        if cancel.is_cancelled() {
+        if self.cancel.is_cancelled() {
+            report_download_progress(
+                observer,
+                &request.tax_code,
+                TaskStatus::Cancelled,
+                0,
+                Some(invoices.len()),
+                "Đã hủy quá trình tải hóa đơn",
+                None,
+                None,
+                None,
+            );
+
             return Ok(SyncSummary {
                 cancelled: true,
                 ..Default::default()
             });
         }
 
-        observer.on_started(invoices.len());
+        // Bước 2: Đã lấy được danh sách, bắt đầu lưu SQLite.
+        let total = invoices.len();
 
-        // Bước 2: Lưu summary.
         let mut summary = SyncSummary {
-            total: invoices.len(),
+            total,
             ..Default::default()
         };
 
+        report_download_progress(
+            observer,
+            &request.tax_code,
+            TaskStatus::Running,
+            0,
+            Some(total),
+            format!("Đã lấy được {total} hóa đơn. Đang chuẩn bị lưu vào SQLite"),
+            None,
+            None,
+            None,
+        );
+
         let today = vietnam_today().await?;
+        let today_string = today.format("%Y-%m-%d").to_string();
+
+        let mut processed = 0usize;
 
         for item in &invoices {
-            if cancel.is_cancelled() {
+            if self.cancel.is_cancelled() {
                 summary.cancelled = true;
                 break;
             }
 
-            let invoice_key = invoice_key(item)?;
+            // Lấy khóa hóa đơn.
+            let invoice_key = match invoice_key(item) {
+                Ok(key) => key,
+                Err(err) => {
+                    summary.failed += 1;
+                    processed += 1;
 
+                    report_download_progress(
+                        observer,
+                        &request.tax_code,
+                        TaskStatus::Running,
+                        processed,
+                        Some(total),
+                        "Không thể xác định khóa hóa đơn",
+                        Some(item),
+                        Some(false),
+                        Some(err.to_string()),
+                    );
+
+                    continue;
+                }
+            };
+
+            // Kiểm tra hóa đơn đã tồn tại hay chưa.
             let exists = invoice_db.invoice_today_exists(
                 &request.tax_code,
                 request.invoice_type,
@@ -155,60 +254,130 @@ impl TaxSyncService {
             )?;
 
             if exists {
+                processed += 1;
+
+                report_download_progress(
+                    observer,
+                    &request.tax_code,
+                    TaskStatus::Running,
+                    processed,
+                    Some(total),
+                    "Hóa đơn đã tồn tại, bỏ qua",
+                    Some(item),
+                    Some(true),
+                    None,
+                );
+
                 continue;
             }
 
-            if cancel.is_cancelled() {
+            if self.cancel.is_cancelled() {
                 summary.cancelled = true;
                 break;
             }
 
-            let result = (|| -> Result<(String, String)> {
+            // Lưu summary vào SQLite.
+            let result = (|| -> Result<()> {
                 let date = invoice_date_vietnam(item)?;
 
-                let is_today = date == today.format("%Y-%m-%d").to_string();
+                let is_today = date == today_string;
 
-                let key = invoice_db.save_invoice_summary(
+                invoice_db.save_invoice_summary(
                     &request.tax_code,
                     request.invoice_type,
                     item,
                     is_today,
                 )?;
 
-                self.update_notify.notify_one();
-
-                Ok((date, key))
+                Ok(())
             })();
 
-            // Giữ nguyên logic xử lý result của bạn tại đây:
-            // cập nhật summary.saved / summary.failed,
-            // ghi log lỗi nếu lưu summary thất bại.
-            //
-            // Nếu result.is_err(), nhớ tăng summary.failed.
-            let _ = result;
+            processed += 1;
+
+            match result {
+                Ok(()) => {
+                    summary.saved += 1;
+
+                    self.update_notify.notify_one();
+
+                    report_download_progress(
+                        observer,
+                        &request.tax_code,
+                        TaskStatus::Running,
+                        processed,
+                        Some(total),
+                        "Đã lưu hóa đơn vào SQLite",
+                        Some(item),
+                        Some(true),
+                        None,
+                    );
+                }
+
+                Err(err) => {
+                    summary.failed += 1;
+
+                    report_download_progress(
+                        observer,
+                        &request.tax_code,
+                        TaskStatus::Running,
+                        processed,
+                        Some(total),
+                        "Lỗi khi lưu hóa đơn vào SQLite",
+                        Some(item),
+                        Some(false),
+                        Some(err.to_string()),
+                    );
+                }
+            }
         }
 
-        // Không hoàn tất ngày nếu đã hủy hoặc có lỗi lưu summary.
-        if summary.cancelled || summary.failed > 0 {
-            observer.on_finished(&summary);
-            return Ok(summary);
-        }
-
-        // Kiểm tra lần cuối trước khi đánh dấu completed.
-        if cancel.is_cancelled() {
+        // Bước 3: Kiểm tra trạng thái sau khi lưu.
+        if summary.cancelled || self.cancel.is_cancelled() {
             summary.cancelled = true;
-            observer.on_finished(&summary);
+
+            report_download_progress(
+                observer,
+                &request.tax_code,
+                TaskStatus::Cancelled,
+                processed,
+                Some(total),
+                "Đã hủy quá trình tải hóa đơn",
+                None,
+                None,
+                None,
+            );
+
             return Ok(summary);
         }
 
-        // Bước 3: Chỉ hoàn thành khi đã lưu đủ danh sách.
+        // Nếu có hóa đơn lưu lỗi thì không đánh dấu ngày hoàn thành.
+        if summary.failed > 0 {
+            report_download_progress(
+                observer,
+                &request.tax_code,
+                TaskStatus::Failed,
+                processed,
+                Some(total),
+                format!(
+                    "Tải hóa đơn hoàn tất nhưng có {} hóa đơn lưu lỗi",
+                    summary.failed
+                ),
+                None,
+                Some(false),
+                None,
+            );
+
+            return Ok(summary);
+        }
+
+        // Bước 4: Đánh dấu các ngày đã tải danh sách hoàn tất.
         for date in &dates {
-            if cancel.is_cancelled() {
+            if self.cancel.is_cancelled() {
                 summary.cancelled = true;
                 break;
             }
 
-            let is_today = date == today.format("%Y-%m-%d").to_string().as_str();
+            let is_today = date == &today_string;
 
             invoice_db.mark_day_list_completed(
                 &request.tax_code,
@@ -216,9 +385,11 @@ impl TaxSyncService {
                 date,
                 &is_today,
             )?;
-            if (is_today) {
+
+            if is_today {
                 continue;
             }
+
             invoice_db.delete_invoices_today_by_date(
                 &request.tax_code,
                 request.invoice_type,
@@ -226,7 +397,37 @@ impl TaxSyncService {
             )?;
         }
 
-        observer.on_finished(&summary);
+        // Bước 5: Phát trạng thái kết thúc.
+        if summary.cancelled || self.cancel.is_cancelled() {
+            summary.cancelled = true;
+
+            report_download_progress(
+                observer,
+                &request.tax_code,
+                TaskStatus::Cancelled,
+                processed,
+                Some(total),
+                "Đã hủy quá trình tải hóa đơn",
+                None,
+                None,
+                None,
+            );
+        } else {
+            report_download_progress(
+                observer,
+                &request.tax_code,
+                TaskStatus::Completed,
+                processed,
+                Some(total),
+                format!(
+                    "Đã tải xong {} hóa đơn, lưu thành công {} hóa đơn",
+                    summary.total, summary.saved
+                ),
+                None,
+                Some(true),
+                None,
+            );
+        }
 
         Ok(summary)
     }
@@ -237,32 +438,89 @@ impl TaxSyncService {
         tax_code: &str,
         invoice_type: u8,
         token: &str,
-        delay_ms: u64,
         batch_size: u32,
-        cancel: CancellationToken,
+        observer: &dyn SyncObserver,
     ) -> Result<(usize, usize)> {
-        if cancel.is_cancelled() {
+        if self.cancel.is_cancelled() {
             return Ok((0, 0));
         }
+
+        // Bước 1: Lấy danh sách hóa đơn thiếu thông tin.
+        report_detail_progress(
+            observer,
+            tax_code,
+            TaskStatus::Running,
+            0,
+            0,
+            "Đang tìm hóa đơn thiếu thông tin",
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
 
         let invoices =
             invoice_db.get_invoices_pending_detail(tax_code, invoice_type, batch_size)?;
 
-        let mut completed = 0;
-        let mut failed = 0;
+        let total = invoices.len();
+
+        if total == 0 {
+            report_detail_progress(
+                observer,
+                tax_code,
+                TaskStatus::Completed,
+                0,
+                0,
+                "Không có hóa đơn nào cần bổ sung thông tin",
+                None,
+                None,
+                None,
+                Some(true),
+                None,
+            );
+
+            return Ok((0, 0));
+        }
+
+        // Bước 2: Bắt đầu bổ sung thông tin.
+        report_detail_progress(
+            observer,
+            tax_code,
+            TaskStatus::Running,
+            0,
+            total,
+            format!("Tìm thấy {total} hóa đơn cần bổ sung thông tin"),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+
+        let mut completed = 0usize;
+        let mut failed = 0usize;
+        let mut processed = 0usize;
+
         for invoice in invoices {
-            if cancel.is_cancelled() {
+            if self.cancel.is_cancelled() {
                 break;
             }
 
-            tokio::select! {
-                _ = cancel.cancelled() => break,
-                _ = request_delay(delay_ms) => {}
-            }
-
-            if cancel.is_cancelled() {
-                break;
-            }
+            // Thông báo hóa đơn đang được xử lý.
+            report_detail_progress(
+                observer,
+                tax_code,
+                TaskStatus::Running,
+                processed,
+                total,
+                format!("Đang bổ sung thông tin hóa đơn {}", invoice.shdon),
+                None,
+                Some(invoice.shdon),
+                Some(invoice.khhdon.clone()),
+                None,
+                None,
+            );
 
             let result = async {
                 let (detail, xml) = self
@@ -274,7 +532,6 @@ impl TaxSyncService {
                         invoice.khmshdon,
                         invoice_type,
                         token,
-                        delay_ms,
                     )
                     .await?;
 
@@ -290,17 +547,31 @@ impl TaxSyncService {
             }
             .await;
 
+            processed += 1;
+
             match result {
                 Ok(()) => {
                     completed += 1;
+
                     self.upload_notify.notify_one();
-                    // println!(
-                    //     "[tax-sync] Detail retry success: tax_code={}, invoice={}",
-                    //     tax_code, invoice.shdon
-                    // );
+
+                    report_detail_progress(
+                        observer,
+                        tax_code,
+                        TaskStatus::Running,
+                        processed,
+                        total,
+                        format!("Đã bổ sung thông tin hóa đơn {}", invoice.shdon),
+                        None,
+                        Some(invoice.shdon),
+                        Some(invoice.khhdon.clone()),
+                        Some(true),
+                        None,
+                    );
                 }
+
                 Err(err) => {
-                    if cancel.is_cancelled() {
+                    if self.cancel.is_cancelled() {
                         break;
                     }
 
@@ -308,7 +579,6 @@ impl TaxSyncService {
 
                     let message = err.to_string();
 
-                    // Chỉ cập nhật trạng thái lỗi, không trả lỗi ra ngoài.
                     if let Err(db_err) = invoice_db.set_detail_failed(
                         tax_code,
                         invoice_type,
@@ -316,12 +586,77 @@ impl TaxSyncService {
                         &message,
                     ) {
                         eprintln!(
-                            "[tax-sync] Cannot mark detail failed: tax_code={}, type={}, key={}, error={}",
-                            tax_code, invoice_type, invoice.invoice_key, db_err
-                        );
+                        "[tax-sync] Cannot mark detail failed: tax_code={}, type={}, key={}, error={}",
+                        tax_code, invoice_type, invoice.invoice_key, db_err
+                    );
                     }
+
+                    report_detail_progress(
+                        observer,
+                        tax_code,
+                        TaskStatus::Running,
+                        processed,
+                        total,
+                        format!("Bổ sung thông tin hóa đơn {} thất bại", invoice.shdon),
+                        None,
+                        Some(invoice.shdon),
+                        Some(invoice.khhdon.clone()),
+                        Some(false),
+                        Some(message),
+                    );
                 }
             }
+        }
+
+        // Bước 3: Kết thúc.
+        if self.cancel.is_cancelled() {
+            report_detail_progress(
+                observer,
+                tax_code,
+                TaskStatus::Cancelled,
+                processed,
+                total,
+                format!(
+                    "Đã hủy bổ sung thông tin: thành công {}, thất bại {}",
+                    completed, failed
+                ),
+                None,
+                None,
+                None,
+                None,
+                None,
+            );
+        } else if failed > 0 {
+            report_detail_progress(
+                observer,
+                tax_code,
+                TaskStatus::Failed,
+                processed,
+                total,
+                format!(
+                    "Bổ sung thông tin hoàn tất nhưng có {} hóa đơn thất bại",
+                    failed
+                ),
+                None,
+                None,
+                None,
+                Some(false),
+                None,
+            );
+        } else {
+            report_detail_progress(
+                observer,
+                tax_code,
+                TaskStatus::Completed,
+                processed,
+                total,
+                format!("Đã bổ sung thông tin thành công {} hóa đơn", completed),
+                None,
+                None,
+                None,
+                Some(true),
+                None,
+            );
         }
 
         Ok((completed, failed))
@@ -352,4 +687,60 @@ fn dates_between(from: &str, to: &str) -> Result<Vec<String>> {
     }
 
     Ok(dates)
+}
+
+fn report_download_progress(
+    observer: &dyn SyncObserver,
+    tax_code: &str,
+    status: TaskStatus,
+    completed: usize,
+    total: Option<usize>,
+    message: impl Into<String>,
+    invoice: Option<&Value>,
+    success: Option<bool>,
+    error: Option<String>,
+) {
+    observer.on_progress(TaskProgress {
+        tax_code: tax_code.to_string(),
+        task: InvoiceTask::Download,
+        status,
+        completed,
+        total,
+        message: message.into(),
+        invoice_date: None,
+        invoice_number: None,
+        invoice_serial: None,
+        success,
+        error,
+        current_invoice: invoice.cloned(),
+    });
+}
+
+fn report_detail_progress(
+    observer: &dyn SyncObserver,
+    tax_code: &str,
+    status: TaskStatus,
+    completed: usize,
+    total: usize,
+    message: impl Into<String>,
+    invoice_date: Option<String>,
+    invoice_number: Option<i64>,
+    invoice_serial: Option<String>,
+    success: Option<bool>,
+    error: Option<String>,
+) {
+    observer.on_progress(TaskProgress {
+        tax_code: tax_code.to_string(),
+        task: InvoiceTask::CompleteDetails,
+        status,
+        completed,
+        total: Some(total),
+        message: message.into(),
+        invoice_date,
+        invoice_number,
+        invoice_serial,
+        success,
+        error,
+        current_invoice: None,
+    });
 }

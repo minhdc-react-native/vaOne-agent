@@ -22,7 +22,7 @@ import AppWindow from "../components/AppWindow";
 import { ComboPopup } from "../components/Select/ComboPopup";
 import { DateInput } from "../components/Date/DateInput";
 import { formatNumber, getCurrentMonthDateRange } from "../lib/utils";
-import { Cable, ChevronLeft, ChevronRight, Clock, CloudSync, List, Loader, RefreshCcw, Search, Unplug } from "lucide-react";
+import { Cable, ChevronLeft, ChevronRight, Clock, CloudSync, List, Loader, MonitorDown, RefreshCcw, RotateCw, Search, Unplug } from "lucide-react";
 import Button from "../components/Button";
 import { formatDate } from "../api/services/tct.service";
 import { dialog } from "../service/dialog.service";
@@ -110,8 +110,8 @@ const initialSync: ISyncConfig = {
     taxCode: "",
     fromDate: dateMonth.toDate,
     toDate: dateMonth.toDate,
-    taxSync: false,
-    appSync: true,
+    taxSync: true,
+    appSync: false,
 };
 
 function StatCard({
@@ -124,9 +124,9 @@ function StatCard({
     classNumber?: string;
 }) {
     return (
-        <div className="w-full rounded-xl border border-gray-200 bg-white p-2">
+        <div className="w-full rounded-xl border border-gray-200 bg-white py-1 px-2">
             <div className="truncate text-sm text-gray-500">{label}</div>
-            <div className={clsx("mt-1 text-xl font-semibold tabular-nums text-right", classNumber)}>
+            <div className={clsx("mt-1 text-lg font-semibold tabular-nums text-right", classNumber)}>
                 {value.toLocaleString("vi-VN")}
             </div>
         </div>
@@ -329,7 +329,7 @@ export function TaxInvoiceManager() {
             });
             return;
         };
-        if (!syncConfig.taxSync && !syncConfig.appSync) {
+        if (!syncConfig.taxSync && (!account?.auto_sync || !syncConfig.appSync)) {
             showNotification({
                 type: "warning",
                 message: "Bạn phải chọn ít nhất 1 chức năng!"
@@ -348,7 +348,7 @@ export function TaxInvoiceManager() {
                         1. Quét lại dữ liệu từ <span className="font-bold text-red-700">cơ quan thuế</span> những dữ liệu còn thiếu và cập nhật thông tin mới nhất.
                     </i>}
 
-                    {syncConfig.appSync && <i className="block">
+                    {account?.auto_sync && syncConfig.appSync && <i className="block">
                         {syncConfig.taxSync ? '2.' : '1.'} Đồng bộ lại sang ứng <span className="font-bold text-red-700">{account?.type_app}</span> tất cả hóa đơn trong khoảng thời gian này.
                     </i>}
                 </div>
@@ -386,7 +386,7 @@ export function TaxInvoiceManager() {
     }, [fullScreen]);
 
     const onClose = useCallback(() => {
-        // navigate(`/tax-config/${taxCodeSelect}`);
+        navigate(`/tax-config/${taxCodeSelect}`);
     }, [taxCodeSelect])
 
     const handleSelect = useCallback((account: ITaxAccount) => {
@@ -438,7 +438,7 @@ export function TaxInvoiceManager() {
                     <Button
                         variant="ghost"
                         className="h-6"
-                        icon={<RefreshCcw size={18} />}
+                        icon={<RefreshCcw size={18} className="text-gray-500" />}
                         onClick={() => onRefreshAll()}
                         disabled={statsLoading || invoicesLoading}
                     >
@@ -451,17 +451,17 @@ export function TaxInvoiceManager() {
             <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 text-sm text-gray-800 p-2 bg-gray-100">
                 <div className="flex gap-1">
                     <div className="flex flex-col gap-1 w-70 shrink-0">
-                        <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2">
-                            <Clock className="h-10 w-10 shrink-0 text-gray-500" />
-                            <div className="space-y-1">
-                                <div className="flex gap-1 justify-between text-gray-500">
+                        <div className="flex gap-1 h-14 rounded-xl border border-gray-200 bg-white px-3 py-2">
+                            <Clock className="h-10 w-10 shrink-0 text-gray-400" />
+                            <div className="flex-1 space-y-1 text-xs">
+                                <div className="text-sm flex gap-1 justify-between text-gray-500">
                                     <span>Ngày bắt đầu: </span>
-                                    <span>{formatDate(account?.start_date)}</span>
+                                    <span className="text-gray-800">{formatDate(account?.start_date)}</span>
                                 </div>
                                 <Line />
                                 <div className="w-full flex gap-1 justify-between">
                                     <Cable size={15} className="text-red-700" />
-                                    <span className="text-sm font-bold text-gray-800">
+                                    <span className="font-bold text-gray-800">
                                         {account?.updated_at
                                             ? formatDate(account.updated_at, true)
                                             : "Chưa đồng bộ"}
@@ -658,58 +658,62 @@ export function TaxInvoiceManager() {
                                     </div>
                                 </Tabs.Panel>
                                 <Tabs.Panel index={1} className="border border-gray-300 rounded-md">
-                                    <div className="flex-1 bg-white p-3 space-y-2 h-28 w-100">
-                                        <div className="flex gap-1 flex-1">
-                                            <div className="flex-1 w-50">
-                                                <DateInput
-                                                    label="Từ ngày"
-                                                    labelPosition="left"
-                                                    required
-                                                    value={filters.from_date ?? ""}
-                                                    onChange={(value) =>
-                                                        updateFilter(
-                                                            "from_date",
-                                                            value || undefined,
-                                                        )
-                                                    }
-                                                />
+                                    <div className="flex gap-2 h-full">
+                                        <div className="flex-1 bg-white p-3 space-y-2 h-28 w-100">
+                                            <div className="flex gap-1 flex-1">
+                                                <div className="flex-1 w-50">
+                                                    <DateInput
+                                                        label="Từ ngày"
+                                                        labelPosition="left"
+                                                        required
+                                                        value={filters.from_date ?? ""}
+                                                        onChange={(value) =>
+                                                            updateFilter(
+                                                                "from_date",
+                                                                value || undefined,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                                <div className="w-50">
+                                                    <DateInput
+                                                        label="Đến ngày"
+                                                        labelPosition="left"
+                                                        required
+                                                        value={filters.to_date ?? ""}
+                                                        onChange={(value) =>
+                                                            updateFilter(
+                                                                "to_date",
+                                                                value || undefined,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                                <div className="flex-1" />
                                             </div>
-                                            <div className="w-50">
-                                                <DateInput
-                                                    label="Đến ngày"
-                                                    labelPosition="left"
-                                                    required
-                                                    value={filters.to_date ?? ""}
-                                                    onChange={(value) =>
-                                                        updateFilter(
-                                                            "to_date",
-                                                            value || undefined,
-                                                        )
-                                                    }
-                                                />
+                                            <div className="flex gap-4 items-center">
+                                                <div className="flex flex-col gap-2">
+                                                    <Switch
+                                                        label="Lấy lại từ cơ quan thuế"
+                                                        // description="Cho phép worker xử lý tài khoản này"
+                                                        checked={syncConfig.taxSync}
+                                                        onChange={(value) =>
+                                                            updateSyncConfig("taxSync", value)
+                                                        }
+                                                    />
+                                                    {account?.auto_sync && <Switch
+                                                        label="Đồng bộ lại sang ứng dụng"
+                                                        // description="Cho phép worker xử lý tài khoản này"
+                                                        checked={syncConfig.appSync}
+                                                        onChange={(value) =>
+                                                            updateSyncConfig("appSync", value)
+                                                        }
+                                                    />}
+                                                </div>
                                             </div>
-                                            <div className="flex-1" />
                                         </div>
-                                        <div className="flex gap-4 items-center">
-                                            <div className="flex flex-col gap-2">
-                                                <Switch
-                                                    label="Lấy lại từ cơ quan thuế"
-                                                    // description="Cho phép worker xử lý tài khoản này"
-                                                    checked={syncConfig.taxSync}
-                                                    onChange={(value) =>
-                                                        updateSyncConfig("taxSync", value)
-                                                    }
-                                                />
-                                                <Switch
-                                                    label="Đồng bộ lại sang ứng dụng"
-                                                    // description="Cho phép worker xử lý tài khoản này"
-                                                    checked={syncConfig.appSync}
-                                                    onChange={(value) =>
-                                                        updateSyncConfig("appSync", value)
-                                                    }
-                                                />
-                                            </div>
-                                            <Button onClick={handleReset} icon={isPending ? <Loader className="animate-spin" /> : <CloudSync />} variant="danger">
+                                        <div className="h-full p-4">
+                                            <Button className="h-full" onClick={handleReset} icon={isPending ? <Loader className="animate-spin" /> : <MonitorDown className="text-gray-500" />} variant="ghost">
                                                 Đồng bộ lại
                                             </Button>
                                         </div>

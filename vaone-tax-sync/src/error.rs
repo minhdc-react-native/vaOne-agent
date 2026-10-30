@@ -5,6 +5,12 @@ pub enum TaxSyncError {
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
 
+    #[error("HTTP 429: Too many requests for tax code {tax_code}. Retry after {retry_after_secs} seconds")]
+    RateLimited {
+        tax_code: String,
+        retry_after_secs: u64,
+    },
+
     #[error("JSON processing failed: {0}")]
     Json(#[from] serde_json::Error),
 
@@ -40,6 +46,12 @@ pub enum TaxSyncError {
 
     #[error("Date range is invalid: {0}")]
     InvalidDateRange(String),
+}
+
+impl TaxSyncError {
+    pub fn is_rate_limited(&self) -> bool {
+        matches!(self, Self::RateLimited { .. })
+    }
 }
 
 pub type Result<T> = std::result::Result<T, TaxSyncError>;

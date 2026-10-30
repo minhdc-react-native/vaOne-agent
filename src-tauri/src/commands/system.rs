@@ -1,5 +1,6 @@
 use crate::models::system::AgentInfo;
 use crate::models::system::Login;
+use crate::services::progress_store::ProgressStore;
 use crate::state::APP_HANDLE;
 use crate::state::APP_STATE;
 use crate::state::CURRENT_ROUTE;
@@ -11,11 +12,12 @@ use serde::Serialize;
 use serde_json::Value;
 use std::sync::Mutex;
 use tauri::webview::PageLoadEvent;
-use tauri::AppHandle;
 use tauri::WebviewUrl;
 use tauri::WebviewWindow;
 use tauri::WebviewWindowBuilder;
+use tauri::{AppHandle, Emitter, State};
 use tauri::{LogicalPosition, LogicalSize, Manager, Position, Size};
+use vaone_tax_sync::models::TaskProgress;
 
 #[tauri::command]
 pub fn set_current_route(route: String) {
@@ -155,9 +157,22 @@ pub fn captcha_predict(svg: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn open_history_invoice_window(app: AppHandle, tax_code: String) -> Result<(), String> {
-    let label = format!("history-invoice-{tax_code}");
-    let route = format!("/history-invoice/{tax_code}");
+pub fn sync_current_progress(app: AppHandle, state: State<'_, ProgressStore>) -> Vec<TaskProgress> {
+    let tasks = state.get_running();
+
+    for task in &tasks {
+        if let Err(err) = app.emit("tax-sync-progress", task) {
+            eprintln!("[tax-sync] Emit progress failed: {err}");
+        }
+    }
+
+    tasks
+}
+
+#[tauri::command]
+pub async fn open_progress_task_window(app: AppHandle) -> Result<(), String> {
+    let label = format!("progress_task");
+    let route = format!("/progress-task");
 
     // Nếu cửa sổ đã tồn tại thì hiện lại và focus.
     if let Some(window) = app.get_webview_window(&label) {
@@ -172,11 +187,11 @@ pub async fn open_history_invoice_window(app: AppHandle, tax_code: String) -> Re
     let init_script = format!("window.location.hash = {};", route_js);
 
     WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
-        .title(format!("Lịch sử hóa đơn - {tax_code}"))
-        .inner_size(1050.0, 800.0)
+        .title(format!("Tiến trình đồng bộ"))
+        .inner_size(400.0, 430.0)
         .resizable(true)
         .decorations(false)
-        // .always_on_top(true)
+        .always_on_top(true)
         .center()
         .visible(false)
         .initialization_script(&init_script)

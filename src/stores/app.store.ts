@@ -35,6 +35,8 @@ interface IAppState {
 
     syncProgress: ISyncProgress | null;
     setSyncProgress: (payload: Record<string, any>) => void;
+    openOverlay: boolean;
+    setOpenOverlay: (openOverlay: boolean) => void;
 }
 export const useAppStore = create<IAppState>()(
     persist(
@@ -65,7 +67,9 @@ export const useAppStore = create<IAppState>()(
                     ...(state.syncProgress || {}),
                     ...payload
                 } : null,
-            }))
+            })),
+            openOverlay: false,
+            setOpenOverlay: (openOverlay) => set({ openOverlay })
         }),
         {
             name: "app-storage",

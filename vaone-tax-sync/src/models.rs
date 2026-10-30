@@ -1,9 +1,64 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InvoiceTask {
+    Download,
+    CompleteDetails,
+    Upload,
+}
+
+impl InvoiceTask {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Download => "Tải hóa đơn",
+            Self::CompleteDetails => "Bổ sung thông tin",
+            Self::Upload => "Đẩy dữ liệu lên ứng dụng",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskStatus {
+    Running,
+    Completed,
+    Failed,
+    Cancelled,
+    CompletedWithErrors,
+}
+
 pub struct Captcha {
     pub ckey: String,
     pub cvalue: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskProgress {
+    pub tax_code: String,
+    pub task: InvoiceTask,
+    pub status: TaskStatus,
+    pub completed: usize,
+    pub total: Option<usize>,
+    pub message: String,
+    pub invoice_date: Option<String>,
+    pub invoice_number: Option<i64>,
+    pub invoice_serial: Option<String>,
+    pub success: Option<bool>,
+    pub error: Option<String>,
+    pub current_invoice: Option<Value>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FetchAllProgress {
+    pub completed_months: usize,
+    pub total_months: usize,
+    pub total_invoices: usize,
+    pub current_from: String,
+    pub current_to: String,
+    pub page: usize,
+    pub message: String,
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +90,7 @@ pub struct SyncSummary {
     pub completed: usize,
     pub success: usize,
     pub failed: usize,
+    pub saved: usize,
     pub cancelled: bool,
 }
 

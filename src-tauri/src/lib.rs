@@ -8,6 +8,7 @@ mod utils;
 mod window_config;
 use crate::api::http::wait;
 use crate::models::system::AppState;
+use crate::services::progress_store::ProgressStore;
 use crate::services::tct::tax_sync_adapter::{ConsoleSyncObserver, LocalCaptchaSolver};
 use crate::services::update::check_update_on_startup;
 use crate::services::worker_manage::TaxSyncWorkerManager;
@@ -181,6 +182,8 @@ pub fn run() {
 
             app.manage(worker_manager);
 
+            app.manage(ProgressStore::default());
+
             Ok(())
         })
         // HANDLE MENU CLICK
@@ -225,7 +228,8 @@ pub fn run() {
             commands::invoice::start_m_invoice_sync,
             commands::system::captcha_train,
             commands::system::captcha_predict,
-            commands::system::open_history_invoice_window,
+            commands::system::open_progress_task_window,
+            commands::system::sync_current_progress,
             commands::tax_accounts::get_tax_accounts,
             commands::tax_accounts::create_tax_account,
             commands::tax_accounts::update_tax_account,

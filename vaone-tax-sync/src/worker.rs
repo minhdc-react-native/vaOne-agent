@@ -1,9 +1,9 @@
 use crate::auth::VaOnlineOrgUnit;
 use crate::db::invoice_database::InvoiceDatabase;
-use crate::models::InvoiceUpload;
+use crate::global_request_queue::GlobalRequestQueue;
+use crate::models::{InvoiceTask, InvoiceUpload, TaskProgress, TaskStatus};
 use crate::{
     auth::{get_current_year, ApplicationLoginResponse, TaxAuthService, TypeApp},
-    client::request_delay,
     database::Database,
     error::TaxSyncError,
     models::{SyncRequest, TaxAccount},
@@ -121,6 +121,7 @@ pub struct TaxSyncWorker {
     config: TaxSyncWorkerConfig,
     upload_notify: Arc<Notify>,
     update_notify: Arc<Notify>,
+    request_queue: Arc<GlobalRequestQueue>,
 }
 
 impl TaxSyncWorker {
@@ -150,6 +151,7 @@ impl TaxSyncWorker {
             config,
             upload_notify: Arc::new(Notify::new()),
             update_notify: Arc::new(Notify::new()),
+            request_queue: GlobalRequestQueue::new(Duration::from_millis(DEFAULT_DELAY_MS)),
         })
     }
 
@@ -398,6 +400,14 @@ impl TaxSyncWorker {
                 .await
             {
                 eprintln!("[tax-sync] Account {} failed: {error:#}", account.tax_code);
+
+                if is_rate_limited(&error) {
+                    eprintln!(
+                        "[tax-sync] Account {} bị HTTP 429, bỏ qua và chuyển sang tài khoản tiếp theo",
+                        account.tax_code
+                    );
+                    continue;
+                }
             }
         }
 
@@ -420,18 +430,20 @@ impl TaxSyncWorker {
             let invoice_db =
                 InvoiceDatabase::open_existing(&self.invoice_db_dir, &account.tax_code)?;
 
+            // Mọi thao tác hóa đơn của tài khoản này dùng invoice_db.
             if let Err(error) = self
                 .process_account_update(&account, &invoice_db, cancel.clone())
                 .await
             {
-                if cancel.is_cancelled() {
-                    return Ok(false);
-                }
+                eprintln!("[tax-sync] Account {} failed: {error:#}", account.tax_code);
 
-                eprintln!(
-                    "[tax-sync] Account {} update failed: {error:#}",
-                    account.tax_code
-                );
+                if is_rate_limited(&error) {
+                    eprintln!(
+                        "[tax-sync] Account {} bị HTTP 429, bỏ qua và chuyển sang tài khoản tiếp theo",
+                        account.tax_code
+                    );
+                    continue;
+                }
             }
 
             if cancel.is_cancelled() {
@@ -475,10 +487,12 @@ impl TaxSyncWorker {
         }
 
         let service = TaxSyncService::new(
-            self.db.clone(),
+            account.tax_code.clone(),
             self.upload_notify.clone(),
             self.update_notify.clone(),
             self.captcha_solver.clone(),
+            self.request_queue.clone(),
+            cancel.clone(),
         )?;
 
         for invoice_type in &invoice_types {
@@ -492,9 +506,8 @@ impl TaxSyncWorker {
                     &account.tax_code,
                     *invoice_type,
                     &token,
-                    self.config.delay_ms,
-                    BATCH_SIZE, // Số hóa đơn mỗi batch
-                    cancel.clone(),
+                    BATCH_SIZE, // Số hóa đơn mỗi batch,
+                    self.observer.as_ref(),
                 )
                 .await?;
 
@@ -554,21 +567,10 @@ impl TaxSyncWorker {
             let dates = invoice_db.get_incomplete_days(&account.tax_code, *invoice_type)?;
 
             for date in dates {
-                if cancel.is_cancelled() {
-                    break;
-                }
-
                 eprintln!(
                     "[tax-sync] tax_code={}, type={}, date={}",
                     account.tax_code, invoice_type, date
                 );
-
-                // Cho phép dừng ngay cả khi đang chờ delay.
-                tokio::select! {
-                    _ = cancel.cancelled() => break,
-                    _ = request_delay(self.config.delay_ms) => {}
-                }
-
                 if cancel.is_cancelled() {
                     break;
                 }
@@ -588,6 +590,12 @@ impl TaxSyncWorker {
                         "[tax-sync] tax_code={}, type={}, date={}: {error:#}",
                         account.tax_code, invoice_type, date
                     );
+
+                    // Nếu gặp 429 thì dừng toàn bộ account hiện tại.
+                    // Không tiếp tục quét các ngày và loại hóa đơn khác.
+                    if is_rate_limited(&error) {
+                        return Err(error);
+                    }
                 }
 
                 // Nếu vừa hoàn thành một ngày mà nhận tín hiệu dừng,
@@ -849,10 +857,12 @@ impl TaxSyncWorker {
         }
 
         let service = TaxSyncService::new(
-            self.db.clone(),
+            account.tax_code.clone(),
             self.upload_notify.clone(),
             self.update_notify.clone(),
             self.captcha_solver.clone(),
+            self.request_queue.clone(),
+            cancel.clone(),
         )?;
 
         let request = SyncRequest {
@@ -868,10 +878,21 @@ impl TaxSyncWorker {
         }
         invoice_db.set_day_running(&account.tax_code, invoice_type, date)?;
 
-        service
-            .run(&invoice_db, request, self.observer.as_ref(), cancel.clone())
-            .await
-            .map_err(|error| anyhow!(error.to_string()))?;
+        let result = service
+            .run(&invoice_db, request, self.observer.as_ref())
+            .await;
+
+        if let Err(error) = result {
+            if is_rate_limited(&error) {
+                // Giữ ngày ở trạng thái pending để lần sau tiếp tục.
+                invoice_db.set_day_pending(&account.tax_code, invoice_type, date)?;
+
+                // Trả nguyên lỗi, không chuyển thành String.
+                return Err(error);
+            }
+
+            return Err(error);
+        }
 
         if cancel.is_cancelled() {
             // Không đánh dấu completed nếu quá trình bị dừng.
@@ -892,22 +913,74 @@ impl TaxSyncWorker {
         type_app: &TypeApp,
         cancel: CancellationToken,
     ) -> Result<Value> {
+        const BATCH_SIZE: usize = 20;
+
+        let total = invoices.len();
+
         if cancel.is_cancelled() {
             return Ok(Value::Array(Vec::new()));
         }
 
-        // let invoices = self.db.get_invoices_pending_upload(tax_code)?;
+        if total == 0 {
+            report_upload_progress(
+                self.observer.as_ref(),
+                tax_code,
+                TaskStatus::Completed,
+                0,
+                0,
+                "Không có hóa đơn cần upload",
+                Some(true),
+                None,
+            );
+
+            return Ok(Value::Array(Vec::new()));
+        }
 
         let mut results = Vec::new();
-        const BATCH_SIZE: usize = 20;
 
-        for batch in invoices.chunks(BATCH_SIZE) {
+        let mut processed = 0usize;
+        let mut uploaded = 0usize;
+        let mut failed = 0usize;
+
+        let total_batches = total.div_ceil(BATCH_SIZE);
+
+        // Thông báo bắt đầu upload.
+        report_upload_progress(
+            self.observer.as_ref(),
+            tax_code,
+            TaskStatus::Running,
+            0,
+            total,
+            format!("Có {total} hóa đơn cần upload"),
+            None,
+            None,
+        );
+
+        for (batch_index, batch) in invoices.chunks(BATCH_SIZE).enumerate() {
             // Không bắt đầu batch mới khi đã nhận yêu cầu dừng.
             if cancel.is_cancelled() {
                 break;
             }
 
-            // Bổ sung outOrIn và xml vào từng hóa đơn.
+            let batch_number = batch_index + 1;
+
+            report_upload_progress(
+                self.observer.as_ref(),
+                tax_code,
+                TaskStatus::Running,
+                processed,
+                total,
+                format!(
+                    "Đang upload batch {}/{} ({} hóa đơn)",
+                    batch_number,
+                    total_batches,
+                    batch.len()
+                ),
+                None,
+                None,
+            );
+
+            // Bổ sung outOrIn và XML vào từng hóa đơn.
             let datas: Vec<Value> = batch
                 .iter()
                 .map(|item| {
@@ -938,30 +1011,71 @@ impl TaxSyncWorker {
                 "data": datas
             });
 
-            // Không select! để hủy ngang request upload.
-            // Chờ kết quả để biết có cần cập nhật trạng thái DB hay không.
+            // Chờ kết quả request để xác định trạng thái DB.
             match self.auth.post_data(&payload, token, type_app).await {
                 Ok(result) => {
+                    let mut batch_success = 0usize;
+                    let mut batch_failed = 0usize;
+
                     for invoice in batch {
-                        if let Err(err) = invoice_db.set_upload_completed(
+                        match invoice_db.set_upload_completed(
                             tax_code,
                             invoice.invoice_type,
                             &invoice.invoice_key,
                         ) {
-                            eprintln!(
-                                "[tax-sync] Mark upload completed failed: key={}, error={}",
-                                invoice.invoice_key, err
-                            );
+                            Ok(()) => batch_success += 1,
+
+                            Err(err) => {
+                                batch_failed += 1;
+
+                                eprintln!(
+                                    "[tax-sync] Mark upload completed failed: key={}, error={}",
+                                    invoice.invoice_key, err
+                                );
+                            }
                         }
                     }
 
-                    println!("[tax-sync] Upload thành công: count={}", batch.len());
+                    uploaded += batch_success;
+                    failed += batch_failed;
+
+                    processed += batch.len();
+
+                    println!(
+                        "[tax-sync] Upload thành công: count={}, db_success={}, db_failed={}",
+                        batch.len(),
+                        batch_success,
+                        batch_failed
+                    );
 
                     results.push(result);
+
+                    report_upload_progress(
+                        self.observer.as_ref(),
+                        tax_code,
+                        TaskStatus::Running,
+                        processed,
+                        total,
+                        format!(
+                            "Đã upload batch {}/{}: {} hóa đơn thành công",
+                            batch_number, total_batches, batch_success
+                        ),
+                        Some(batch_failed == 0),
+                        if batch_failed > 0 {
+                            Some(format!(
+                                "{} hóa đơn không cập nhật được trạng thái SQLite",
+                                batch_failed
+                            ))
+                        } else {
+                            None
+                        },
+                    );
                 }
 
                 Err(err) => {
                     let message = err.to_string();
+
+                    let mut batch_failed = 0usize;
 
                     for invoice in batch {
                         if let Err(db_err) = invoice_db.set_upload_failed(
@@ -975,12 +1089,28 @@ impl TaxSyncWorker {
                                 invoice.invoice_key, db_err
                             );
                         }
+
+                        batch_failed += 1;
                     }
+
+                    failed += batch_failed;
+                    processed += batch.len();
 
                     eprintln!(
                         "[tax-sync] Upload thất bại: count={}, error={}",
                         batch.len(),
                         message
+                    );
+
+                    report_upload_progress(
+                        self.observer.as_ref(),
+                        tax_code,
+                        TaskStatus::Running,
+                        processed,
+                        total,
+                        format!("Upload batch {}/{} thất bại", batch_number, total_batches),
+                        Some(false),
+                        Some(message),
                     );
                 }
             }
@@ -990,11 +1120,53 @@ impl TaxSyncWorker {
                 break;
             }
 
-            // Có thể dừng ngay trong thời gian chờ delay.
+            // Delay giữa các batch.
             tokio::select! {
                 _ = cancel.cancelled() => break,
-                _ = request_delay(self.config.delay_ms) => {}
+                _ = sleep(Duration::from_millis(self.config.delay_ms)) => {}
             }
+        }
+
+        // Kết thúc upload.
+        if cancel.is_cancelled() {
+            report_upload_progress(
+                self.observer.as_ref(),
+                tax_code,
+                TaskStatus::Cancelled,
+                processed,
+                total,
+                format!(
+                    "Đã hủy upload: thành công {}, thất bại {}",
+                    uploaded, failed
+                ),
+                None,
+                None,
+            );
+        } else if failed > 0 {
+            report_upload_progress(
+                self.observer.as_ref(),
+                tax_code,
+                TaskStatus::CompletedWithErrors,
+                processed,
+                total,
+                format!(
+                    "Upload hoàn tất: thành công {}, thất bại {}",
+                    uploaded, failed
+                ),
+                Some(false),
+                None,
+            );
+        } else {
+            report_upload_progress(
+                self.observer.as_ref(),
+                tax_code,
+                TaskStatus::Completed,
+                processed,
+                total,
+                format!("Upload thành công {} hóa đơn", uploaded),
+                Some(true),
+                None,
+            );
         }
 
         Ok(Value::Array(results))
@@ -1010,4 +1182,36 @@ fn token_is_valid(expires_at: &str) -> bool {
     let safety_margin = ChronoDuration::minutes(5);
 
     Utc::now() + safety_margin < expiry.with_timezone(&Utc)
+}
+
+fn report_upload_progress(
+    observer: &dyn SyncObserver,
+    tax_code: &str,
+    status: TaskStatus,
+    completed: usize,
+    total: usize,
+    message: impl Into<String>,
+    success: Option<bool>,
+    error: Option<String>,
+) {
+    observer.on_progress(TaskProgress {
+        tax_code: tax_code.to_string(),
+        task: InvoiceTask::Upload,
+        status,
+        completed,
+        total: Some(total),
+        message: message.into(),
+        invoice_date: None,
+        invoice_number: None,
+        invoice_serial: None,
+        success,
+        error,
+        current_invoice: None,
+    });
+}
+
+fn is_rate_limited(error: &anyhow::Error) -> bool {
+    error
+        .downcast_ref::<TaxSyncError>()
+        .is_some_and(|e| e.is_rate_limited())
 }

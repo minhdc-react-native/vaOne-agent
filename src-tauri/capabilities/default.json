@@ -5,7 +5,7 @@
   "windows": [
     "main",
     "splash_screen",
-    "history-invoice-*"
+    "progress_task"
   ],
   "permissions": [
     "core:default",

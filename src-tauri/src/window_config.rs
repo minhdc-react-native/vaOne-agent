@@ -13,6 +13,7 @@ pub fn get_window_size(id: &str) -> Option<(f64, f64)> {
         "quit" => Some((350.0, 180.0)),
         "taxConfig" => Some((900.0, 720.0)),
         "historyInvoice" => Some((1050.0, 800.0)),
+        "progressTask" => Some((400.0, 430.0)),
         _ => None,
     }
 }

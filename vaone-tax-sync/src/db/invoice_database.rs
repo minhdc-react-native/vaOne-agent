@@ -1290,26 +1290,14 @@ impl InvoiceDatabase {
 
         if tax_sync {
             tx.execute(
-                "DELETE FROM sync_invoices_today
-                 WHERE tax_code = ?1 AND invoice_date >= ?2 AND invoice_date <= ?3",
-                params![tax_code, from_date, to_date],
-            )
-            .map_err(db_error)?;
-
-            tx.execute(
-                "DELETE FROM sync_invoices
-                 WHERE tax_code = ?1 AND invoice_date >= ?2 AND invoice_date <= ?3",
-                params![tax_code, from_date, to_date],
-            )
-            .map_err(db_error)?;
-
-            tx.execute(
-                "DELETE FROM sync_days
+                "UPDATE sync_days SET list_status='pending'
                  WHERE tax_code = ?1 AND sync_date >= ?2 AND sync_date <= ?3",
                 params![tax_code, from_date, to_date],
             )
             .map_err(db_error)?;
-        } else if app_sync {
+        }
+
+        if app_sync {
             tx.execute(
                 "UPDATE sync_invoices
                  SET upload_status = 'pending',

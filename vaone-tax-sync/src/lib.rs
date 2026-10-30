@@ -3,6 +3,7 @@ pub mod client;
 pub mod database;
 pub mod db;
 pub mod error;
+pub mod global_request_queue;
 pub mod invoice;
 pub mod models;
 pub mod secret_store;

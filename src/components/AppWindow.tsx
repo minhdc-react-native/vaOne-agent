@@ -31,6 +31,8 @@ export const hideWindow = async (callBack?: {
         if (!confirmed) return;
     }
 
+    callBack?.onClose?.();
+
     const currentWindow = getCurrentWindow();
 
     if (currentWindow.label === "main") {
@@ -45,7 +47,6 @@ export const hideWindow = async (callBack?: {
         await currentWindow.close();
     }
 
-    callBack?.onClose?.();
 };
 
 export default function AppWindow({
@@ -63,6 +64,9 @@ export default function AppWindow({
     // useEscape(hideWindow, !disableClose, callBack);
 
     useEffect(() => {
+
+        if (location.pathname === "/progress-task") return;
+
         const path = location.pathname.split("/").slice(0, 2).join("/");
         invoke("set_current_route", {
             route: path,
@@ -87,7 +91,7 @@ export default function AppWindow({
                 "
             >
                 {icon && <IconLucide
-                    name={icon}
+                    name={icon} size={18}
                 />}
                 {title && <span
                     data-tauri-drag-region
