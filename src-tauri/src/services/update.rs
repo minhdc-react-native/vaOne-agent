@@ -1,4 +1,4 @@
-use serde_json::json;
+use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_updater::UpdaterExt;
@@ -10,8 +10,6 @@ use crate::state::APP_HANDLE;
 pub fn check_update_on_startup(app: AppHandle, silent: Option<bool>) {
     let silent = silent.unwrap_or(false);
     tauri::async_runtime::spawn(async move {
-        // tokio::time::sleep(Duration::from_secs(3)).await;
-
         let Ok(updater) = app.updater() else {
             return;
         };
@@ -150,4 +148,10 @@ async fn update_and_restart(app: AppHandle, current_version: String) -> anyhow::
     app.restart();
 
     Ok(())
+}
+
+pub fn update_progress(payload: Option<&Value>) {
+    if let Some(app) = APP_HANDLE.get() {
+        let _ = app.emit("sync-progress", payload);
+    }
 }

@@ -1,0 +1,200 @@
+use serde::Deserialize;
+use tauri::State;
+use vaone_tax_sync::{
+    auth::{ApplicationLoginResponse, LoginResponse, TaxAuthService, TypeApp},
+    database::Database,
+    db::invoice_database::InvoiceDatabaseManager,
+    error::TaxSyncError,
+    models::{TaxAccount, TaxAccountInput},
+    secret_store::SecretStore,
+};
+
+use crate::{commands::system::predict_captcha, services::worker_manage::TaxSyncWorkerManager};
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckTaxLoginInput {
+    pub account: TaxAccount,
+
+    // Mật khẩu lấy trực tiếp từ form khi thêm mới.
+    pub tax_password: Option<String>,
+    pub app_password: Option<String>,
+}
+
+#[tauri::command]
+pub fn get_tax_accounts(
+    db: State<'_, Database>,
+) -> Result<Vec<vaone_tax_sync::models::TaxAccount>, String> {
+    db.get_tax_accounts().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_tax_account(
+    input: TaxAccountInput,
+    db: tauri::State<'_, Database>,
+    invoice_manager: tauri::State<'_, InvoiceDatabaseManager>,
+) -> std::result::Result<TaxAccount, String> {
+    let tax_code = input.tax_code.trim().to_string();
+
+    // Tạo database hóa đơn trước.
+    invoice_manager
+        .initialize_tax_code(&tax_code)
+        .map_err(|e| e.to_string())?;
+
+    // Sau đó tạo tài khoản trên database chính.
+    match db.create_tax_account(&input) {
+        Ok(account) => Ok(account),
+        Err(error) => {
+            // Có thể dọn file vừa tạo nếu việc tạo tài khoản thất bại.
+            if let Err(cleanup_error) = invoice_manager.delete_tax_code(&tax_code) {
+                eprintln!("[tax-sync] Không thể dọn database hóa đơn: {cleanup_error}");
+            }
+
+            Err(error.to_string())
+        }
+    }
+}
+
+#[tauri::command]
+pub fn update_tax_account(
+    db: State<'_, Database>,
+    manager: State<'_, TaxSyncWorkerManager>,
+    tax_code: String,
+    input: TaxAccountInput,
+) -> Result<TaxAccount, String> {
+    let should_notify_upload = input.auto_sync;
+
+    let account = db
+        .update_tax_account(&tax_code, &input)
+        .map_err(|e| e.to_string())?;
+
+    if should_notify_upload {
+        manager.notify_upload();
+    }
+
+    Ok(account)
+}
+
+#[tauri::command]
+pub fn update_auto_sync(
+    db: State<'_, Database>,
+    tax_code: String,
+    enabled: bool,
+    auto_sync: bool,
+) -> Result<TaxAccount, String> {
+    db.update_auto_sync(&tax_code, &enabled, &auto_sync)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_tax_account(
+    db: State<'_, Database>,
+    invoice_manager: State<'_, InvoiceDatabaseManager>,
+    tax_code: String,
+) -> Result<(), String> {
+    // 1. Xóa tài khoản trong database chính.
+    db.delete_tax_account(&tax_code)
+        .map_err(|e| e.to_string())?;
+
+    // 2. Xóa database hóa đơn riêng của mã số thuế.
+    invoice_manager.delete_tax_code(&tax_code).map_err(|e| {
+        eprintln!(
+            "[tax-sync] Đã xóa tài khoản {}, nhưng không xóa được database hóa đơn: {}",
+            tax_code, e
+        );
+        e.to_string()
+    })?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn check_tax_application_login(
+    input: CheckTaxLoginInput,
+) -> Result<LoginResponse, String> {
+    let store = SecretStore::new();
+    let auth = TaxAuthService::new().map_err(|e| e.to_string())?;
+    let account = &input.account;
+
+    // 1. Lấy mật khẩu cơ quan thuế:
+    // Ưu tiên mật khẩu nhập trên form, nếu không có thì đọc SecretStore.
+    let tax_password = match input.tax_password {
+        Some(password) if !password.trim().is_empty() => password,
+        _ => store.get_secret(&account.password_key).map_err(|e| {
+            format!("Không lấy được mật khẩu cơ quan thuế. Vui lòng nhập lại mật khẩu: {e}")
+        })?,
+    };
+
+    // 2. Đăng nhập cơ quan thuế, tự nhận diện captcha.
+    let token = auth
+        .login(account, &tax_password, |captcha_content| {
+            let content = captcha_content.to_string();
+
+            async move { predict_captcha(&content).map_err(TaxSyncError::Authentication) }
+        })
+        .await
+        .map_err(|e| format!("Đăng nhập cơ quan thuế thất bại: {e}"))?;
+
+    // 3. Chỉ kiểm tra đăng nhập ứng dụng khi bật auto_sync.
+    if account.auto_sync {
+        // 3. Lấy mật khẩu ứng dụng:
+        // Ưu tiên mật khẩu nhập trên form, nếu không có thì đọc SecretStore.
+        let app_password = match input.app_password {
+            Some(password) if !password.trim().is_empty() => password,
+            _ => {
+                let key = account
+                    .pass_app_key
+                    .as_deref()
+                    .filter(|key| !key.trim().is_empty())
+                    .ok_or_else(|| {
+                        "Chưa có mật khẩu ứng dụng. Vui lòng nhập mật khẩu để kiểm tra.".to_string()
+                    })?;
+
+                store.get_secret(key).map_err(|e| {
+                    format!("Không lấy được mật khẩu ứng dụng. Vui lòng nhập lại mật khẩu: {e}")
+                })?
+            }
+        };
+        let type_app = TypeApp::try_from(account.type_app.as_str()).map_err(|e| e.to_string())?;
+        // 4. Kiểm tra đăng nhập vaOnline hoặc vaOne.
+        auth.check_application_login(account, &app_password, &type_app)
+            .await
+            .map_err(|e| format!("Đăng nhập ứng dụng thất bại: {e}"))?;
+    }
+    Ok(token)
+}
+
+#[tauri::command]
+pub async fn check_app_login(
+    input: CheckTaxLoginInput,
+) -> Result<ApplicationLoginResponse, String> {
+    let store = SecretStore::new();
+    let auth = TaxAuthService::new().map_err(|e| e.to_string())?;
+    let account = &input.account;
+    // 3. Lấy mật khẩu ứng dụng:
+    // Ưu tiên mật khẩu nhập trên form, nếu không có thì đọc SecretStore.
+    let app_password = match input.app_password {
+        Some(password) if !password.trim().is_empty() => password,
+        _ => {
+            let key = account
+                .pass_app_key
+                .as_deref()
+                .filter(|key| !key.trim().is_empty())
+                .ok_or_else(|| {
+                    "Chưa có mật khẩu ứng dụng. Vui lòng nhập mật khẩu để kiểm tra.".to_string()
+                })?;
+
+            store.get_secret(key).map_err(|e| {
+                format!("Không lấy được mật khẩu ứng dụng. Vui lòng nhập lại mật khẩu: {e}")
+            })?
+        }
+    };
+    let type_app = TypeApp::try_from(account.type_app.as_str()).map_err(|e| e.to_string())?;
+    // 4. Kiểm tra đăng nhập vaOnline hoặc vaOne.
+    let result = auth
+        .check_application_login(account, &app_password, &type_app)
+        .await
+        .map_err(|e| format!("Đăng nhập ứng dụng thất bại: {e}"))?;
+
+    Ok(result)
+}

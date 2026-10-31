@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import { cn } from "../lib/utils";
+import clsx from "clsx";
 
 export interface SwitchProps {
     checked: boolean;
@@ -8,6 +9,7 @@ export interface SwitchProps {
     description?: string;
     disabled?: boolean;
     className?: string;
+    labelClass?: string;
 }
 
 const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
@@ -19,6 +21,7 @@ const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
             description,
             disabled = false,
             className,
+            labelClass
         },
         ref
     ) => {
@@ -32,7 +35,7 @@ const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
                 {(label || description) && (
                     <div className="flex flex-1 flex-col">
                         {label && (
-                            <span className="text-sm font-medium">
+                            <span className={clsx("text-sm font-medium", labelClass)}>
                                 {label}
                             </span>
                         )}
@@ -53,10 +56,10 @@ const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
                     disabled={disabled}
                     onClick={() => onChange(!checked)}
                     className={cn(
-                        "relative inline-flex h-4 w-11 shrink-0 rounded-full",
+                        "relative inline-flex h-3 w-7 shrink-0 rounded-full",
                         "transition-colors duration-200",
                         "focus:outline-none focus:ring-2 focus:ring-(--primary) focus:ring-offset-2",
-                        disabled && "cursor-not-allowed opacity-50",
+                        disabled ? "cursor-not-allowed opacity-50" : "hover:cursor-pointer",
                         checked
                             ? "bg-(--primary)"
                             : "bg-gray-300"
@@ -65,9 +68,9 @@ const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
                     <span
                         className={cn(
                             "absolute top-0.5 left-0.5",
-                            "h-3 w-3 rounded-full bg-white shadow",
+                            "h-2 w-2 rounded-full bg-white shadow",
                             "transition-transform duration-200",
-                            checked && "translate-x-7"
+                            checked && "translate-x-4"
                         )}
                     />
                 </button>

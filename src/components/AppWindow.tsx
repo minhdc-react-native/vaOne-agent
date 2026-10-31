@@ -1,24 +1,54 @@
 import { useEffect, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { Maximize, Minimize, X } from "lucide-react";
 import Button from "./Button";
 import { trayApi } from "../api/axios/axiosClient";
 import { useEscape } from "../hook/useEscape";
 import { useLocation } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { IconLucide, IconName } from "./IconLucide";
+import { Tooltip } from "./Tooltip/Tooltip";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 interface AppWindowProps {
     icon?: IconName,
-    title: string;
+    title?: string;
     children: ReactNode;
     content?: ReactNode;
     disableClose?: boolean;
+    callBack?: {
+        beforeClose?: () => Promise<void>;
+        onConfirm?: () => Promise<boolean>;
+        onClose?: () => void;
+    }
+    fullScreen?: boolean;
+    setFullScreen?: (fullScreen: boolean) => void;
 }
-export const hideWindow = async () => {
-    await trayApi.post("/open_tray_page", {
-        route: "/blank",
-        data: {},
-    });
+export const hideWindow = async (callBack?: {
+    beforeClose?: () => Promise<void>;
+    onConfirm?: () => Promise<boolean>;
+    onClose?: () => void;
+}) => {
+    if (callBack?.onConfirm) {
+        const confirmed = await callBack.onConfirm();
+        if (!confirmed) return;
+    }
+    if (callBack?.beforeClose) await callBack.beforeClose();
+
+    const currentWindow = getCurrentWindow();
+
+    if (currentWindow.label === "main") {
+        // Giữ cơ chế cũ cho cửa sổ chính.
+        await trayApi.post("/open_tray_page", {
+            route: "/blank",
+            data: {},
+        });
+    } else {
+        console.log('currentWindow>>', currentWindow);
+        // Đóng đúng cửa sổ hiện tại, không tác động main.
+        await currentWindow.close();
+    }
+
+    callBack?.onClose?.();
 };
 
 export default function AppWindow({
@@ -26,14 +56,29 @@ export default function AppWindow({
     title,
     children,
     content,
-    disableClose = false
+    disableClose = false,
+    callBack,
+    fullScreen,
+    setFullScreen
 }: AppWindowProps) {
     const location = useLocation();
-    useEscape(hideWindow, !disableClose);
+
+    // useEscape(hideWindow, !disableClose, callBack);
 
     useEffect(() => {
+        const pathname = location.pathname;
+
+        if (
+            pathname === "/progress-task" ||
+            pathname.startsWith("/history-invoice")
+        ) {
+            return;
+        }
+
+        const path = pathname.split("/").slice(0, 2).join("/");
+
         invoke("set_current_route", {
-            route: location.pathname,
+            route: path,
         });
     }, [location.pathname]);
 
@@ -55,20 +100,27 @@ export default function AppWindow({
                 "
             >
                 {icon && <IconLucide
-                    name={icon}
+                    name={icon} size={18}
                 />}
-                <span
+                {title && <span
                     data-tauri-drag-region
                     className="cursor-pointer flex-1 text-sm font-semibold text-gray-800"
                 >
                     {title}
-                </span>
+                </span>}
                 {content}
-                {!disableClose && <Button
+                {fullScreen !== undefined && <Tooltip title={fullScreen ? "Thu nhỏ" : "Toàn màn hình"}><Button
+                    onClick={() => setFullScreen?.(!fullScreen)} variant="ghost"
+                    iconOnly icon={fullScreen ? <Minimize size={15} /> : <Maximize size={15} />}
+                /></Tooltip>}
+                {!disableClose && <Tooltip title="Thoát"><Button
                     // disabled={disableClose}
-                    onClick={hideWindow} variant="ghost"
+                    onClick={() => {
+                        if (fullScreen) setFullScreen?.(false);
+                        hideWindow(callBack);
+                    }} variant="ghost"
                     iconOnly icon={<X size={15} />}
-                />}
+                /></Tooltip>}
             </header>
 
             {/* Content */}
