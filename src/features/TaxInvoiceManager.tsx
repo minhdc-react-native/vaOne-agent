@@ -37,6 +37,7 @@ import { TaxAccountItem } from "./TaxAccountItem";
 import { ITaxAccount } from "../service/taxAccountService";
 import { Tooltip } from "../components/Tooltip/Tooltip";
 import { Line } from "../components/Line";
+import { emit } from "@tauri-apps/api/event";
 
 
 const PAGE_SIZE = 100;
@@ -385,9 +386,9 @@ export function TaxInvoiceManager() {
         invoke("page_ready", { name: "historyInvoice", show: true, fullScreen });
     }, [fullScreen]);
 
-    const onClose = useCallback(() => {
-        navigate(`/tax-config/${taxCodeSelect}`);
-    }, [taxCodeSelect])
+    // const onClose = useCallback(() => {
+    //     navigate(`/tax-config/${taxCodeSelect}`);
+    // }, [taxCodeSelect])
 
     const handleSelect = useCallback((account: ITaxAccount) => {
         if (account.tax_code === taxCodeSelect) return;
@@ -401,6 +402,10 @@ export function TaxInvoiceManager() {
         );
     }, [localError]);
     const [tab, setTab] = useState(0);
+
+    const beforeClose = async () => {
+        await emit('modal_closed');
+    }
 
     return (
         <AppWindow
@@ -446,7 +451,7 @@ export function TaxInvoiceManager() {
                     </Button>
                 </div>
             }
-            callBack={{ onClose }}
+            callBack={{ beforeClose }}
         >
             <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 text-sm text-gray-800 p-2 bg-gray-100">
                 <div className="flex gap-1">

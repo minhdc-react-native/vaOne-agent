@@ -170,9 +170,11 @@ pub fn sync_current_progress(app: AppHandle, state: State<'_, ProgressStore>) ->
 }
 
 #[tauri::command]
-pub async fn open_progress_task_window(app: AppHandle) -> Result<(), String> {
-    let label = format!("progress_task");
-    let route = format!("/progress-task");
+pub async fn open_modal_window(app: AppHandle, route: String, name: String) -> Result<(), String> {
+    let label = format!("modal_screen");
+    // let route = format!("/progress-task");
+
+    let (mut width, mut height) = window_config::get_window_size(&name).unwrap();
 
     // Nếu cửa sổ đã tồn tại thì hiện lại và focus.
     if let Some(window) = app.get_webview_window(&label) {
@@ -187,8 +189,8 @@ pub async fn open_progress_task_window(app: AppHandle) -> Result<(), String> {
     let init_script = format!("window.location.hash = {};", route_js);
 
     WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
-        .title(format!("Tiến trình đồng bộ"))
-        .inner_size(400.0, 430.0)
+        .title(format!("Modal screen"))
+        .inner_size(width, height)
         .resizable(true)
         .decorations(false)
         .always_on_top(true)

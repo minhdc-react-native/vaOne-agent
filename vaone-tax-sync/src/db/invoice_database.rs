@@ -415,29 +415,39 @@ impl InvoiceDatabase {
         Ok(())
     }
 
-    pub fn get_incomplete_days(&self, tax_code: &str, invoice_type: u8) -> Result<Vec<String>> {
+    pub fn get_incomplete_days(
+        &self,
+        tax_code: &str,
+        invoice_type: u8,
+        limit: usize,
+    ) -> Result<Vec<String>> {
         self.check_tax_code(tax_code)?;
+
         let conn = self.connect()?;
+
         let mut stmt = conn
             .prepare(
                 "SELECT sync_date FROM sync_days
-                 WHERE tax_code = ?1 AND invoice_type = ?2
-                   AND list_status != 'completed'
-                 ORDER BY sync_date ASC",
+             WHERE tax_code = ?1
+               AND invoice_type = ?2
+               AND list_status != 'completed'
+             ORDER BY sync_date ASC
+             LIMIT ?3",
             )
             .map_err(db_error)?;
 
         let rows = stmt
-            .query_map(params![tax_code, invoice_type], |row| row.get(0))
+            .query_map(params![tax_code, invoice_type, limit], |row| row.get(0))
             .map_err(db_error)?;
 
         let mut dates = Vec::new();
+
         for row in rows {
             dates.push(row.map_err(db_error)?);
         }
+
         Ok(dates)
     }
-
     // ---------------------------------------------------------------------
     // 2. Lưu danh sách hóa đơn
     // ---------------------------------------------------------------------

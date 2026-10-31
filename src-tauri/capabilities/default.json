@@ -5,7 +5,7 @@
   "windows": [
     "main",
     "splash_screen",
-    "progress_task"
+    "modal_screen"
   ],
   "permissions": [
     "core:default",

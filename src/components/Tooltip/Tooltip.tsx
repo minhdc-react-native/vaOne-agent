@@ -234,13 +234,20 @@ export function Tooltip({ children, content, title, subTitle, className, classTo
                             />
                         )}
 
-                        <div className="flex flex-col items-center">
-                            {title && <div>{title}</div>}
+                        <div className="flex flex-col items-center w-full max-w-[320px] mx-auto text-center">
+                            {title && (
+                                <div className="w-full max-w-full wrap-break-word whitespace-normal">
+                                    {title}
+                                </div>
+                            )}
+
                             {subTitle && (
-                                <div className={variant === "dark" ? "text-yellow-100" : "text-yellow-700"}>
+                                <div className={`w-full max-w-full wrap-break-word whitespace-normal ${variant === "dark" ? "text-yellow-100" : "text-yellow-700"
+                                    }`}>
                                     {subTitle}
                                 </div>
                             )}
+
                             {content}
                         </div>
                     </div>

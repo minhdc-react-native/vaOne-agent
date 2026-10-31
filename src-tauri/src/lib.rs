@@ -228,7 +228,7 @@ pub fn run() {
             commands::invoice::start_m_invoice_sync,
             commands::system::captcha_train,
             commands::system::captcha_predict,
-            commands::system::open_progress_task_window,
+            commands::system::open_modal_window,
             commands::system::sync_current_progress,
             commands::tax_accounts::get_tax_accounts,
             commands::tax_accounts::create_tax_account,

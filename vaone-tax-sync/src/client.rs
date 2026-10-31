@@ -1,4 +1,5 @@
 use crate::auth::get_captcha;
+use crate::db::invoice_database::{invoice_key, InvoiceDatabase};
 use crate::error::TaxSyncError;
 use crate::global_request_queue::GlobalRequestQueue;
 use crate::models::FetchAllProgress;
@@ -79,7 +80,7 @@ impl TaxClient {
         };
 
         Ok(format!(
-            "{}?sort=tdlap:desc&size={}&search={}",
+            "{}?sort=shdon:desc&size={}&search={}",
             base,
             PAGE_SIZE,
             url::form_urlencoded::byte_serialize(search.as_bytes()).collect::<String>()
@@ -211,10 +212,12 @@ impl TaxClient {
 
     pub async fn fetch_all<F, Fut, P>(
         &self,
+        tax_code: &str,
         invoice_type: u8,
         from_date: &str,
         to_date: &str,
         token: &str,
+        invoice_db: &InvoiceDatabase,
         solve_captcha: F,
         mut on_progress: P,
     ) -> Result<Vec<Value>>
@@ -375,6 +378,19 @@ impl TaxClient {
 
                 if let Some(items) = response["datas"].as_array() {
                     // eprintln!("invoices: {:?}", items);
+                    if let Some(item) = items.last() {
+                        let invoice_key = invoice_key(item)?;
+
+                        let exists = invoice_db.invoice_today_exists(
+                            tax_code,
+                            invoice_type,
+                            &invoice_key,
+                        )?;
+
+                        if exists {
+                            break;
+                        }
+                    }
                     result.extend(items.iter().cloned());
                 }
 

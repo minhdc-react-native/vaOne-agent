@@ -21,37 +21,46 @@ import ProgressTask from "./pages/ProgressTask";
 
 function App() {
   const navigate = useNavigate();
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    listen("tray-navigate", (event) => {
-      const { route, data } = event.payload as {
-        route: string;
-        data: any;
-      };
-      navigate(route, { state: data });
-    }).then((fn) => {
-      unlisten = fn;
-    });
-    return () => {
-      unlisten?.();
-    };
-  }, [navigate]);
-
+  const setOpenOverlay = useAppStore(store => store.setOpenOverlay);
   const setSyncProgress = useAppStore(store => store.setSyncProgress);
+
   useEffect(() => {
-    const unlisten = listen<{
-      completed: number;
-      total: number;
-      item: any
-    }>("sync-progress", (event) => {
-      console.log(event.payload);
-      setSyncProgress(event.payload);
-    });
+    let unlisteners: (() => void)[] = [];
+
+    const setupListeners = async () => {
+      const listeners = await Promise.all([
+        listen("tray-navigate", (event) => {
+          const { route, data } = event.payload as {
+            route: string;
+            data: any;
+          };
+
+          navigate(route, { state: data });
+        }),
+
+        listen("modal_closed", () => {
+          setOpenOverlay(false);
+        }),
+
+        listen<{
+          completed: number;
+          total: number;
+          item: any;
+        }>("sync-progress", (event) => {
+          console.log(event.payload);
+          setSyncProgress(event.payload);
+        }),
+      ]);
+
+      unlisteners = listeners;
+    };
+
+    setupListeners();
 
     return () => {
-      unlisten.then(fn => fn());
+      unlisteners.forEach(unlisten => unlisten());
     };
-  }, []);
+  }, [navigate, setOpenOverlay, setSyncProgress]);
 
   // useUpdater();
   const autostartInitialized = useAppStore(store => store.autostartInitialized);

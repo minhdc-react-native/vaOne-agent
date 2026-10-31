@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import AppWindow from "../components/AppWindow";
 import { Loader } from "lucide-react";
@@ -28,6 +28,8 @@ export interface TaskProgress {
     completed: number;
     total: number | null;
     message: string;
+
+    invoice_type: number;
 
     invoice_date?: string | null;
     invoice_number?: number | null;
@@ -134,14 +136,12 @@ export default function ProgressTask({
         invoke("page_ready", { name: "progressTask" });
     }, []);
 
-    const setOpenOverlay = useAppStore(appStore => appStore.setOpenOverlay);
-
-    const onClose = () => {
-        setOpenOverlay(false);
+    const beforeClose = async () => {
+        await emit('modal_closed');
     }
 
     return (
-        <AppWindow title={"Theo dõi tiến trình đồng bộ dữ liệu"} icon="Loader" callBack={{ onClose }}>
+        <AppWindow title={"Theo dõi tiến trình đồng bộ dữ liệu"} icon="Loader" callBack={{ beforeClose }}>
             <div className={`space-y-3 w-full m-4 ${className}`}>
                 {tasks.length === 0 && <NoTask />}
                 {tasks.map((task) => <ProgressTaskItem key={`${task.tax_code}:${task.task}`} task={task} />)}

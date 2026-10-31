@@ -42,6 +42,7 @@ pub struct TaskProgress {
     pub completed: usize,
     pub total: Option<usize>,
     pub message: String,
+    pub invoice_type: u8,
     pub invoice_date: Option<String>,
     pub invoice_number: Option<i64>,
     pub invoice_serial: Option<String>,

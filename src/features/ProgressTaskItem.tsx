@@ -6,6 +6,14 @@ const TASK_LABELS: Record<InvoiceTask, string> = {
     upload: "Đẩy dữ liệu lên ứng dụng",
 };
 
+const mapInvoiceType: Record<number, string> = {
+    0: "",
+    1: "Mua vào",
+    2: "Bán ra",
+    3: "Mua vào MTT",
+    4: "Bán ra MTT"
+}
+
 interface IProgressTaskItem {
     task: TaskProgress
 }
@@ -17,7 +25,7 @@ export const ProgressTaskItem = ({ task }: IProgressTaskItem) => {
             <div className="mb-2 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                     <div className="text-sm font-semibold text-gray-800">
-                        {TASK_LABELS[task.task]}
+                        {TASK_LABELS[task.task]} ({mapInvoiceType[task.invoice_type]})
                     </div>
 
                     <div className="text-xs text-gray-500">

@@ -76,6 +76,7 @@ impl TaxSyncService {
         report_download_progress(
             observer,
             &request.tax_code,
+            request.invoice_type,
             TaskStatus::Running,
             0,
             None,
@@ -90,10 +91,12 @@ impl TaxSyncService {
         let invoices = match self
             .client
             .fetch_all(
+                &request.tax_code,
                 request.invoice_type,
                 &request.from_date,
                 &request.to_date,
                 &request.token,
+                invoice_db,
                 move |captcha_content| {
                     let solver = Arc::clone(&solver);
                     let svg = captcha_content.to_string();
@@ -109,6 +112,7 @@ impl TaxSyncService {
                     report_download_progress(
                         observer,
                         &request.tax_code,
+                        request.invoice_type,
                         TaskStatus::Running,
                         progress.completed_months,
                         Some(progress.total_months),
@@ -131,6 +135,7 @@ impl TaxSyncService {
                     report_download_progress(
                         observer,
                         &request.tax_code,
+                        request.invoice_type,
                         TaskStatus::Cancelled,
                         0,
                         None,
@@ -160,6 +165,7 @@ impl TaxSyncService {
                 report_download_progress(
                     observer,
                     &request.tax_code,
+                    request.invoice_type,
                     TaskStatus::Failed,
                     0,
                     None,
@@ -177,6 +183,7 @@ impl TaxSyncService {
             report_download_progress(
                 observer,
                 &request.tax_code,
+                request.invoice_type,
                 TaskStatus::Cancelled,
                 0,
                 Some(invoices.len()),
@@ -203,6 +210,7 @@ impl TaxSyncService {
         report_download_progress(
             observer,
             &request.tax_code,
+            request.invoice_type,
             TaskStatus::Running,
             0,
             Some(total),
@@ -217,7 +225,7 @@ impl TaxSyncService {
 
         let mut processed = 0usize;
 
-        for item in &invoices {
+        for (index, item) in invoices.iter().enumerate() {
             if self.cancel.is_cancelled() {
                 summary.cancelled = true;
                 break;
@@ -233,6 +241,7 @@ impl TaxSyncService {
                     report_download_progress(
                         observer,
                         &request.tax_code,
+                        request.invoice_type,
                         TaskStatus::Running,
                         processed,
                         Some(total),
@@ -259,6 +268,7 @@ impl TaxSyncService {
                 report_download_progress(
                     observer,
                     &request.tax_code,
+                    request.invoice_type,
                     TaskStatus::Running,
                     processed,
                     Some(total),
@@ -303,6 +313,7 @@ impl TaxSyncService {
                     report_download_progress(
                         observer,
                         &request.tax_code,
+                        request.invoice_type,
                         TaskStatus::Running,
                         processed,
                         Some(total),
@@ -319,6 +330,7 @@ impl TaxSyncService {
                     report_download_progress(
                         observer,
                         &request.tax_code,
+                        request.invoice_type,
                         TaskStatus::Running,
                         processed,
                         Some(total),
@@ -338,6 +350,7 @@ impl TaxSyncService {
             report_download_progress(
                 observer,
                 &request.tax_code,
+                request.invoice_type,
                 TaskStatus::Cancelled,
                 processed,
                 Some(total),
@@ -355,6 +368,7 @@ impl TaxSyncService {
             report_download_progress(
                 observer,
                 &request.tax_code,
+                request.invoice_type,
                 TaskStatus::Failed,
                 processed,
                 Some(total),
@@ -404,6 +418,7 @@ impl TaxSyncService {
             report_download_progress(
                 observer,
                 &request.tax_code,
+                request.invoice_type,
                 TaskStatus::Cancelled,
                 processed,
                 Some(total),
@@ -416,6 +431,7 @@ impl TaxSyncService {
             report_download_progress(
                 observer,
                 &request.tax_code,
+                request.invoice_type,
                 TaskStatus::Completed,
                 processed,
                 Some(total),
@@ -453,6 +469,7 @@ impl TaxSyncService {
             0,
             0,
             "Đang tìm hóa đơn thiếu thông tin",
+            invoice_type,
             None,
             None,
             None,
@@ -473,6 +490,7 @@ impl TaxSyncService {
                 0,
                 0,
                 "Không có hóa đơn nào cần bổ sung thông tin",
+                invoice_type,
                 None,
                 None,
                 None,
@@ -491,6 +509,7 @@ impl TaxSyncService {
             0,
             total,
             format!("Tìm thấy {total} hóa đơn cần bổ sung thông tin"),
+            invoice_type,
             None,
             None,
             None,
@@ -515,6 +534,7 @@ impl TaxSyncService {
                 processed,
                 total,
                 format!("Đang bổ sung thông tin hóa đơn {}", invoice.shdon),
+                invoice_type,
                 None,
                 Some(invoice.shdon),
                 Some(invoice.khhdon.clone()),
@@ -562,6 +582,7 @@ impl TaxSyncService {
                         processed,
                         total,
                         format!("Đã bổ sung thông tin hóa đơn {}", invoice.shdon),
+                        invoice_type,
                         None,
                         Some(invoice.shdon),
                         Some(invoice.khhdon.clone()),
@@ -598,6 +619,7 @@ impl TaxSyncService {
                         processed,
                         total,
                         format!("Bổ sung thông tin hóa đơn {} thất bại", invoice.shdon),
+                        invoice_type,
                         None,
                         Some(invoice.shdon),
                         Some(invoice.khhdon.clone()),
@@ -620,6 +642,7 @@ impl TaxSyncService {
                     "Đã hủy bổ sung thông tin: thành công {}, thất bại {}",
                     completed, failed
                 ),
+                invoice_type,
                 None,
                 None,
                 None,
@@ -637,6 +660,7 @@ impl TaxSyncService {
                     "Bổ sung thông tin hoàn tất nhưng có {} hóa đơn thất bại",
                     failed
                 ),
+                invoice_type,
                 None,
                 None,
                 None,
@@ -651,6 +675,7 @@ impl TaxSyncService {
                 processed,
                 total,
                 format!("Đã bổ sung thông tin thành công {} hóa đơn", completed),
+                invoice_type,
                 None,
                 None,
                 None,
@@ -692,6 +717,7 @@ fn dates_between(from: &str, to: &str) -> Result<Vec<String>> {
 fn report_download_progress(
     observer: &dyn SyncObserver,
     tax_code: &str,
+    invoice_type: u8,
     status: TaskStatus,
     completed: usize,
     total: Option<usize>,
@@ -707,6 +733,7 @@ fn report_download_progress(
         completed,
         total,
         message: message.into(),
+        invoice_type: invoice_type,
         invoice_date: None,
         invoice_number: None,
         invoice_serial: None,
@@ -723,6 +750,7 @@ fn report_detail_progress(
     completed: usize,
     total: usize,
     message: impl Into<String>,
+    invoice_type: u8,
     invoice_date: Option<String>,
     invoice_number: Option<i64>,
     invoice_serial: Option<String>,
@@ -736,6 +764,7 @@ fn report_detail_progress(
         completed,
         total: Some(total),
         message: message.into(),
+        invoice_type,
         invoice_date,
         invoice_number,
         invoice_serial,

@@ -16,6 +16,7 @@ interface AppWindowProps {
     content?: ReactNode;
     disableClose?: boolean;
     callBack?: {
+        beforeClose?: () => Promise<void>;
         onConfirm?: () => Promise<boolean>;
         onClose?: () => void;
     }
@@ -23,6 +24,7 @@ interface AppWindowProps {
     setFullScreen?: (fullScreen: boolean) => void;
 }
 export const hideWindow = async (callBack?: {
+    beforeClose?: () => Promise<void>;
     onConfirm?: () => Promise<boolean>;
     onClose?: () => void;
 }) => {
@@ -30,8 +32,7 @@ export const hideWindow = async (callBack?: {
         const confirmed = await callBack.onConfirm();
         if (!confirmed) return;
     }
-
-    callBack?.onClose?.();
+    if (callBack?.beforeClose) await callBack.beforeClose();
 
     const currentWindow = getCurrentWindow();
 
@@ -47,6 +48,7 @@ export const hideWindow = async (callBack?: {
         await currentWindow.close();
     }
 
+    callBack?.onClose?.();
 };
 
 export default function AppWindow({
@@ -64,10 +66,17 @@ export default function AppWindow({
     // useEscape(hideWindow, !disableClose, callBack);
 
     useEffect(() => {
+        const pathname = location.pathname;
 
-        if (location.pathname === "/progress-task") return;
+        if (
+            pathname === "/progress-task" ||
+            pathname.startsWith("/history-invoice")
+        ) {
+            return;
+        }
 
-        const path = location.pathname.split("/").slice(0, 2).join("/");
+        const path = pathname.split("/").slice(0, 2).join("/");
+
         invoke("set_current_route", {
             route: path,
         });

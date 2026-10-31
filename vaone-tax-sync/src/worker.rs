@@ -311,6 +311,7 @@ impl TaxSyncWorker {
                     self.invoices_pending_upload(
                         &invoice_db,
                         &account.tax_code,
+                        1,
                         &invoices,
                         &token,
                         &type_app,
@@ -564,7 +565,7 @@ impl TaxSyncWorker {
                 break;
             }
 
-            let dates = invoice_db.get_incomplete_days(&account.tax_code, *invoice_type)?;
+            let dates = invoice_db.get_incomplete_days(&account.tax_code, *invoice_type, 2)?;
 
             for date in dates {
                 eprintln!(
@@ -908,6 +909,7 @@ impl TaxSyncWorker {
         &self,
         invoice_db: &InvoiceDatabase,
         tax_code: &str,
+        invoice_type: u8,
         invoices: &Vec<InvoiceUpload>,
         token: &ApplicationLoginResponse,
         type_app: &TypeApp,
@@ -925,6 +927,7 @@ impl TaxSyncWorker {
             report_upload_progress(
                 self.observer.as_ref(),
                 tax_code,
+                invoice_type,
                 TaskStatus::Completed,
                 0,
                 0,
@@ -948,6 +951,7 @@ impl TaxSyncWorker {
         report_upload_progress(
             self.observer.as_ref(),
             tax_code,
+            invoice_type,
             TaskStatus::Running,
             0,
             total,
@@ -967,6 +971,7 @@ impl TaxSyncWorker {
             report_upload_progress(
                 self.observer.as_ref(),
                 tax_code,
+                invoice_type,
                 TaskStatus::Running,
                 processed,
                 total,
@@ -1053,6 +1058,7 @@ impl TaxSyncWorker {
                     report_upload_progress(
                         self.observer.as_ref(),
                         tax_code,
+                        invoice_type,
                         TaskStatus::Running,
                         processed,
                         total,
@@ -1105,6 +1111,7 @@ impl TaxSyncWorker {
                     report_upload_progress(
                         self.observer.as_ref(),
                         tax_code,
+                        invoice_type,
                         TaskStatus::Running,
                         processed,
                         total,
@@ -1132,6 +1139,7 @@ impl TaxSyncWorker {
             report_upload_progress(
                 self.observer.as_ref(),
                 tax_code,
+                invoice_type,
                 TaskStatus::Cancelled,
                 processed,
                 total,
@@ -1146,6 +1154,7 @@ impl TaxSyncWorker {
             report_upload_progress(
                 self.observer.as_ref(),
                 tax_code,
+                invoice_type,
                 TaskStatus::CompletedWithErrors,
                 processed,
                 total,
@@ -1160,6 +1169,7 @@ impl TaxSyncWorker {
             report_upload_progress(
                 self.observer.as_ref(),
                 tax_code,
+                invoice_type,
                 TaskStatus::Completed,
                 processed,
                 total,
@@ -1187,6 +1197,7 @@ fn token_is_valid(expires_at: &str) -> bool {
 fn report_upload_progress(
     observer: &dyn SyncObserver,
     tax_code: &str,
+    invoice_type: u8,
     status: TaskStatus,
     completed: usize,
     total: usize,
@@ -1201,6 +1212,7 @@ fn report_upload_progress(
         completed,
         total: Some(total),
         message: message.into(),
+        invoice_type: invoice_type,
         invoice_date: None,
         invoice_number: None,
         invoice_serial: None,
