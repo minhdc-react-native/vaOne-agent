@@ -80,7 +80,7 @@ impl TaxClient {
         };
 
         Ok(format!(
-            "{}?sort=shdon:desc&size={}&search={}",
+            "{}?sort=ntao:desc&size={}&search={}",
             base,
             PAGE_SIZE,
             url::form_urlencoded::byte_serialize(search.as_bytes()).collect::<String>()
@@ -378,6 +378,7 @@ impl TaxClient {
 
                 if let Some(items) = response["datas"].as_array() {
                     // eprintln!("invoices: {:?}", items);
+                    result.extend(items.iter().cloned());
                     if let Some(item) = items.last() {
                         let invoice_key = invoice_key(item)?;
 
@@ -391,7 +392,6 @@ impl TaxClient {
                             break;
                         }
                     }
-                    result.extend(items.iter().cloned());
                 }
 
                 // Cập nhật tiến trình sau mỗi trang.
