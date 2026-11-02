@@ -31,34 +31,42 @@ impl LayoutBuilder {
                     if element.content.trim().is_empty() {
                         element.content = "{value}".to_string();
                     }
-                    let context = if let Some(field) = element.field_name.as_deref() {
-                        if field == "totalPages" {
+
+                    let context = if let Some(name) = element.name.as_deref() {
+                        if name == "totalPages" {
                             json!({ "value": "00" })
-                        } else if field.starts_with("pageInfo") {
-                            // Xử lý riêng cho pageInfo...
-                            json!({ 
+                        } else if name.starts_with("pageInfo") {
+                            json!({
                                 "totalPage": 99,
-                                "date":"01/01/0000",
-                                "time":"01:00",
-                                "dateTime":"01/01/0000 01:00" })
+                                "date": "01/01/0000",
+                                "time": "01:00",
+                                "dateTime": "01/01/0000 01:00"
+                            })
                         } else {
                             let mut watch = Vec::new();
 
-                            if let Ok(dynamic) =
-                                serde_json::from_str::<DynamicContent>(&element.content)
-                            {
-                                watch = dynamic.watch;
-                                element.content = dynamic.fn_text;
+                            match serde_json::from_str::<DynamicContent>(&element.content) {
+                                Ok(dynamic) => {
+                                    watch = dynamic.watch;
+                                    element.content = dynamic.fn_text;
+                                }
+                                Err(_) => {}
                             }
 
-                            TextLayout::build_context(data, field, "value", &watch)
+                            if let Some(field) = element
+                                .field_name
+                                .as_deref()
+                                .or_else(|| watch.first().map(String::as_str))
+                            {
+                                TextLayout::build_context(data, field, "value", &watch)
+                            } else {
+                                Value::Object(Default::default())
+                            }
                         }
                     } else {
                         Value::Object(Default::default())
                     };
-                    // if element.name.as_deref() == Some("pageInfo02") {
-                    //     println!("element.content={} context={:#?}", element.content, context);
-                    // }
+
                     let mut layout: crate::models::TextLayoutResult =
                         TextLayout::layout(fonts, doc.height, &element, &context, ctx.clone());
                     layout.visible = Some(visible);

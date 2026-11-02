@@ -56,17 +56,22 @@ pub fn create_tax_account(
 }
 
 #[tauri::command]
-pub fn update_tax_account(
+pub async fn update_tax_account(
     db: State<'_, Database>,
     manager: State<'_, TaxSyncWorkerManager>,
     tax_code: String,
     input: TaxAccountInput,
 ) -> Result<TaxAccount, String> {
     let should_notify_upload = input.auto_sync;
+    let should_logout = !should_notify_upload || !input.enabled;
 
     let account = db
         .update_tax_account(&tax_code, &input)
         .map_err(|e| e.to_string())?;
+
+    if should_logout {
+        app_logout(account.clone(), db.inner().clone()).await?;
+    }
 
     if should_notify_upload {
         manager.notify_upload();
@@ -76,14 +81,36 @@ pub fn update_tax_account(
 }
 
 #[tauri::command]
-pub fn update_auto_sync(
+pub async fn update_auto_sync(
     db: State<'_, Database>,
     tax_code: String,
     enabled: bool,
     auto_sync: bool,
 ) -> Result<TaxAccount, String> {
-    db.update_auto_sync(&tax_code, &enabled, &auto_sync)
-        .map_err(|e| e.to_string())
+    let result = db
+        .update_auto_sync(&tax_code, &enabled, &auto_sync)
+        .map_err(|e| e.to_string())?;
+
+    let should_logout = !auto_sync || !enabled;
+
+    if should_logout {
+        app_logout(result.clone(), db.inner().clone()).await?;
+    }
+
+    Ok(result)
+}
+
+async fn app_logout(account: TaxAccount, db: Database) -> Result<(), String> {
+    let auth = TaxAuthService::new().map_err(|e| e.to_string())?;
+
+    auth.logout_application(&account)
+        .await
+        .map_err(|e| format!("Đăng xuất ứng dụng thất bại: {e}"))?;
+
+    db.update_application_logout(&account.tax_code)
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command]

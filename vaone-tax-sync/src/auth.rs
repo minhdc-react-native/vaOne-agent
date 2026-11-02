@@ -895,6 +895,108 @@ impl TaxAuthService {
 
         Ok(result)
     }
+
+    pub async fn logout_application(&self, account: &TaxAccount) -> Result<()> {
+        match account.type_app.as_str() {
+            "vaOnline" => self.logout_vaonline(account).await,
+            "vaOne" | "vaShop" => self.logout_vaone(account).await,
+            _ => Err(TaxSyncError::Authentication(
+                "Loại ứng dụng không được hỗ trợ".to_string(),
+            )),
+        }
+    }
+
+    async fn logout_vaonline(&self, account: &TaxAccount) -> Result<()> {
+        let (access_code, app_token, user_app, org_unit) = match (
+            account.access_code.as_deref(),
+            account.app_token.as_deref(),
+            account.user_app.as_deref(),
+            account.org_unit.as_deref(),
+        ) {
+            (Some(access_code), Some(app_token), Some(user_app), Some(org_unit)) => {
+                let base_url = account
+                    .url_api
+                    .clone()
+                    .unwrap_or_else(|| format!("https://{}.vaonline.vn", access_code));
+                // 1. Đăng nhập ứng dụng.
+                let logout_url = format!("{base_url}/api/User/Logout");
+
+                let access_token =
+                    format!("{};{};{};{}", app_token, org_unit, get_current_year(), "vi");
+
+                let payload = serde_json::json!({
+                    "username":user_app,
+                    "token": access_token,
+                });
+                let response = self
+                    .http
+                    .post(&logout_url)
+                    .header("Accept", "application/json")
+                    .header("x-tenant-name", access_code)
+                    .bearer_auth(&access_token)
+                    .json(&payload)
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        TaxSyncError::Authentication(format!("Không thể logout vaOnline: {e}"))
+                    })?;
+
+                let status = response.status();
+
+                if !status.is_success() {
+                    return Err(TaxSyncError::Authentication(format!(
+                        "Logout vaOnline thất bại, HTTP {status}"
+                    )));
+                }
+                (access_code, app_token, user_app, org_unit)
+            }
+            _ => return Ok(()),
+        };
+        Ok(())
+    }
+
+    async fn logout_vaone(&self, account: &TaxAccount) -> Result<()> {
+        let Some(app_token) = account
+            .app_token
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+        else {
+            return Ok(());
+        };
+
+        let default_url = match account.type_app.as_str() {
+            "vaOne" => "http://10.8.0.146:30334",
+            "vaShop" => "https://web.vashop.vn",
+            _ => unreachable!(),
+        };
+
+        let base_url = account
+            .url_api
+            .as_deref()
+            .filter(|url| !url.trim().is_empty())
+            .unwrap_or(default_url);
+
+        let logout_url = format!("{}/api/app/user/logout", base_url.trim_end_matches('/'));
+
+        let response = self
+            .http
+            .get(&logout_url)
+            .header("Accept", "application/json")
+            .bearer_auth(app_token)
+            .send()
+            .await
+            .map_err(|e| TaxSyncError::Authentication(format!("Không thể logout: {e}")))?;
+
+        let status = response.status();
+
+        if !status.is_success() {
+            return Err(TaxSyncError::Authentication(format!(
+                "Logout thất bại, HTTP {status}"
+            )));
+        }
+
+        Ok(())
+    }
 }
 
 /// Đọc token từ response JSON.

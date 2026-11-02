@@ -3,7 +3,7 @@ use crate::{layout::TextLayout, models::*};
 use serde::Deserialize;
 use serde_json::Value;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DynamicContent {
     pub watch: Vec<String>,

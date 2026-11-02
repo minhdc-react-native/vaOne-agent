@@ -326,6 +326,10 @@ impl TextLayout {
         }
 
         for field in watch {
+            println!(
+                "watch field={} data={:#?},data field={}",
+                field, data, data[field]
+            );
             if let Some(value) = resolve_value(data, field) {
                 Self::insert_nested(&mut map, field, value);
             }

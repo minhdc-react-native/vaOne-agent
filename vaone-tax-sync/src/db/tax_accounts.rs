@@ -743,6 +743,30 @@ impl Database {
 
         Ok(())
     }
+
+    pub fn update_application_logout(&self, tax_code: &str) -> Result<()> {
+        let conn = self.connect()?;
+        conn.execute(
+            r#"
+        UPDATE tax_accounts
+        SET
+            app_auth_status = 'pending',
+            app_token = NULL,
+            app_refresh_token = NULL,
+            app_token_type = NULL,
+            app_token_expires_at = NULL,
+            last_app_login_at = NULL,
+            last_app_auth_error = NULL,
+            app_auth_fail_count = 0,
+            app_auth_blocked = 0 
+        WHERE tax_code = ?1
+        "#,
+            [tax_code],
+        )
+        .map_err(db_error)?;
+
+        Ok(())
+    }
 }
 
 fn validate_tax_account_input(input: &TaxAccountInput, is_create: bool) -> Result<()> {
