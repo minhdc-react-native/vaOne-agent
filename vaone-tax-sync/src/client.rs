@@ -1,8 +1,9 @@
 use crate::auth::get_captcha;
-use crate::db::invoice_database::{invoice_key, InvoiceDatabase};
+use crate::db::invoice_database::{invoice_date_vietnam, invoice_key, InvoiceDatabase};
 use crate::error::TaxSyncError;
 use crate::global_request_queue::GlobalRequestQueue;
 use crate::models::FetchAllProgress;
+use crate::worker::vietnam_today;
 use anyhow::{bail, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use chrono::{Datelike, Duration, NaiveDate};
@@ -379,21 +380,23 @@ impl TaxClient {
                 if let Some(items) = response["datas"].as_array() {
                     // eprintln!("invoices: {:?}", items);
                     result.extend(items.iter().cloned());
+                    let today = vietnam_today().await?;
+                    let today_string = today.format("%Y-%m-%d").to_string();
+
                     if let Some(item) = items.last() {
-                        let invoice_key = invoice_key(item)?;
+                        if invoice_date_vietnam(item)? == today_string {
+                            let invoice_key = invoice_key(item)?;
 
-                        let exists = invoice_db.invoice_today_exists(
-                            tax_code,
-                            invoice_type,
-                            &invoice_key,
-                        )?;
-
-                        if exists {
-                            break;
+                            if invoice_db.invoice_today_exists(
+                                tax_code,
+                                invoice_type,
+                                &invoice_key,
+                            )? {
+                                break;
+                            }
                         }
                     }
                 }
-
                 // Cập nhật tiến trình sau mỗi trang.
                 on_progress(FetchAllProgress {
                     completed_months,
