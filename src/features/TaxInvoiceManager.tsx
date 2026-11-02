@@ -386,9 +386,9 @@ export function TaxInvoiceManager() {
         invoke("page_ready", { name: "historyInvoice", show: true, fullScreen });
     }, [fullScreen]);
 
-    // const onClose = useCallback(() => {
-    //     navigate(`/tax-config/${taxCodeSelect}`);
-    // }, [taxCodeSelect])
+    const onClose = useCallback(() => {
+        // navigate(`/tax-config/${taxCodeSelect}`);
+    }, [taxCodeSelect])
 
     const handleSelect = useCallback((account: ITaxAccount) => {
         if (account.tax_code === taxCodeSelect) return;
@@ -451,7 +451,7 @@ export function TaxInvoiceManager() {
                     </Button>
                 </div>
             }
-            callBack={{ beforeClose }}
+            callBack={{ beforeClose, onClose }}
         >
             <div className="flex h-full min-h-0 w-full min-w-0 flex-col gap-4 text-sm text-gray-800 p-2 bg-gray-100">
                 <div className="flex gap-1">

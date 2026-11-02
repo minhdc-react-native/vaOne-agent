@@ -142,7 +142,7 @@ export default function ProgressTask({
 
     return (
         <AppWindow title={"Theo dõi tiến trình đồng bộ dữ liệu"} icon="Loader" callBack={{ beforeClose }}>
-            <div className={`space-y-3 w-full m-4 ${className}`}>
+            <div className={`space-y-3 w-100 m-4 ${className}`}>
                 {tasks.length === 0 && <NoTask />}
                 {tasks.map((task) => <ProgressTaskItem key={`${task.tax_code}:${task.task}`} task={task} />)}
             </div>
