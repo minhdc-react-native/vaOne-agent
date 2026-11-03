@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
-import AppWindow, { hideWindow } from "../components/AppWindow";
+import AppWindow, { hideWindow, IWindowConfig } from "../components/AppWindow";
 import Button from "../components/Button";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Input from "../components/Input";
 import { getDelayRequest, ILogin, useAppStore } from "../stores/app.store";
 import Switch from "../components/Switch";
@@ -63,7 +63,6 @@ export default function LoginMInvoicePage({ params }: IProgs) {
             getInvoice(login);
             return;
         }
-        invoke("page_ready", { name: 'loginSaveInvoice' });
     }, [login, location.key]);
 
     const [loading, setLoading] = useState(false);
@@ -106,9 +105,12 @@ export default function LoginMInvoicePage({ params }: IProgs) {
     ) {
         return null;
     }
+    const config = useMemo<IWindowConfig>(() => {
+        return { name: "loginSaveInvoice" }
+    }, []);
 
     return (
-        <AppWindow title="Đăng nhập" icon="User">
+        <AppWindow title="Đăng nhập" icon="User" config={config}>
             <div className="flex h-full flex-col gap-2 p-4 w-95">
 
                 <div className="mb-2 w-full flex text-center justify-center">

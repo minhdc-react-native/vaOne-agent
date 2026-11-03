@@ -18,7 +18,7 @@ import { useTaxAccounts } from "../hook/useTaxAccounts";
 import StatusBadge, { StatusType } from "../components/StatusBadge";
 import { useNavigate, useParams } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
-import AppWindow from "../components/AppWindow";
+import AppWindow, { IWindowConfig } from "../components/AppWindow";
 import { ComboPopup } from "../components/Select/ComboPopup";
 import { DateInput } from "../components/Date/DateInput";
 import { formatNumber, getCurrentMonthDateRange } from "../lib/utils";
@@ -382,10 +382,6 @@ export function TaxInvoiceManager() {
     const [fullScreen, setFullScreen] = useState(false);
     const navigate = useNavigate();
 
-    useEffect(() => {
-        invoke("page_ready", { name: "historyInvoice", show: true, fullScreen });
-    }, [fullScreen]);
-
     const onClose = useCallback(() => {
         // navigate(`/tax-config/${taxCodeSelect}`);
     }, [taxCodeSelect])
@@ -406,9 +402,13 @@ export function TaxInvoiceManager() {
     const beforeClose = async () => {
         await emit('modal_closed');
     }
+    const config = useMemo<IWindowConfig>(() => {
+        return { name: "historyInvoice", show: true, fullScreen }
+    }, [fullScreen]);
 
     return (
         <AppWindow
+            config={config}
             fullScreen={fullScreen}
             setFullScreen={setFullScreen}
             content={

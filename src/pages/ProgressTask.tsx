@@ -1,13 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import AppWindow from "../components/AppWindow";
-import { Loader } from "lucide-react";
-import { Loading } from "../components/Loading";
+import AppWindow, { IWindowConfig } from "../components/AppWindow";
 import { ProgressTaskItem } from "../features/ProgressTaskItem";
-import { useAppStore } from "../stores/app.store";
-import { showNotification } from "../lib/notification";
-import { dialog } from "../service/dialog.service";
 
 export type InvoiceTask =
     | "download"
@@ -43,7 +38,6 @@ export interface TaskProgress {
 interface ProgressTaskProps {
     className?: string;
 }
-
 
 export default function ProgressTask({
     className = "",
@@ -132,17 +126,17 @@ export default function ProgressTask({
         };
     }, []);
 
-    useEffect(() => {
-        invoke("page_ready", { name: "progressTask" });
-    }, []);
-
     const beforeClose = async () => {
         await emit('modal_closed');
     }
 
+    const config = useMemo<IWindowConfig>(() => {
+        return { name: "progressTask" }
+    }, []);
+
     return (
-        <AppWindow title={"Theo dõi tiến trình đồng bộ dữ liệu"} icon="Loader" callBack={{ beforeClose }}>
-            <div className={`space-y-3 w-100 m-4 ${className}`}>
+        <AppWindow title={"Theo dõi tiến trình đồng bộ dữ liệu"} icon="Loader" callBack={{ beforeClose }} config={config}>
+            <div className={`space-y-3 w-92 m-4 ${className}`}>
                 {tasks.length === 0 && <NoTask />}
                 {tasks.map((task) => <ProgressTaskItem key={`${task.tax_code}:${task.task}`} task={task} />)}
             </div>

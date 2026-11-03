@@ -1,16 +1,14 @@
-import { useEffect, useState } from "react";
-import AppWindow from "../components/AppWindow";
+import { useEffect, useMemo } from "react";
+import AppWindow, { IWindowConfig } from "../components/AppWindow";
 import { invoke } from "@tauri-apps/api/core";
 import TaxAccountManager from "../features/TaxAccountManager";
 import { usePauseTaxSyncWorker } from "../hook/usePauseTaxSyncWorker";
-import { ArrowBigDownDash, Cable, Loader, SquarePause, SquarePlay } from "lucide-react";
+import { ArrowBigDownDash, Loader, SquarePause, SquarePlay } from "lucide-react";
 import Button from "../components/Button";
 import { Tooltip } from "../components/Tooltip/Tooltip";
-import { useLatest } from "../hook/useLatest";
 import { dialog } from "../service/dialog.service";
 import ModalOverlay from "../features/ModalOverlay";
 import { useAppStore } from "../stores/app.store";
-import { listen } from "@tauri-apps/api/event";
 import { Loading } from "../components/Loading";
 export const KEY_TAX_ACCOUNT_SCROLL_TOP = 'tax-account-scroll-top'
 export const TaxConfig = () => {
@@ -20,8 +18,6 @@ export const TaxConfig = () => {
     } = usePauseTaxSyncWorker();
 
     useEffect(() => {
-        invoke("page_ready", { name: "taxConfig" });
-
         return () => {
             sessionStorage.removeItem(KEY_TAX_ACCOUNT_SCROLL_TOP);
         }
@@ -49,8 +45,12 @@ export const TaxConfig = () => {
         return confirmed;
     }
 
+    const config = useMemo<IWindowConfig>(() => {
+        return { name: "taxConfig" }
+    }, []);
+
     return (
-        <AppWindow title={"Quản lý kết nối, đồng bộ dữ liệu với tổng cục thuế"} icon="Unplug"
+        <AppWindow title={"Quản lý kết nối, đồng bộ dữ liệu với tổng cục thuế"} icon="Unplug" config={config}
             content={
                 <div className="mr-4 flex gap-2 items-center">
                     {isRunning && <div className="relative">

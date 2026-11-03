@@ -1,19 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 import Button from "../components/Button";
-import { useEffect } from "react";
-import AppWindow, { hideWindow } from "../components/AppWindow";
+import { useMemo } from "react";
+import AppWindow, { hideWindow, IWindowConfig } from "../components/AppWindow";
 
 export default function QuitPage() {
     const quit = async () => {
         await invoke("quit_app");
     };
 
-    useEffect(() => {
-        invoke("page_ready", { name: "quit" });
+    const config = useMemo<IWindowConfig>(() => {
+        return { name: "quit" }
     }, []);
 
     return (
-        <AppWindow title="Thoát ứng dụng" icon="LogOut">
+        <AppWindow title="Thoát ứng dụng" icon="LogOut" config={config}>
             <div className="w-87.5 h-full p-4">
                 <p className="flex justify-center">
                     Bạn có muốn thoát

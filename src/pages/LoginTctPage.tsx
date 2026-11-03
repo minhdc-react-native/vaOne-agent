@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RotateCw } from "lucide-react";
 
-import AppWindow, { hideWindow } from "../components/AppWindow";
+import AppWindow, { hideWindow, IWindowConfig } from "../components/AppWindow";
 import Button from "../components/Button";
 import Input from "../components/Input";
 
@@ -92,7 +92,6 @@ export default function LoginTctPage({ params }: IProgs) {
             getInvoiceTCT(login);
             return;
         }
-        invoke("page_ready", { name: 'loginTct' });
         loadCaptcha();
     }, [login, loadCaptcha, getInvoiceTCT, location.key]);
 
@@ -135,7 +134,9 @@ export default function LoginTctPage({ params }: IProgs) {
         });
         // await getInvoiceTCT(res.token);
     };
-
+    const config = useMemo<IWindowConfig>(() => {
+        return { name: "loginTct" }
+    }, []);
     if (
         login &&
         login.username === params.username && !reConnect.current
@@ -144,7 +145,7 @@ export default function LoginTctPage({ params }: IProgs) {
     }
 
     return (
-        <AppWindow title="Đăng nhập" icon="User">
+        <AppWindow title="Đăng nhập" icon="User" config={config}>
             <div className="flex h-full flex-col gap-4 p-6 w-95">
 
                 <div className="mb-2 w-full flex text-center justify-center">

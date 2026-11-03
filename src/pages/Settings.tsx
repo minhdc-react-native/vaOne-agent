@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
     enable,
@@ -6,9 +6,8 @@ import {
     isEnabled,
 } from "@tauri-apps/plugin-autostart";
 
-import AppWindow, { hideWindow } from "../components/AppWindow";
+import AppWindow, { hideWindow, IWindowConfig } from "../components/AppWindow";
 import Button from "../components/Button";
-import Input from "../components/Input";
 import Switch from "../components/Switch";
 
 import { useAppStore } from "../stores/app.store";
@@ -98,13 +97,13 @@ export default function SettingsPage() {
         await hideWindow();
     };
 
-    useEffect(() => {
-        invoke("page_ready", { name: "settings" });
+    const config = useMemo<IWindowConfig>(() => {
+        return { name: "settings" }
     }, []);
 
     if (!info) {
         return (
-            <AppWindow title="Cài đặt" icon="Cog">
+            <AppWindow title="Cài đặt" icon="Cog" config={config}>
                 <div className="flex h-full w-82.5 items-center justify-center">
                     Loading...
                 </div>
@@ -113,7 +112,7 @@ export default function SettingsPage() {
     }
 
     return (
-        <AppWindow title="Cài đặt" icon="Cog">
+        <AppWindow title="Cài đặt" icon="Cog" config={config}>
             <div className="flex h-full w-82.5 flex-col justify-between p-4">
                 <div className="space-y-2">
                     <div className="text-4xl flex justify-center pb-4 text-gray-500"><span className="pr-2 font-semibold text-red-700">vaOne</span>plugin</div>

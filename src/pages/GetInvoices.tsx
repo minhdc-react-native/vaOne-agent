@@ -1,9 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 import Progress from "../components/Progress";
 import { Divider } from "../components/Divider";
-import AppWindow from "../components/AppWindow";
-import { invoke } from "@tauri-apps/api/core";
+import AppWindow, { IWindowConfig } from "../components/AppWindow";
 import { useAppStore } from "../stores/app.store";
 import { formatDate } from "../api/services/tct.service";
 
@@ -21,12 +20,13 @@ export const GetInvoices = () => {
         () => TYPE_LOADING[login?.info.invoiceType],
         [login?.info.invoiceType]
     );
-    useEffect(() => {
-        invoke("page_ready", { name: 'getInvoiceTct' });
+
+    const config = useMemo<IWindowConfig>(() => {
+        return { name: "getInvoiceTct" }
     }, []);
 
     return (
-        <AppWindow title="Tải hóa đơn..." icon="Download">
+        <AppWindow title="Tải hóa đơn..." icon="Download" config={config}>
             <div className="space-y-2 p-6 w-100">
                 {/* Info panel */}
                 <div className="space-y-1 text-sm">

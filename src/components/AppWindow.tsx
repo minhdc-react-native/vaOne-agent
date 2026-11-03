@@ -8,8 +8,17 @@ import { invoke } from "@tauri-apps/api/core";
 import { IconLucide, IconName } from "./IconLucide";
 import { Tooltip } from "./Tooltip/Tooltip";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import clsx from "clsx";
+type IWindowName = 'splash' | 'report' | 'settings' | 'loginTct' | 'getInvoiceTct' | 'loginMInvoice' |
+    'loginSaveInvoice' | 'loginEmpty' | 'blank' | 'update' | 'quit' | 'taxConfig' | 'historyInvoice' | 'progressTask';
 
+export interface IWindowConfig {
+    name: IWindowName;
+    show?: boolean;
+    fullScreen?: boolean;
+};
 interface AppWindowProps {
+    config: IWindowConfig;
     icon?: IconName,
     title?: string;
     children: ReactNode;
@@ -52,6 +61,7 @@ export const hideWindow = async (callBack?: {
 };
 
 export default function AppWindow({
+    config,
     icon,
     title,
     children,
@@ -82,8 +92,12 @@ export default function AppWindow({
         });
     }, [location.pathname]);
 
+    useEffect(() => {
+        invoke("page_ready", { ...config });
+    }, [config]);
+
     return (
-        <div className="flex h-screen flex-col bg-white">
+        <div className={clsx("flex h-screen flex-col bg-white")}>
             {/* Title Bar */}
             <header
                 className="

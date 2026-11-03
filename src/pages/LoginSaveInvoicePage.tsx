@@ -1,12 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-import AppWindow, { hideWindow } from "../components/AppWindow";
+import AppWindow, { hideWindow, IWindowConfig } from "../components/AppWindow";
 import Button from "../components/Button";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Input from "../components/Input";
 import { getDelayRequest, ILogin, useAppStore } from "../stores/app.store";
 import Switch from "../components/Switch";
 import { dialog } from "../service/dialog.service";
-import { useLoading } from "../service/loading.service";
 import { saveInvoiceService } from "../api/services/saveInvoice.service";
 import { useLocation } from "react-router-dom";
 import { Loading } from "../components/Loading";
@@ -64,7 +63,6 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
             getInvoice(login);
             return;
         }
-        invoke("page_ready", { name: 'loginSaveInvoice' });
     }, [login, location.key]);
 
     const [loading, setLoading] = useState(false);
@@ -101,6 +99,10 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
         });
     };
 
+    const config = useMemo<IWindowConfig>(() => {
+        return { name: "loginSaveInvoice" }
+    }, []);
+
     if (
         login &&
         login.taxCode === params.taxCode && !reConnect.current
@@ -109,7 +111,7 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
     }
 
     return (
-        <AppWindow title="Đăng nhập" icon="User">
+        <AppWindow title="Đăng nhập" icon="User" config={config}>
             <div className="flex h-full flex-col gap-2 p-6 w-95">
 
                 <div className="mb-2 w-full flex text-center justify-center">
