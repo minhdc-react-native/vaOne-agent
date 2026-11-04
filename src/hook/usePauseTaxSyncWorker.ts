@@ -19,13 +19,16 @@ export function usePauseTaxSyncWorker() {
     }, [])
 
     const stopSyncWorker = useCallback(async () => {
-        await invoke("stop_tax_sync_worker").catch((error) => {
+        try {
+            await invoke("stop_tax_sync_worker");
+            await invoke("app_logout_all");
+        } catch (error) {
             showNotification({
                 type: "warning",
-                message: "Không thể dừng tax sync worker:"
-            })
-        });
-    }, [])
+                message: `Không thể dừng tax sync worker hoặc đăng xuất: ${error}`
+            });
+        }
+    }, []);
 
     const startSyncWorker = useCallback(async () => {
         await invoke("start_tax_sync_worker").catch((error) => {

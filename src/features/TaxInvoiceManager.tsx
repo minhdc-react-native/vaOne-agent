@@ -7,22 +7,17 @@ import {
     useResetSyncStatus,
 } from "../hook/useSyncInvoices";
 import type {
-    IInvoiceStats,
     ISyncInvoiceFilters,
-    IPaginatedResult,
-    ISyncInvoice,
     ISyncConfig,
-    ISyncDay,
 } from "../service/syncInvoicesService";
 import { useTaxAccounts } from "../hook/useTaxAccounts";
 import StatusBadge, { StatusType } from "../components/StatusBadge";
 import { useNavigate, useParams } from "react-router-dom";
-import { invoke } from "@tauri-apps/api/core";
 import AppWindow, { IWindowConfig } from "../components/AppWindow";
 import { ComboPopup } from "../components/Select/ComboPopup";
 import { DateInput } from "../components/Date/DateInput";
 import { formatNumber, getCurrentMonthDateRange } from "../lib/utils";
-import { Cable, ChevronLeft, ChevronRight, Clock, CloudSync, List, Loader, MonitorDown, RefreshCcw, RotateCw, Search, Unplug } from "lucide-react";
+import { Cable, ChevronLeft, ChevronRight, Clock, List, Loader, MonitorDown, RefreshCcw, Search } from "lucide-react";
 import Button from "../components/Button";
 import { formatDate } from "../api/services/tct.service";
 import { dialog } from "../service/dialog.service";
@@ -164,19 +159,43 @@ export function TaxInvoiceManager() {
 
     const account = useMemo(() => accounts.find(acc => acc.tax_code === taxCodeSelect), [taxCodeSelect, accounts]);
 
-    const {
-        mutateAsync: getStats,
-        isPending: statsLoading,
-    } = useGetInvoiceStats();
+    const [page, setPage] = useState(1);
+    const [localError, setLocalError] = useState<string | null>(null);
+
+    const [filters, setFilters] = useState<ISyncInvoiceFilters>({
+        ...initialFilters,
+        tax_code: taxCodeSelect,
+    });
 
     const {
-        mutateAsync: getSyncDays
-    } = useGetSyncDays();
+        data: stats,
+        isLoading: statsLoading,
+        refetch: getStats,
+    } = useGetInvoiceStats(taxCodeSelect ?? "");
 
     const {
-        mutateAsync: getInvoices,
-        isPending: invoicesLoading,
-    } = useGetSyncInvoices();
+        data: syncDays = [],
+        isLoading: syncDaysLoading,
+        refetch: getSyncDays,
+    } = useGetSyncDays(taxCodeSelect ?? "", false);
+
+    const filterPage = useMemo(() => {
+        return {
+            ...filters,
+            tax_code: taxCodeSelect,
+        }
+    }, [filters, taxCodeSelect]);
+
+    const {
+        data: invoicePage,
+        isLoading: invoicesLoading,
+        refetch: getInvoices,
+    } = useGetSyncInvoices({
+        taxCode: taxCodeSelect ?? "",
+        filters: filterPage,
+        page,
+        page_size: PAGE_SIZE,
+    });
 
     const { mutate: resetSyncStatus, isPending } = useResetSyncStatus();
 
@@ -184,88 +203,6 @@ export function TaxInvoiceManager() {
         ...initialSync,
         taxCode: taxCodeSelect ?? ""
     });
-
-    const [filters, setFilters] = useState<ISyncInvoiceFilters>({
-        ...initialFilters,
-        tax_code: taxCodeSelect,
-    });
-
-    const [stats, setStats] = useState<IInvoiceStats | null>(null);
-    const [syncDays, setSyncDays] = useState<ISyncDay[]>([]);
-
-    const [invoicePage, setInvoicePage] =
-        useState<IPaginatedResult<ISyncInvoice> | null>(null);
-
-    const [page, setPage] = useState(1);
-
-
-    const [localError, setLocalError] = useState<string | null>(null);
-
-    const loadStats = useCallback(async () => {
-        if (!taxCodeSelect) return;
-
-        try {
-            const result = await getStats(taxCodeSelect);
-            setStats(result);
-        } catch (error) {
-            setLocalError(String(error));
-        }
-    }, [taxCodeSelect, getStats]);
-
-    const loadSyncDays = useCallback(async () => {
-        if (!taxCodeSelect) return;
-        try {
-            const result = await getSyncDays({ taxCode: taxCodeSelect, isSuccess: false });
-            setSyncDays(result);
-        } catch (error) {
-            setLocalError(String(error));
-        }
-    }, [taxCodeSelect, setSyncDays]);
-
-    const loadInvoices = useCallback(
-        async (
-            nextFilters: ISyncInvoiceFilters,
-            nextPage: number,
-        ) => {
-            if (!taxCodeSelect) return;
-
-            try {
-                setLocalError(null);
-                const result = await getInvoices({
-                    taxCode: taxCodeSelect,
-                    filters: {
-                        ...nextFilters,
-                        tax_code: taxCodeSelect,
-                    },
-                    page: nextPage,
-                    page_size: PAGE_SIZE,
-                });
-                setInvoicePage(result);
-                setPage(nextPage);
-            } catch (error) {
-                setLocalError(String(error));
-            }
-        },
-        [taxCodeSelect, getInvoices],
-    );
-
-    // Tải dữ liệu khi tax_code thay đổi.
-    useEffect(() => {
-        setStats(null);
-        setInvoicePage(null);
-        setPage(1);
-
-        setFilters({
-            ...initialFilters,
-            tax_code: taxCodeSelect
-        });
-
-        if (!taxCodeSelect) return;
-
-        void loadStats();
-        void loadSyncDays();
-        void loadInvoices(initialFilters, 1);
-    }, [taxCodeSelect]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const updateFilter = <K extends keyof ISyncInvoiceFilters>(
         key: K,
@@ -288,32 +225,10 @@ export function TaxInvoiceManager() {
     };
 
     const onRefreshAll = async () => {
-        void loadAccounts();
-        void loadStats();
-        void loadSyncDays();
-        void applyFilters();
+        void getStats();
+        void getSyncDays();
+        void getInvoices();
     }
-    const applyFilters = () => {
-        void loadInvoices(filters, 1);
-    };
-
-    useEffect(() => {
-        if (filters.from_date && filters.to_date && filters.from_date > filters.to_date) {
-            showNotification({
-                type: "warning",
-                message: `Đến ngày ${formatDate(filters.to_date)} phải nhỏ hơn từ ngày ${formatDate(filters.from_date)}!`
-            });
-            return;
-        };
-        applyFilters();
-    }, [filters]);
-
-    // useEffect(() => {
-    //     const timer = setTimeout(() => {
-    //         applyFilters();
-    //     }, 500);
-    //     return () => clearTimeout(timer);
-    // }, [filters]);
 
     const handleReset = async () => {
         if (!filters.from_date || !filters.to_date) {
@@ -364,7 +279,7 @@ export function TaxInvoiceManager() {
         },
             {
                 onSuccess: () => {
-                    applyFilters();
+                    onRefreshAll();
                     showNotification({ type: "success", message: "Cập nhật thành công" });
                 },
                 onError: (error) => {
@@ -919,9 +834,7 @@ export function TaxInvoiceManager() {
                                         invoicesLoading ||
                                         page <= 1
                                     }
-                                    onClick={() =>
-                                        void loadInvoices(filters, page - 1)
-                                    }
+                                    onClick={() => setPage((prevPage) => Math.max(prevPage - 1, 1))}
                                 />
                                 <Button
                                     iconOnly={true}
@@ -932,9 +845,7 @@ export function TaxInvoiceManager() {
                                         totalPages === 0 ||
                                         page >= totalPages
                                     }
-                                    onClick={() =>
-                                        void loadInvoices(filters, page + 1)
-                                    }
+                                    onClick={() => setPage((prevPage) => Math.min(prevPage + 1, totalPages))}
                                 />
                             </div>
                         </div>

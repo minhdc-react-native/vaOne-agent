@@ -100,6 +100,21 @@ pub async fn update_auto_sync(
     Ok(result)
 }
 
+#[tauri::command]
+pub async fn app_logout_all(db: State<'_, Database>) -> Result<(), String> {
+    let accounts = db
+        .get_enabled_tax_accounts(false)
+        .map_err(|e| e.to_string())?;
+
+    for account in accounts {
+        app_logout(account, db.inner().clone())
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
+}
+
 async fn app_logout(account: TaxAccount, db: Database) -> Result<(), String> {
     let auth = TaxAuthService::new().map_err(|e| e.to_string())?;
 

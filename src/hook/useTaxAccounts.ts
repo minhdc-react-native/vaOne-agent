@@ -18,6 +18,8 @@ export function useTaxAccounts() {
     const accountsQuery = useQuery({
         queryKey: TAX_ACCOUNTS_QUERY_KEY,
         queryFn: () => taxAccountService.getAll(),
+        staleTime: 0,
+        refetchOnMount: "always",
     });
 
     // Hàm refresh thủ công khi cần

@@ -237,6 +237,7 @@ pub fn run() {
             commands::tax_accounts::delete_tax_account,
             commands::tax_accounts::check_tax_application_login,
             commands::tax_accounts::check_app_login,
+            commands::tax_accounts::app_logout_all,
             commands::sync_invoices::get_invoice_stats,
             commands::sync_invoices::get_sync_days,
             commands::sync_invoices::get_sync_invoices,

@@ -484,6 +484,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
         try {
             setOpenOverlay(true);
             await invoke("open_modal_window", { route: `/history-invoice/${taxCode}`, name: "historyInvoice" });
+            setSelectedTaxCode(taxCode);
         } catch (error) {
             console.error("Không thể mở tiến trình đồng bộ:", error);
         }
@@ -706,7 +707,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                             }
                         />
                         {/* Target app */}
-                        {form.auto_sync && <div className="space-y-3">
+                        <div className="space-y-3">
 
                             <Field label="Ứng dụng đích" required>
                                 <div className="grid grid-cols-3 border border-gray-300 rounded">
@@ -803,7 +804,7 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
                                     updateField("url_api", e.target.value)
                                 }
                             />
-                        </div>}
+                        </div>
 
                         {/* Error */}
                         {/* {displayError && (

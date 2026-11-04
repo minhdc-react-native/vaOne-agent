@@ -398,6 +398,18 @@ impl Database {
                 "UPDATE tax_accounts
              SET enabled = ?1,
                 auto_sync = ?2,
+
+                -- Reset xác thực cơ quan thuế
+                auth_status = 'pending',
+                token = NULL,
+                refresh_token = NULL,
+                token_type = NULL,
+                token_expires_at = NULL,
+                last_login_at = NULL,
+                last_auth_error = NULL,
+                auth_fail_count = 0,
+                auth_blocked = 0,
+                
                 -- Reset xác thực ứng dụng
                 app_auth_status = 'pending',
                 app_token = NULL,
