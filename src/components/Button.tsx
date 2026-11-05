@@ -71,7 +71,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
                     "bg-(--danger) text-white hover:bg-(--danger-hover)",
 
                     variant === "ghost" &&
-                    "hover:bg-gray-100",
+                    "border border-gray-300 hover:bg-gray-100",
                     "focus:ring-0 focus:outline-none focus-visible:ring-1 focus-visible:ring-gray-300",
                     className
                 )}

@@ -2,11 +2,39 @@ import axios from "axios";
 import { getDelayRequest, getTokenTct } from "../../stores/app.store";
 import { invoke } from "@tauri-apps/api/core";
 import { dialog } from "../../service/dialog.service";
-export function formatDate(dateStr?: string): string {
+
+export function formatDate(
+    dateStr?: string | null,
+    includeTime = false,
+): string {
     if (!dateStr) return "";
-    const [year, month, day] = dateStr.split("T")[0].split("-");
-    return `${day}/${month}/${year}`;
+
+    // SQLite CURRENT_TIMESTAMP có dạng YYYY-MM-DD HH:mm:ss (UTC).
+    // Chuyển thành ISO UTC để JavaScript parse đúng múi giờ.
+    const normalized = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateStr)
+        ? dateStr.replace(" ", "T") + "Z"
+        : dateStr;
+
+    const date = new Date(normalized);
+    if (isNaN(date.getTime())) return "";
+
+    const options: Intl.DateTimeFormatOptions = {
+        timeZone: "Asia/Ho_Chi_Minh",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+    };
+
+    if (includeTime) {
+        options.hour = "2-digit";
+        options.minute = "2-digit";
+        options.second = "2-digit";
+        options.hourCycle = "h23";
+    }
+
+    return new Intl.DateTimeFormat("vi-VN", options).format(date);
 }
+
 interface IInfoLogin {
     username: string;
     password: string;
@@ -52,6 +80,7 @@ export const tctService = {
                 url: "https://hoadondientu.gdt.gov.vn/api/captcha"
             });
             return {
+                content: res.content,
                 captcha: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(res.content)}`,
                 key: res.key ?? ""
             }
@@ -68,7 +97,7 @@ export const tctService = {
             });
             return res as ILoginRequest;
         } catch (e) {
-            let errorMessage = "Đã xảy ra lỗi.";
+            let errorMessage = "Đã xảy ra lỗi. hãy refresh lại mã captcha rồi thử lại!";
             if (axios.isAxiosError(e)) {
                 errorMessage =
                     e.response?.data?.message ??

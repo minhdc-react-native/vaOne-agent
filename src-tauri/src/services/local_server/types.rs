@@ -14,3 +14,24 @@ pub struct PingResponse {
 pub struct MessageRequest {
     pub message: String,
 }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum SourceInvoice {
+    #[serde(rename = "TCT")]
+    Tct,
+
+    #[serde(rename = "M-SMI")]
+    M_Smi,
+
+    #[serde(rename = "SAVE-INVOICE")]
+    SaveInvoice,
+
+    #[serde(rename = "SHOPEE")]
+    Shopee,
+
+    #[serde(rename = "LAZADA")]
+    Lazada,
+
+    #[serde(rename = "TIKTOK")]
+    Tiktok,
+}

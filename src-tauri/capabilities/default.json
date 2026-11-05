@@ -3,7 +3,9 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": [
-    "main"
+    "main",
+    "splash_screen",
+    "modal_screen"
   ],
   "permissions": [
     "core:default",
