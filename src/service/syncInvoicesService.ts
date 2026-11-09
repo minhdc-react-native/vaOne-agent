@@ -65,6 +65,8 @@ export interface ISyncInvoice {
 
     updated_at: string;
     completed_at: string | null;
+    invoice: string,
+    xml_data: string | null,
 }
 
 export interface ISyncInvoiceFilters {

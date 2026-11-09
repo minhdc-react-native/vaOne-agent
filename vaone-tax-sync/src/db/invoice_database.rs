@@ -1,4 +1,7 @@
 use crate::{
+    compression::{
+        compress_zstd_json, compress_zstd_xml, decompress_zstd_json_text, decompress_zstd_xml,
+    },
     error::{Result, TaxSyncError},
     models::{
         InvoiceDetailRetry, InvoiceStats, InvoiceStatsGroup, InvoiceUpload, SyncDay, SyncInvoice,
@@ -105,10 +108,6 @@ impl InvoiceDatabase {
         let base_dir = base_dir.as_ref();
         let path = base_dir.join(format!("{tax_code}.sqlite3"));
 
-        println!("Invoice DB base_dir: {:?}", base_dir);
-        println!("Invoice DB full path: {:?}", path);
-        println!("Invoice DB exists: {}", path.is_file());
-
         if !path.is_file() {
             return Err(TaxSyncError::Database(format!(
                 "Không tìm thấy database hóa đơn của mã số thuế: {tax_code}"
@@ -212,8 +211,8 @@ impl InvoiceDatabase {
                 tthai INTEGER,
                 ttxly INTEGER,
 
-                summary_json TEXT NOT NULL,
-                xml_data TEXT,
+                summary_json BLOB NOT NULL,
+                xml_data BLOB,
 
                 detail_status TEXT NOT NULL DEFAULT 'pending'
                     CHECK (detail_status IN ('pending', 'running', 'completed', 'failed')),
@@ -464,8 +463,7 @@ impl InvoiceDatabase {
 
         let invoice_date = invoice_date_vietnam(summary)?;
         let invoice_key = invoice_key(summary)?;
-        let summary_json = serde_json::to_string(summary)
-            .map_err(|e| TaxSyncError::InvalidInvoice(e.to_string()))?;
+        let summary_json = compress_zstd_json(summary).map_err(TaxSyncError::InvalidInvoice)?;
 
         let (nbnmmst, nbnmten) = if invoice_type == 1 || invoice_type == 3 {
             (summary["nbmst"].as_str(), summary["nbten"].as_str())
@@ -594,24 +592,38 @@ impl InvoiceDatabase {
         xml: &Option<String>,
     ) -> Result<()> {
         self.check_tax_code(tax_code)?;
+
         let detail_data = detail
             .as_ref()
-            .map(serde_json::to_string)
+            .map(compress_zstd_json)
             .transpose()
-            .map_err(|e| TaxSyncError::InvalidInvoice(e.to_string()))?;
+            .map_err(TaxSyncError::InvalidInvoice)?;
+
+        let xml_data = xml
+            .as_deref()
+            .map(compress_zstd_xml)
+            .transpose()
+            .map_err(TaxSyncError::InvalidInvoice)?;
 
         let conn = self.connect()?;
+
         conn.execute(
             "UPDATE sync_invoices
-             SET summary_json = CASE WHEN ?4 IS NOT NULL THEN ?4 ELSE summary_json END,
-                 xml_data = ?5,
-                 detail_status = 'completed',
-                 detail_error = NULL,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE tax_code = ?1 AND invoice_type = ?2 AND invoice_key = ?3",
-            params![tax_code, invoice_type, invoice_key, detail_data, xml],
+         SET summary_json = CASE
+                WHEN ?4 IS NOT NULL THEN ?4
+                ELSE summary_json
+             END,
+             xml_data = CASE WHEN ?5 IS NOT NULL THEN ?5 ELSE xml_data END,
+             detail_status = 'completed',
+             detail_error = NULL,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE tax_code = ?1
+           AND invoice_type = ?2
+           AND invoice_key = ?3",
+            params![tax_code, invoice_type, invoice_key, detail_data, xml_data],
         )
         .map_err(db_error)?;
+
         Ok(())
     }
 
@@ -714,8 +726,29 @@ impl InvoiceDatabase {
                     invoice_type,
                     invoice_key: row.get(0)?,
                     invoice_date: row.get(1)?,
-                    summary_json: row.get(2)?,
-                    xml_data: row.get(3)?,
+                    summary_json: {
+                        let data: Vec<u8> = row.get(2)?;
+                        decompress_zstd_json_text(&data).map_err(|e| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                2,
+                                rusqlite::types::Type::Blob,
+                                Box::new(std::io::Error::other(e)),
+                            )
+                        })?
+                    },
+                    xml_data: {
+                        let data: Option<Vec<u8>> = row.get(3)?;
+                        data.map(|bytes| {
+                            decompress_zstd_xml(&bytes).map_err(|e| {
+                                rusqlite::Error::FromSqlConversionFailure(
+                                    3,
+                                    rusqlite::types::Type::Blob,
+                                    Box::new(std::io::Error::other(e)),
+                                )
+                            })
+                        })
+                        .transpose()?
+                    },
                     detail_status: row.get(4)?,
                     upload_status: row.get(5)?,
                     attempt_count: row.get(6)?,
@@ -1134,7 +1167,8 @@ impl InvoiceDatabase {
                     khhdon, shdon, khmshdon, invoice_date, tgtcthue, tgtthue,
                     tgtttbso, tthai, ttxly, detail_status, upload_status,
                     detail_attempt_count, upload_attempt_count, detail_error,
-                    upload_error, updated_at, completed_at, nbnmmst, nbnmten
+                    upload_error, updated_at, completed_at, nbnmmst, nbnmten,
+                    summary_json,xml_data
                  FROM sync_invoices
                  WHERE tax_code = ?1
                    AND (?2 IS NULL OR invoice_type = ?2)
@@ -1192,6 +1226,29 @@ impl InvoiceDatabase {
                         completed_at: row.get(22)?,
                         nbnmmst: row.get(23)?,
                         nbnmten: row.get(24)?,
+                        invoice: {
+                            let data: Vec<u8> = row.get(25)?;
+                            decompress_zstd_json_text(&data).map_err(|e| {
+                                rusqlite::Error::FromSqlConversionFailure(
+                                    2,
+                                    rusqlite::types::Type::Blob,
+                                    Box::new(std::io::Error::other(e)),
+                                )
+                            })?
+                        },
+                        xml_data: {
+                            let data: Option<Vec<u8>> = row.get(26)?;
+                            data.map(|bytes| {
+                                decompress_zstd_xml(&bytes).map_err(|e| {
+                                    rusqlite::Error::FromSqlConversionFailure(
+                                        3,
+                                        rusqlite::types::Type::Blob,
+                                        Box::new(std::io::Error::other(e)),
+                                    )
+                                })
+                            })
+                            .transpose()?
+                        },
                     })
                 },
             )
@@ -1228,23 +1285,46 @@ impl InvoiceDatabase {
         let mut stmt = conn
             .prepare(
                 "SELECT tax_code, invoice_key, invoice_type, summary_json, xml_data
-             FROM sync_invoices
-             WHERE tax_code = ?1
-               AND detail_status = 'completed'
-               AND upload_status <> 'completed'
-             ORDER BY invoice_type, invoice_key
-             LIMIT ?2",
+         FROM sync_invoices
+         WHERE tax_code = ?1
+           AND detail_status = 'completed'
+           AND upload_status <> 'completed'
+         ORDER BY invoice_type, invoice_key
+         LIMIT ?2",
             )
             .map_err(db_error)?;
 
         let rows = stmt
             .query_map(params![tax_code, limit], |row| {
+                let summary_data: Vec<u8> = row.get(3)?;
+                let xml_data: Option<Vec<u8>> = row.get(4)?;
+
+                let summary_json = decompress_zstd_json_text(&summary_data).map_err(|e| {
+                    rusqlite::Error::FromSqlConversionFailure(
+                        3,
+                        rusqlite::types::Type::Blob,
+                        Box::new(std::io::Error::other(e)),
+                    )
+                })?;
+
+                let xml_data = xml_data
+                    .map(|data| {
+                        decompress_zstd_xml(&data).map_err(|e| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                4,
+                                rusqlite::types::Type::Blob,
+                                Box::new(std::io::Error::other(e)),
+                            )
+                        })
+                    })
+                    .transpose()?;
+
                 Ok((
                     row.get::<_, String>(0)?,
                     row.get::<_, String>(1)?,
                     row.get::<_, u8>(2)?,
-                    row.get::<_, String>(3)?,
-                    row.get::<_, Option<String>>(4)?,
+                    summary_json,
+                    xml_data,
                 ))
             })
             .map_err(db_error)?;

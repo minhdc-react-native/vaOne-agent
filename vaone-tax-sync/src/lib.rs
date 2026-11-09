@@ -1,5 +1,6 @@
 pub mod auth;
 pub mod client;
+pub mod compression;
 pub mod database;
 pub mod db;
 pub mod error;

@@ -78,10 +78,14 @@ export default function AppWindow({
     useEffect(() => {
         const pathname = location.pathname;
 
-        if (
-            pathname === "/progress-task" ||
-            pathname.startsWith("/history-invoice")
-        ) {
+        // if (
+        //     pathname === "/progress-task" ||
+        //     pathname.startsWith("/history-invoice")
+        // ) {
+        //     return;
+        // }
+
+        if (pathname === "/progress-task") {
             return;
         }
 

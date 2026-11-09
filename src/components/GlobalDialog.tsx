@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import Dialog from "./Dialog";
+import Dialog, { DialogSize } from "./Dialog";
 import { contents, dialog, listeners } from "../service/dialog.service";
 
 export type DialogPayload = {
@@ -12,7 +12,8 @@ export type DialogPayload = {
         confirmText?: string;
         cancelText?: string;
     },
-    content?: ReactNode
+    content?: ReactNode,
+    size?: DialogSize
 };
 
 export function GlobalDialog() {
@@ -63,6 +64,7 @@ export function GlobalDialog() {
                 closeDialog(current.id, true);
             }}
             content={content}
+            size={current.size}
         />
     );
 }

@@ -475,20 +475,20 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
     };
     const navigate = useNavigate();
 
-    // const onHistoryInvoice = (taxCode: string) => {
-    //     navigate(`/history-invoice/${taxCode}`);
-    // }
+    const onHistoryInvoice = (taxCode: string) => {
+        navigate(`/history-invoice/${taxCode}`);
+    }
 
-    const setOpenOverlay = useAppStore(appStore => appStore.setOpenOverlay);
-    const onHistoryInvoice = async (taxCode: string) => {
-        try {
-            setOpenOverlay(true);
-            await invoke("open_modal_window", { route: `/history-invoice/${taxCode}`, name: "historyInvoice" });
-            setSelectedTaxCode(taxCode);
-        } catch (error) {
-            console.error("Không thể mở tiến trình đồng bộ:", error);
-        }
-    };
+    // const setOpenOverlay = useAppStore(appStore => appStore.setOpenOverlay);
+    // const onHistoryInvoice = async (taxCode: string) => {
+    //     try {
+    //         setOpenOverlay(true);
+    //         await invoke("open_modal_window", { route: `/history-invoice/${taxCode}`, name: "historyInvoice" });
+    //         setSelectedTaxCode(taxCode);
+    //     } catch (error) {
+    //         console.error("Không thể mở tiến trình đồng bộ:", error);
+    //     }
+    // };
 
     const handleDelete = async (taxCode: string) => {
         if (isRunning) {

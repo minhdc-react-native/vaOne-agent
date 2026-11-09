@@ -261,6 +261,8 @@ pub struct SyncInvoice {
     pub upload_error: Option<String>,
     pub updated_at: String,
     pub completed_at: Option<String>,
+    pub invoice: String,
+    pub xml_data: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

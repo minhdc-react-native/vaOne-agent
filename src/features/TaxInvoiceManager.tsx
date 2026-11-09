@@ -9,6 +9,7 @@ import {
 import type {
     ISyncInvoiceFilters,
     ISyncConfig,
+    ISyncInvoice,
 } from "../service/syncInvoicesService";
 import { useTaxAccounts } from "../hook/useTaxAccounts";
 import StatusBadge, { StatusType } from "../components/StatusBadge";
@@ -17,7 +18,7 @@ import AppWindow, { IWindowConfig } from "../components/AppWindow";
 import { ComboPopup } from "../components/Select/ComboPopup";
 import { DateInput } from "../components/Date/DateInput";
 import { formatNumber, getCurrentMonthDateRange } from "../lib/utils";
-import { Cable, ChevronLeft, ChevronRight, Clock, List, Loader, MonitorDown, RefreshCcw, Search } from "lucide-react";
+import { Braces, Cable, ChevronLeft, ChevronRight, Clock, CodeXml, FileJson, List, Loader, MonitorDown, RefreshCcw, Search } from "lucide-react";
 import Button from "../components/Button";
 import { formatDate } from "../api/services/tct.service";
 import { dialog } from "../service/dialog.service";
@@ -33,6 +34,7 @@ import { ITaxAccount } from "../service/taxAccountService";
 import { Tooltip } from "../components/Tooltip/Tooltip";
 import { Line } from "../components/Line";
 import { emit } from "@tauri-apps/api/event";
+import { InvoiceDataViewer } from "./InvoiceDataViewer";
 
 
 const PAGE_SIZE = 100;
@@ -290,6 +292,18 @@ export function TaxInvoiceManager() {
         );
     };
 
+    const onViewData = useCallback((invoice: ISyncInvoice) => {
+        dialog.open({
+            type: "info",
+            message: `Dữ liệu`,
+            title: `Hóa đơn: ${invoice.shdon}`,
+            text: {
+                confirmText: "Thoát"
+            },
+            content: <InvoiceDataViewer invoice={invoice} />,
+            size: "2xl"
+        });
+    }, [])
 
     const totalPages = invoicePage?.total_pages ?? 0;
     const invoiceItems = invoicePage?.items ?? [];
@@ -298,7 +312,7 @@ export function TaxInvoiceManager() {
     const navigate = useNavigate();
 
     const onClose = useCallback(() => {
-        // navigate(`/tax-config/${taxCodeSelect}`);
+        navigate(`/tax-config/${taxCodeSelect}`);
     }, [taxCodeSelect])
 
     const handleSelect = useCallback((account: ITaxAccount) => {
@@ -315,7 +329,7 @@ export function TaxInvoiceManager() {
     const [tab, setTab] = useState(0);
 
     const beforeClose = async () => {
-        await emit('modal_closed');
+        // await emit('modal_closed');
     }
     const config = useMemo<IWindowConfig>(() => {
         return { name: "historyInvoice", show: true, fullScreen }
@@ -669,10 +683,10 @@ export function TaxInvoiceManager() {
 
                             <div className="min-w-full w-max">
                                 <table className="w-full min-w-max border-collapse text-left">
-                                    <thead className="sticky top-0 z-10 bg-gray-100">
+                                    <thead className="bg-gray-100">
                                         <tr>
-                                            <th className="w-14 px-2 py-1 font-medium">#</th>
-                                            <th className="w-30 px-2 py-1 font-medium">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-14 px-2 py-1 font-medium">#</th>
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-30 px-2 py-1 font-medium">
                                                 {[1, 3].includes(filters.invoice_type ?? 0)
                                                     ? "MST người bán"
                                                     : [2, 4].includes(filters.invoice_type ?? 0)
@@ -680,47 +694,50 @@ export function TaxInvoiceManager() {
                                                         : "MST bán/mua"}
                                             </th>
 
-                                            <th className="w-25 px-2 py-1 font-medium">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-25 px-2 py-1 font-medium">
                                                 Phân loại
                                             </th>
 
-                                            <th className="w-20 px-2 py-1 font-medium">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-20 px-2 py-1 font-medium">
                                                 Ký hiệu
                                             </th>
 
-                                            <th className="w-25 px-2 py-1 font-medium text-right">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-25 px-2 py-1 font-medium text-right">
                                                 Số HĐ
                                             </th>
-                                            <th className="w-28 px-2 py-1 font-medium text-center">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-28 px-2 py-1 font-medium text-center">
                                                 Ngày lập
                                             </th>
-                                            <th className="px-2 py-1 font-medium">
+                                            <th className="sticky top-0 z-10 bg-gray-100 px-2 py-1 font-medium">
                                                 {[1, 3].includes(filters.invoice_type ?? 0)
                                                     ? "Tên người bán"
                                                     : [2, 4].includes(filters.invoice_type ?? 0)
                                                         ? "Tên người mua"
                                                         : "Tên người bán/mua"}
                                             </th>
-                                            <th className="w-18 px-2 py-1 font-medium">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-18 px-2 py-1 font-medium">
                                                 Tiền tệ
                                             </th>
-                                            <th className="w-32 px-2 py-1 font-medium text-right">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-32 px-2 py-1 font-medium text-right">
                                                 Tiền hàng
                                             </th>
-                                            <th className="w-25 px-2 py-1 font-medium text-right">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-25 px-2 py-1 font-medium text-right">
                                                 Thuế
                                             </th>
-                                            <th className="w-32 px-2 py-1 font-medium text-right">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-32 px-2 py-1 font-medium text-right">
                                                 Tổng tiền
                                             </th>
-                                            <th className="w-35 px-2 py-1 font-medium">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-35 px-2 py-1 font-medium">
                                                 Dữ liệu
                                             </th>
-                                            <th className="w-35 px-2 py-1 font-medium">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-35 px-2 py-1 font-medium">
                                                 Đồng bộ
                                             </th>
-                                            <th className="w-50 px-2 py-1 font-medium">
+                                            <th className="sticky top-0 z-10 bg-gray-100 w-50 px-2 py-1 font-medium">
                                                 Trạng thái
+                                            </th>
+                                            <th className="sticky top-0 right-0 z-30 w-20 px-2 py-1 font-medium text-center bg-gray-100">
+                                                Xem
                                             </th>
                                         </tr>
                                     </thead>
@@ -808,6 +825,17 @@ export function TaxInvoiceManager() {
                                                         type={mapInvoiceStyle[invoice.tthai as any]}
                                                         label={mapInvoiceStatus[invoice.tthai as any]}
                                                     />
+                                                </td>
+                                                <td className="px-2 py-1 sticky right-0 z-20 bg-white">
+                                                    <Tooltip title="Xem dữ liệu" subTitle="(JSON & XML)">
+                                                        <div
+                                                            className="flex gap-1 justify-center cursor-pointer"
+                                                            onClick={() => onViewData(invoice)}
+                                                        >
+                                                            <Braces size={15} className="text-red-500" />
+                                                            <CodeXml size={15} className="text-blue-500" />
+                                                        </div>
+                                                    </Tooltip>
                                                 </td>
                                             </tr>
                                         )))}

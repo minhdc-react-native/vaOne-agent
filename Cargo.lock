@@ -7148,6 +7148,7 @@ dependencies = [
  "url",
  "uuid",
  "zip 2.6.1",
+ "zstd",
 ]
 
 [[package]]
