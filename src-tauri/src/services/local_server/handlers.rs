@@ -243,7 +243,8 @@ async fn prepare_reports(reports: &mut Vec<PdfTemplate>, datas: &Vec<Value>) -> 
                             if let Some(field_name) = image.field_name.as_deref() {
                                 if let Some(data) = datas.first() {
                                     if let Some(value) = get_field_value(data, field_name) {
-                                        url = url.replace("{value}", &value);
+                                        let encoded_value = urlencoding::encode(&value);
+                                        url = url.replace("{value}", encoded_value.as_ref());
                                     }
                                 }
                             }
