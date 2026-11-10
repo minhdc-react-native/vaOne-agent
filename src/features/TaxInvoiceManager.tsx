@@ -295,13 +295,13 @@ export function TaxInvoiceManager() {
     const onViewData = useCallback((invoice: ISyncInvoice) => {
         dialog.open({
             type: "info",
-            message: `Dữ liệu`,
+            message: ``,
             title: `Hóa đơn: ${invoice.shdon}`,
             text: {
                 confirmText: "Thoát"
             },
             content: <InvoiceDataViewer invoice={invoice} />,
-            size: "2xl"
+            size: "4xl"
         });
     }, [])
 
@@ -827,13 +827,13 @@ export function TaxInvoiceManager() {
                                                     />
                                                 </td>
                                                 <td className="px-2 py-1 sticky right-0 z-20 bg-white">
-                                                    <Tooltip title="Xem dữ liệu" subTitle="(JSON & XML)">
+                                                    <Tooltip title="Xem dữ liệu" subTitle="(Hóa đơn, JSON, XML)">
                                                         <div
                                                             className="flex gap-1 justify-center cursor-pointer"
                                                             onClick={() => onViewData(invoice)}
                                                         >
-                                                            <Braces size={15} className="text-red-500" />
                                                             <CodeXml size={15} className="text-blue-500" />
+                                                            <Braces size={15} className="text-red-500" />
                                                         </div>
                                                     </Tooltip>
                                                 </td>

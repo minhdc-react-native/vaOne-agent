@@ -10,16 +10,29 @@ import {
 import clsx from "clsx";
 
 type DialogType = "question" | "info" | "success" | "error" | "warning";
-export type DialogSize = "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
+export type DialogSize =
+    | "xs"
+    | "sm"
+    | "md"
+    | "lg"
+    | "xl"
+    | "2xl"
+    | "3xl"
+    | "4xl"
+    | "5xl";
 
 const DIALOG_SIZE_CLASSES: Record<DialogSize, string> = {
-    xs: "w-full max-w-xs",       // 320px
-    sm: "w-full max-w-sm",       // 384px
-    md: "w-full max-w-md",       // 448px
-    lg: "w-full max-w-lg",       // 512px
-    xl: "w-full max-w-xl",       // 576px
-    "2xl": "w-full max-w-2xl",   // 672px
+    xs: "w-full max-w-xs",          // 320px
+    sm: "w-full max-w-sm",          // 384px
+    md: "w-full max-w-md",          // 448px
+    lg: "w-full max-w-lg",          // 512px
+    xl: "w-full max-w-xl",          // 576px
+    "2xl": "w-full max-w-2xl",      // 672px
+    "3xl": "w-full max-w-3xl",      // 768px
+    "4xl": "w-full max-w-4xl",      // 896px
+    "5xl": "w-full max-w-5xl",      // 1024px
 };
+
 interface DialogProps {
     open: boolean;
     type?: DialogType;
