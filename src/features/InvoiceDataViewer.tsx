@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     Copy,
     Check,
@@ -8,10 +8,18 @@ import {
     File,
 } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { ISyncInvoice } from "../service/syncInvoicesService";
 import { InvoicePreview } from "./InvoicePreview";
 import clsx from "clsx";
+
+import reportTemplate from "./invoice-config/report-template.json";
+import { parseInvoiceXml } from "./parseInvoiceXml";
+import { imageUrlToBase64 } from "../api/services/image.service";
+import { generatePdf } from "../api/pdf";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { IPdfProgress } from "../pages/PreviewReport";
+import { listen } from "@tauri-apps/api/event";
 
 type DataTab = "view" | "json" | "xml";
 
@@ -64,14 +72,93 @@ export function InvoiceDataViewer({
         }
     };
 
-
-
     const hasContent = Boolean(content.trim());
+
+    const invoicePdf = useMemo(
+        () => invoice?.xml_data ? parseInvoiceXml(invoice.xml_data) : null,
+        [invoice.xml_data]
+    );
+
+    // const invoicePdf = useMemo(() => {
+    //     const data = invoice?.xml_data ? parseInvoiceXml(invoice.xml_data) : null;
+
+    //     if (!data) return null;
+
+    //     return {
+    //         ...data,
+    //         items: Array.from({ length: 60 }, () => data.items).flat(),
+    //     };
+    // }, [invoice.xml_data]);
+
+    const reports: any[] = [structuredClone(reportTemplate)];
+
+    const [url, setUrl] = useState({ url: "", path: "" });
+    const handleGenerate = useCallback(async () => {
+        if (!invoicePdf) return;
+
+        for (const report of reports) {
+            if (
+                report.backgroundImage &&
+                report.backgroundImage.startsWith("http")
+            ) {
+                report.backgroundImage = await imageUrlToBase64(
+                    report.backgroundImage
+                );
+            }
+
+            for (const element of report.elements) {
+                if (
+                    element.type === "image" &&
+                    typeof element.content === "string" &&
+                    element.content.startsWith("http")
+                ) {
+                    setProgress(prev => ({ ...prev, message: "Đang xử lý hình ảnh" }));
+
+                    const url = resolveImageUrl(
+                        element.content,
+                        invoicePdf,
+                        element.fieldName
+                    );
+                    element.fieldName = "";
+                    element.content = await imageUrlToBase64(url);
+                }
+            }
+        }
+        const path = await generatePdf(reports, [invoicePdf]) as string;
+        const url = convertFileSrc(path);
+
+        setUrl({ url, path });
+    }, [reports, invoicePdf]);
+
+    const [progress, setProgress] = useState<IPdfProgress>({
+        message: "Đang thực hiện...",
+        currentReport: 1,
+        totalReport: 1,
+        current: 0,
+        total: 0
+    });
+
+    useEffect(() => {
+        let unlisten: (() => void) | undefined;
+
+        const setup = async () => {
+            unlisten = await listen("pdf-progress", (event: any) => {
+                setProgress(prev => ({ ...prev, ...event.payload }));
+            });
+            await handleGenerate();
+        };
+
+        setup();
+
+        return () => {
+            unlisten?.();
+        };
+    }, []);
 
     return (
         <div
             className={[
-                "flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white",
+                "invoice-wrapper flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white",
                 className,
             ].filter(Boolean).join(" ")}
         >
@@ -91,7 +178,7 @@ export function InvoiceDataViewer({
                     ].join(" ")}
                 >
                     <File size={16} />
-                    Thông tin
+                    Hóa đơn mẫu
                 </button>
                 <button
                     type="button"
@@ -130,13 +217,13 @@ export function InvoiceDataViewer({
             {/* Content */}
             <div
                 className={[
-                    "min-h-0 overflow-auto bg-gray-200",
+                    "invoice-scroll min-h-0 overflow-auto bg-gray-200",
                     expanded ? "h-[calc(100vh-180px)]" : "h-125",
                 ].join(" ")}
             >
                 {activeTab === "view" ? (
                     invoice.xml_data ? (
-                        <InvoicePreview xml={invoice.xml_data} />
+                        <InvoicePreview urlPdf={url.url} progress={progress} />
                     ) : (
                         <div className="flex h-full min-h-75 flex-col items-center justify-center gap-2 text-gray-900">
                             <File size={32} />
@@ -184,11 +271,11 @@ export function InvoiceDataViewer({
 
             {/* Footer */}
             <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-4 py-2">
-                {activeTab !== "view" ? <div className="flex items-center gap-3 text-[11px] text-gray-500">
+                <div className="flex items-center gap-3 text-[11px] text-gray-500">
                     <span>{lineCount} dòng</span>
                     <span>UTF-8</span>
                     <span>{activeTab.toUpperCase()}</span>
-                </div> : <div className="flex items-center gap-3 text-[11px] text-gray-500">Hiển thị từ dữ liệu XML</div>}
+                </div>
 
                 <button
                     type="button"
@@ -292,4 +379,28 @@ const formatXml = (xml: string): string => {
     } catch {
         return xml;
     }
+};
+
+const getFieldValue = (data: Record<string, any>, fieldName?: string) => {
+    if (!fieldName) return "";
+
+    const value = data[fieldName];
+
+    if (value == null) return "";
+
+    return typeof value === "string"
+        ? value
+        : String(value);
+};
+
+const resolveImageUrl = (
+    url: string,
+    invoice: Record<string, any>,
+    fieldName?: string
+) => {
+    if (!url.includes("{value}")) return url;
+
+    const value = getFieldValue(invoice, fieldName);
+
+    return url.replace("{value}", encodeURIComponent(value));
 };

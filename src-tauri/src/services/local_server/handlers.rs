@@ -24,6 +24,7 @@ use reqwest::header::CONTENT_DISPOSITION;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
 use serde::Deserialize;
+use serde_json::Value;
 use std::env;
 use std::fs;
 use tauri::{Emitter, Manager};
@@ -144,7 +145,7 @@ pub async fn render_pdf(
     // Nếu muốn gửi progress qua websocket thì giữ callback này,
     // còn không thì để rỗng.
     let mut progress = |_p: serde_json::Value| {};
-    prepare_reports(&mut reports)
+    prepare_reports(&mut reports, &datas)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
@@ -220,12 +221,13 @@ pub async fn get_printers() -> impl IntoResponse {
     }
 }
 
-async fn prepare_reports(reports: &mut Vec<PdfTemplate>) -> anyhow::Result<()> {
+async fn prepare_reports(reports: &mut Vec<PdfTemplate>, datas: &Vec<Value>) -> anyhow::Result<()> {
     for report in reports.iter_mut() {
         if let Some(background_image) = report.background_image.as_mut() {
             if background_image.starts_with("http") {
                 let url = background_image.clone();
                 let base64 = get_image_base64(&url).await.map_err(anyhow::Error::msg)?;
+
                 *background_image = base64;
             }
         }
@@ -234,9 +236,23 @@ async fn prepare_reports(reports: &mut Vec<PdfTemplate>) -> anyhow::Result<()> {
             if let Element::Image(image) = element {
                 if let Some(content) = image.content.as_ref() {
                     if content.starts_with("http") {
-                        let url = content.clone();
+                        let mut url = content.clone();
+
+                        // Thay {value} bằng dữ liệu tương ứng
+                        if url.contains("{value}") {
+                            if let Some(field_name) = image.field_name.as_deref() {
+                                if let Some(data) = datas.first() {
+                                    if let Some(value) = get_field_value(data, field_name) {
+                                        url = url.replace("{value}", &value);
+                                    }
+                                }
+                            }
+                        }
+
                         let base64 = get_image_base64(&url).await.map_err(anyhow::Error::msg)?;
+
                         image.content = Some(base64);
+                        image.field_name = None;
                     }
                 }
             }
@@ -244,4 +260,12 @@ async fn prepare_reports(reports: &mut Vec<PdfTemplate>) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn get_field_value(data: &Value, field_name: &str) -> Option<String> {
+    data.get(field_name).and_then(|value| match value {
+        Value::String(s) => Some(s.clone()),
+        Value::Null => None,
+        _ => Some(value.to_string()),
+    })
 }

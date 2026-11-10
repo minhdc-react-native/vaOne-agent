@@ -109,7 +109,7 @@ export function parseInvoiceXml(
             items: parseInvoiceItems(
                 ndHDon?.DSHHDVu?.HHDVu
             ),
-            taxItems: parseInvoiceItems(ndHDon?.TToan?.THTTLTSuat?.LTSuat),
+            taxItems: parseTaxItems(ndHDon?.TToan?.THTTLTSuat?.LTSuat),
             payment: {
                 totalBeforeTax: toNumber(
                     ndHDon?.TToan?.TgTCThue

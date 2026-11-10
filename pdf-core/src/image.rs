@@ -86,7 +86,18 @@ pub fn render_background_image(
         }
     };
 
-    draw_image(
+    // Background chỉ còn 20% độ đậm
+    let gs = ExtendedGraphicsState::default()
+        .with_current_fill_alpha(0.2)
+        .with_current_stroke_alpha(0.2);
+
+    ops.push(Op::SaveGraphicsState);
+
+    ops.push(Op::LoadGraphicsState {
+        gs: doc.add_graphics_state(gs),
+    });
+
+    let _ = draw_image(
         doc,
         ops,
         image,
@@ -95,7 +106,11 @@ pub fn render_background_image(
         page_width,
         page_height,
         page_height,
-    )
+    );
+
+    ops.push(Op::RestoreGraphicsState);
+
+    Ok(())
 }
 
 /// Render image element

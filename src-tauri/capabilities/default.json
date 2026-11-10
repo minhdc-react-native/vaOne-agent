@@ -20,6 +20,7 @@
     "dialog:allow-confirm",
     "dialog:allow-ask",
     "core:window:allow-start-dragging",
-    "updater:default"
+    "updater:default",
+    "core:webview:allow-print"
   ]
 }

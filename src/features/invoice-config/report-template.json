@@ -1,0 +1,990 @@
+{
+    "name": "report-template-data",
+    "unit": "px",
+    "paperKey": "A4",
+    "width": 794,
+    "height": 1123,
+    "backgroundColor": "#ffffff",
+    "elements": [
+        {
+            "id": "drbp6g6r5",
+            "name": "text_drbp",
+            "type": "text",
+            "x": 253.46650372050775,
+            "y": 59.131882419011134,
+            "width": 264.017401740174,
+            "height": 20,
+            "content": "HÓA ĐƠN GIÁ TRỊ GIA TĂNG",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 15,
+                "color": "#000000",
+                "textAlign": "center",
+                "fontWeight": "bold"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "72layjdv6",
+            "name": "text_72la",
+            "type": "text",
+            "x": 253.46650372050775,
+            "y": 82.0952095209521,
+            "width": 264.017401740174,
+            "height": 20,
+            "content": "{dateMonthYear(value)}",
+            "fieldName": "general.issueDate",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "center"
+            },
+            "zIndex": 1,
+            "fn": "dateMonthYear"
+        },
+        {
+            "id": "s0l2v2e8x",
+            "name": "text_s0l2",
+            "type": "text",
+            "x": 253.46650372050772,
+            "y": 103.55745574557457,
+            "width": 264.017401740174,
+            "height": 20,
+            "content": "<b>Mã CQT:</b>{value}",
+            "fieldName": "taxAuthorityCode",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "center"
+            },
+            "zIndex": 1,
+            "fn": "custom"
+        },
+        {
+            "id": "s7fzdcs87",
+            "name": "table_s7fz",
+            "type": "table",
+            "x": 32.57025702570263,
+            "y": 254.5944582769732,
+            "width": 728.030203020302,
+            "height": 60,
+            "fieldName": "items",
+            "columns": [
+                {
+                    "id": "c1",
+                    "header": "STT",
+                    "fieldName": "index",
+                    "width": 30,
+                    "headerStyle": {
+                        "fontWeight": "bold"
+                    }
+                },
+                {
+                    "id": "c2",
+                    "header": "Mã hàng",
+                    "fieldName": "code",
+                    "width": 80,
+                    "headerStyle": {
+                        "fontWeight": "bold"
+                    }
+                },
+                {
+                    "id": "c3",
+                    "header": "Tên hàng hóa, dịch vụ",
+                    "fieldName": "name",
+                    "width": 200,
+                    "headerStyle": {
+                        "fontWeight": "bold"
+                    }
+                },
+                {
+                    "id": "c4",
+                    "header": "ĐVT",
+                    "fieldName": "unit",
+                    "width": 50,
+                    "headerStyle": {
+                        "fontWeight": "bold"
+                    }
+                },
+                {
+                    "id": "c5",
+                    "header": "Số lượng",
+                    "fieldName": "quantity",
+                    "width": 80,
+                    "formatString": "SLG",
+                    "headerStyle": {
+                        "textAlign": "right",
+                        "fontWeight": "bold"
+                    },
+                    "bodyStyle": {
+                        "textAlign": "left"
+                    }
+                },
+                {
+                    "id": "c6",
+                    "header": "Đơn giá",
+                    "fieldName": "unitPrice",
+                    "width": 90,
+                    "headerStyle": {
+                        "textAlign": "right",
+                        "fontWeight": "bold"
+                    },
+                    "formatString": "GIA"
+                },
+                {
+                    "id": "c9",
+                    "header": "Thành tiền",
+                    "fieldName": "amount",
+                    "width": 100,
+                    "headerStyle": {
+                        "textAlign": "right",
+                        "fontWeight": "bold"
+                    },
+                    "formatString": "TIEN"
+                },
+                {
+                    "id": "c10",
+                    "header": "Thuế suất",
+                    "fieldName": "taxRate",
+                    "width": 100,
+                    "headerStyle": {
+                        "fontWeight": "bold"
+                    }
+                }
+            ],
+            "childElements": [],
+            "fixRow": {
+                "row": 1,
+                "data": [
+                    {
+                        "columns": [
+                            {
+                                "id": "c1",
+                                "header": "index",
+                                "fieldName": "index",
+                                "width": "auto"
+                            },
+                            {
+                                "id": "c2",
+                                "header": "code",
+                                "fieldName": "code",
+                                "width": 150
+                            },
+                            {
+                                "id": "c3",
+                                "header": "name",
+                                "fieldName": "name",
+                                "width": 150
+                            },
+                            {
+                                "id": "c4",
+                                "header": "unit",
+                                "fieldName": "unit",
+                                "width": 150
+                            },
+                            {
+                                "id": "c5",
+                                "header": "quantity",
+                                "fieldName": "quantity",
+                                "width": 150,
+                                "headerStyle": {
+                                    "textAlign": "right"
+                                },
+                                "bodyStyle": {
+                                    "textAlign": "right"
+                                },
+                                "formatString": "SLG"
+                            },
+                            {
+                                "id": "c6",
+                                "header": "unitPrice",
+                                "fieldName": "unitPrice",
+                                "width": 150,
+                                "headerStyle": {
+                                    "textAlign": "right"
+                                },
+                                "bodyStyle": {
+                                    "textAlign": "right"
+                                },
+                                "formatString": "GIA"
+                            },
+                            {
+                                "id": "c9",
+                                "header": "amount",
+                                "fieldName": "amount",
+                                "width": 150,
+                                "headerStyle": {
+                                    "textAlign": "right"
+                                },
+                                "bodyStyle": {
+                                    "textAlign": "right"
+                                },
+                                "formatString": "TIEN"
+                            },
+                            {
+                                "id": "c10",
+                                "header": "taxRate",
+                                "fieldName": "taxRate",
+                                "width": 150
+                            }
+                        ]
+                    }
+                ]
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "borderColor": "#000000",
+                "borderWidth": 1,
+                "textAlign": "left"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "ns372rl1a",
+            "name": "image_ns37",
+            "type": "image",
+            "x": 44.191998887388756,
+            "y": 39.972097209720985,
+            "width": 100,
+            "height": 100,
+            "content": "https://quickchart.io/qr?text={value}&size=300&format=png",
+            "fieldName": "qrCode",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "#e2e8f0",
+                "opacity": 1
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "xfw61pdvt",
+            "name": "table_xfw6",
+            "type": "table",
+            "x": 32.570257025702574,
+            "y": 317.3598273691782,
+            "width": 400,
+            "height": 91.95144758137026,
+            "fieldName": "taxItems",
+            "columns": [
+                {
+                    "id": "c1",
+                    "header": "Thuế suất",
+                    "fieldName": "taxRate",
+                    "width": 100,
+                    "headerStyle": {
+                        "fontWeight": "normal"
+                    }
+                },
+                {
+                    "id": "c2",
+                    "header": "Thành tiền",
+                    "fieldName": "amount",
+                    "width": 100,
+                    "headerStyle": {
+                        "fontWeight": "normal",
+                        "textAlign": "right"
+                    },
+                    "formatString": "TIEN"
+                },
+                {
+                    "id": "c3",
+                    "header": "Tiền thuế",
+                    "fieldName": "taxAmount",
+                    "width": 100,
+                    "formatString": "TIEN",
+                    "headerStyle": {
+                        "fontWeight": "normal",
+                        "textAlign": "right"
+                    }
+                }
+            ],
+            "childElements": [],
+            "fixRow": {
+                "row": 1,
+                "data": [
+                    {
+                        "columns": [
+                            {
+                                "id": "c1",
+                                "header": "taxRate",
+                                "fieldName": "taxRate",
+                                "width": "auto"
+                            },
+                            {
+                                "id": "c2",
+                                "header": "amount",
+                                "fieldName": "amount",
+                                "width": 100,
+                                "headerStyle": {
+                                    "textAlign": "right"
+                                },
+                                "formatString": "TIEN",
+                                "bodyStyle": {
+                                    "textAlign": "right"
+                                }
+                            },
+                            {
+                                "id": "c3",
+                                "header": "taxAmount",
+                                "fieldName": "taxAmount",
+                                "width": 100,
+                                "formatString": "TIEN",
+                                "headerStyle": {
+                                    "textAlign": "right"
+                                },
+                                "bodyStyle": {
+                                    "textAlign": "right"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "borderColor": "#000000",
+                "borderWidth": 1,
+                "textAlign": "left",
+                "fixPosition": true
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "oz7eiodku",
+            "name": "text_oz7e",
+            "type": "text",
+            "x": 38.82241419034349,
+            "y": 148.52454594497397,
+            "width": 712.2720733680993,
+            "height": 20,
+            "content": "<b>Tên người bán: </b>{value}",
+            "fieldName": "seller.name",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left"
+            },
+            "zIndex": 1,
+            "autoHeight": true
+        },
+        {
+            "id": "3xg62o8ow",
+            "name": "text_3xg6",
+            "type": "text",
+            "x": 38.82241419034349,
+            "y": 169.5342564286999,
+            "width": 192.27117424923574,
+            "height": 20,
+            "content": "<b>Mã số thuế: </b>{value}",
+            "fieldName": "seller.taxCode",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "ul3ix340c",
+            "name": "text_ul3i",
+            "type": "text",
+            "x": 38.82241419034349,
+            "y": 189.58280884732966,
+            "width": 712.2720733680993,
+            "height": 20,
+            "content": "<b>Địa chỉ: </b>{value}",
+            "fieldName": "seller.address",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left"
+            },
+            "zIndex": 1,
+            "autoHeight": true
+        },
+        {
+            "id": "om5mvtfd7",
+            "name": "text_om5m",
+            "type": "text",
+            "x": 243.5994327121921,
+            "y": 169.5342564286999,
+            "width": 192.27117424923574,
+            "height": 20,
+            "content": "<b>Điện thoại: </b>{value}",
+            "fieldName": "seller.phone",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "wxtg7emoi",
+            "name": "text_wxtg",
+            "type": "text",
+            "x": 38.82241419034349,
+            "y": 209.9518072289157,
+            "width": 712.2720733680993,
+            "height": 20,
+            "content": "<b>Tên người mua: </b>{value}",
+            "fieldName": "buyer.name",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left"
+            },
+            "zIndex": 1,
+            "autoHeight": true
+        },
+        {
+            "id": "yox4uwea6",
+            "name": "text_yox4",
+            "type": "text",
+            "x": 38.82241419034349,
+            "y": 231.92267577773785,
+            "width": 712.2720733680993,
+            "height": 20,
+            "content": "<b>Địa chỉ: </b>{value}",
+            "fieldName": "buyer.address",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left"
+            },
+            "zIndex": 1,
+            "autoHeight": true
+        },
+        {
+            "id": "bajd7y5su",
+            "name": "text_bajd",
+            "type": "text",
+            "x": 611.7195157687005,
+            "y": 57.91656381966197,
+            "width": 133.74734759935262,
+            "height": 20,
+            "content": "<b>Mẫu số:</b>{value}",
+            "fieldName": "general.invoiceForm",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left"
+            },
+            "zIndex": 1,
+            "fn": "custom"
+        },
+        {
+            "id": "zv2plyyfr",
+            "name": "text_zv2p",
+            "type": "text",
+            "x": 611.7195157687005,
+            "y": 78.92627430338791,
+            "width": 133.74734759935262,
+            "height": 20,
+            "content": "<b>Ký hiệu:</b>{value}",
+            "fieldName": "general.invoiceSeries",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left"
+            },
+            "zIndex": 1,
+            "fn": "custom"
+        },
+        {
+            "id": "cy6kgeiwk",
+            "name": "text_cy6k",
+            "type": "text",
+            "x": 611.7195157687005,
+            "y": 98.92627430338791,
+            "width": 133.74734759935262,
+            "height": 20,
+            "content": "<b>Số hóa đơn: </b>{value}",
+            "fieldName": "general.invoiceNumber",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left"
+            },
+            "zIndex": 1,
+            "fn": "custom"
+        },
+        {
+            "id": "f9dqj0wy1",
+            "name": "text_f9dq",
+            "type": "text",
+            "x": 439.48326655502615,
+            "y": 321.18503866211114,
+            "width": 210.33986693040822,
+            "height": 20,
+            "content": "Tổng tiền chưa thuế:",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "right",
+                "borderRadius": 4,
+                "padding": 8,
+                "fontWeight": "bold"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "coom55n5v",
+            "name": "text_coom",
+            "type": "text",
+            "x": 439.48326655502615,
+            "y": 344.18503866211114,
+            "width": 210.33986693040822,
+            "height": 20,
+            "content": "Tổng tiền thuế:",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "right",
+                "borderRadius": 4,
+                "padding": 8,
+                "fontWeight": "bold"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "cfo7pkac1",
+            "name": "text_cfo7",
+            "type": "text",
+            "x": 439.48326655502615,
+            "y": 367.18503866211114,
+            "width": 210.33986693040822,
+            "height": 20,
+            "content": "Tổng tiền chiết khấu thương mại:",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "right",
+                "borderRadius": 4,
+                "padding": 8,
+                "fontWeight": "bold"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "7ikdc485a",
+            "name": "text_7ikd",
+            "type": "text",
+            "x": 439.48326655502615,
+            "y": 390.18503866211114,
+            "width": 210.33986693040822,
+            "height": 20,
+            "content": "Tổng tiền thanh toán bằng số:",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "right",
+                "borderRadius": 4,
+                "padding": 8,
+                "fontWeight": "bold"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "hqrt8l2fn",
+            "name": "text_hqrt",
+            "type": "text",
+            "x": 650.47440358134,
+            "y": 321.18503866211114,
+            "width": 108.11634598093868,
+            "height": 20,
+            "content": "{formatNumber(value,\"TIEN\")}",
+            "fieldName": "payment.totalBeforeTax",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "right",
+                "fontWeight": "bold"
+            },
+            "zIndex": 1,
+            "formatString": "",
+            "fn": "formatNumber"
+        },
+        {
+            "id": "zt3y2flet",
+            "name": "text_zt3y",
+            "type": "text",
+            "x": 649.464693097614,
+            "y": 344.18503866211114,
+            "width": 108.11634598093868,
+            "height": 20,
+            "content": "{formatNumber(value,\"TIEN\")}",
+            "fieldName": "payment.totalTax",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "right",
+                "fontWeight": "bold"
+            },
+            "zIndex": 1,
+            "formatString": "",
+            "fn": "formatNumber"
+        },
+        {
+            "id": "3p6kjhhzd",
+            "name": "text_3p6k",
+            "type": "text",
+            "x": 650.47440358134,
+            "y": 367.18503866211114,
+            "width": 108.11634598093868,
+            "height": 20,
+            "content": "{formatNumber(value,\"TIEN\")}",
+            "fieldName": "payment.totalDiscount",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "right",
+                "fontWeight": "bold"
+            },
+            "zIndex": 1,
+            "formatString": "",
+            "fn": "formatNumber"
+        },
+        {
+            "id": "dhblt95vv",
+            "name": "text_dhbl",
+            "type": "text",
+            "x": 650.47440358134,
+            "y": 390.18503866211114,
+            "width": 108.11634598093868,
+            "height": 20,
+            "content": "{formatNumber(value,\"TIEN\")}",
+            "fieldName": "payment.totalPayment",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "right",
+                "fontWeight": "bold"
+            },
+            "zIndex": 1,
+            "formatString": "",
+            "fn": "formatNumber"
+        },
+        {
+            "id": "r73ck4ukn",
+            "name": "text_r73c",
+            "type": "text",
+            "x": 38.82241419034349,
+            "y": 414.55403704369724,
+            "width": 712.2720733680993,
+            "height": 20,
+            "content": "<b>Tổng tiền thanh toán bằng chữ: </b> {moneyToWords(value)} đồng.",
+            "fieldName": "payment.totalPayment",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "left"
+            },
+            "zIndex": 1,
+            "autoHeight": true,
+            "fn": "moneyToWords"
+        },
+        {
+            "id": "2cojdf0hs",
+            "name": "text_2coj",
+            "type": "text",
+            "x": 454.2046803074526,
+            "y": 455.75389284879003,
+            "width": 264,
+            "height": 20,
+            "content": "NGƯỜI BÁN HÀNG",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "center",
+                "fontWeight": "bold"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "16eu8x2aq",
+            "name": "text_16eu",
+            "type": "text",
+            "x": 89.50214805115988,
+            "y": 455.75389284879003,
+            "width": 264,
+            "height": 20,
+            "content": "NGƯỜI MUA HÀNG",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "center",
+                "fontWeight": "bold"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "rd5yio4fk",
+            "name": "text_rd5y",
+            "type": "text",
+            "x": 89.50214805115988,
+            "y": 478.50566444884015,
+            "width": 264,
+            "height": 20,
+            "content": "(Chữ ký số (nếu có))",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "center",
+                "fontStyle": "italic"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "2fsjc6ybz",
+            "name": "text_2fsj",
+            "type": "text",
+            "x": 454.2046803074526,
+            "y": 478.50566444884015,
+            "width": 264,
+            "height": 20,
+            "content": "(Chữ ký điện tử, chữ ký số)",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "center",
+                "fontStyle": "italic"
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "1vkfellod",
+            "name": "text_1vkf",
+            "type": "text",
+            "x": 147.87114643274595,
+            "y": 1062.0794821075347,
+            "width": 519.0685128573998,
+            "height": 20,
+            "content": "(Cần kiểm tra, đối chiếu khi lập, nhận hóa đơn)",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#000000",
+                "textAlign": "center",
+                "fontStyle": "italic",
+                "fixPosition": true
+            },
+            "zIndex": 1
+        },
+        {
+            "id": "akgp6wu5n",
+            "name": "text_akgp",
+            "type": "text",
+            "x": 253.46650372050772,
+            "y": 124.29149433555116,
+            "width": 264.017401740174,
+            "height": 20,
+            "content": "(hóa đơn mẫu không có giá trị pháp lý)",
+            "childElements": [],
+            "fixRow": {
+                "row": 0,
+                "data": []
+            },
+            "style": {
+                "backgroundColor": "transparent",
+                "opacity": 1,
+                "fontSize": 11,
+                "color": "#4c4848",
+                "textAlign": "center",
+                "fontStyle": "italic"
+            },
+            "zIndex": 1
+        }
+    ],
+    "backgroundImage": "https://ai-print-template-designer.vercel.app/background/a4-01.jpeg"
+}

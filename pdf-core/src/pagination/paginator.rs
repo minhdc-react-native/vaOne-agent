@@ -226,14 +226,13 @@ impl Paginator {
                 ctx.previous_design_bottom = item.design_bottom();
                 continue;
             }
+            let fix_position = item.fix_position();
             match item {
                 PageItem::Table { element, layout } => {
-                    Self::paginate_table(element, layout, &mut ctx, continuous);
+                    Self::paginate_table(element, layout, &mut ctx, continuous, fix_position);
                 }
 
                 mut item => {
-                    let fix_position = item.fix_position();
-
                     if fix_position {
                         // Không thay đổi vị trí của item
                         ctx.current_y = item.bottom();
@@ -293,6 +292,7 @@ impl Paginator {
         layout: TableLayoutResult,
         ctx: &mut PaginationContext,
         continuous: bool,
+        fix_position: bool,
     ) {
         let design_bottom = element.y + element.height;
         let header_height = layout.header_height();
@@ -308,6 +308,7 @@ impl Paginator {
 
         let template = layout.empty_body();
         let rows = layout.rows;
+
         let spacing = element.y - ctx.previous_design_bottom;
         ctx.current_y += spacing;
 
@@ -315,26 +316,25 @@ impl Paginator {
         table.translate_y(ctx.current_y - table.y);
 
         for row in rows {
-            // Chiều cao nếu thêm row này
             let next_height = table.height + row.height;
-
             let available_height = ctx.page_height - ctx.margin_bottom;
-            // Không còn đủ chỗ trên trang hiện tại
-            if !continuous
+
+            if !fix_position
+                && !continuous
                 && ctx.current_y + next_height > available_height
                 && (!table.rows.is_empty()
                     || !ctx.current_page.is_empty()
                     || ctx.current_y > ctx.margin_top)
             {
-                // The first product group may already be too tall for the space
-                // below the receipt heading. Move it intact without emitting an
-                // orphan table header on the previous page.
                 if !table.rows.is_empty() {
                     table.recalc_height();
 
                     let mut table_element = element.clone();
                     table_element.y = table.y;
-                    table_element.height = table.height;
+
+                    if !fix_position {
+                        table_element.height = table.height;
+                    }
 
                     ctx.current_page.push(PageItem::Table {
                         element: table_element,
@@ -342,7 +342,6 @@ impl Paginator {
                     });
                 }
 
-                // Sang trang mới
                 ctx.new_page();
 
                 table = template.clone();
@@ -357,11 +356,12 @@ impl Paginator {
 
             let mut table_element = element;
             table_element.y = table.y;
-            table_element.height = table.height;
 
-            ctx.current_y = table.bottom();
-
-            ctx.previous_design_bottom = design_bottom;
+            if !fix_position {
+                table_element.height = table.height;
+                ctx.current_y = table.bottom();
+                ctx.previous_design_bottom = design_bottom;
+            }
 
             ctx.current_page.push(PageItem::Table {
                 element: table_element,

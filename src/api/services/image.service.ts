@@ -1,17 +1,37 @@
 import axios from "axios";
 
 export async function imageUrlToBase64(url: string): Promise<string> {
-    const response = await axios.get(url, {
-        responseType: "blob",
-    });
+    try {
+        const response = await axios.get(url, {
+            responseType: "blob",
+        });
 
-    return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
+        console.log("image response:", {
+            url,
+            status: response.status,
+            contentType: response.headers["content-type"],
+            size: response.data.size,
+        });
 
-        reader.onloadend = () => resolve(reader.result as string);
+        return await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
 
-        reader.onerror = reject;
+            reader.onload = () => {
+                if (typeof reader.result === "string") {
+                    resolve(reader.result);
+                } else {
+                    reject(new Error("Không thể convert image sang base64"));
+                }
+            };
 
-        reader.readAsDataURL(response.data);
-    });
+            reader.onerror = () => {
+                reject(reader.error ?? new Error("FileReader error"));
+            };
+
+            reader.readAsDataURL(response.data);
+        });
+    } catch (error) {
+        console.error("imageUrlToBase64 error:", url, error);
+        throw error;
+    }
 }

@@ -1,0 +1,54 @@
+{
+    "general": {
+        "version": "2.1.0",
+        "invoiceName": "Hóa đơn giá trị gia tăng",
+        "invoiceForm": "1",
+        "invoiceSeries": "C26MCP",
+        "invoiceNumber": "355525",
+        "issueDate": "2026-11-10",
+        "currency": "VND",
+        "exchangeRate": 1,
+        "paymentMethod": "TM/CK",
+        "taxAuthorityCode": "M1-26-R7SQR-00000355667"
+    },
+    "seller": {
+        "name": "CÔNG TY TNHH MỘT THÀNH VIÊN CHUNG PHÁT",
+        "taxCode": "1101224110",
+        "address": "Ấp Cầu Tràm, Khu công nghiệp Cầu Tràm, Xã Rạch Kiến, Tỉnh Tây Ninh, Việt Nam",
+        "phone": ""
+    },
+    "buyer": {
+        "name": "Bán cho người tiêu dùng",
+        "address": "-"
+    },
+    "items": [
+        {
+            "index": 1,
+            "code": "E10",
+            "name": "Xăng E10 RON 95 Mức 3",
+            "unit": "Lít",
+            "quantity": 0.9456,
+            "unitPrice": 21150,
+            "discountRate": 0,
+            "discountAmount": 0,
+            "amount": 20000,
+            "taxRate": "KKKNT"
+        }
+    ],
+    "taxItems": [
+        {
+            "taxRate": "KKKNT",
+            "amount": 20000,
+            "taxAmount": 20000
+        }
+    ],
+    "payment": {
+        "totalBeforeTax": 20000,
+        "totalDiscount": 0,
+        "totalTax": 0,
+        "totalPayment": 20000,
+        "totalPaymentInWords": "Hai mươi nghìn đồng"
+    },
+    "qrCode": "000201999600323A24D5ACAC614F12E5B6536E5CA8138601101101224110020110306C26MCP04063555250508202611100605200006304E8A3",
+    "taxAuthorityCode": "M1-26-R7SQR-00000355667"
+}
