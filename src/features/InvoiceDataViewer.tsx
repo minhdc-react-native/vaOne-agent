@@ -9,11 +9,10 @@ import {
 } from "lucide-react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
-import { ISyncInvoice } from "../service/syncInvoicesService";
+import { ISyncInvoice, syncInvoiceService } from "../service/syncInvoicesService";
 import { InvoicePreview } from "./InvoicePreview";
 import clsx from "clsx";
 
-import reportTemplate from "./invoice-config/report-template.json";
 import { parseInvoiceXml } from "./parseInvoiceXml";
 import { imageUrlToBase64 } from "../api/services/image.service";
 import { generatePdf } from "../api/pdf";
@@ -54,6 +53,11 @@ export function InvoiceDataViewer({
         return formatXml(invoice.xml_data);
     }, [invoice.xml_data]);
 
+    const invoicePdf = useMemo(
+        () => invoice?.xml_data ? parseInvoiceXml(invoice.xml_data) : null,
+        [invoice.xml_data]
+    );
+
     const content = activeTab === "json"
         ? jsonContent
         : xmlContent;
@@ -64,7 +68,7 @@ export function InvoiceDataViewer({
 
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(content);
+            await navigator.clipboard.writeText(activeTab !== "view" ? content : JSON.stringify(invoicePdf));
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1500);
         } catch (error) {
@@ -73,11 +77,6 @@ export function InvoiceDataViewer({
     };
 
     const hasContent = Boolean(content.trim());
-
-    const invoicePdf = useMemo(
-        () => invoice?.xml_data ? parseInvoiceXml(invoice.xml_data) : null,
-        [invoice.xml_data]
-    );
 
     // const invoicePdf = useMemo(() => {
     //     const data = invoice?.xml_data ? parseInvoiceXml(invoice.xml_data) : null;
@@ -90,45 +89,42 @@ export function InvoiceDataViewer({
     //     };
     // }, [invoice.xml_data]);
 
-    const reports: any[] = [structuredClone(reportTemplate)];
-
     const [url, setUrl] = useState({ url: "", path: "" });
     const handleGenerate = useCallback(async () => {
         if (!invoicePdf) return;
+        const report: any = await syncInvoiceService.getReportTemplate();
 
-        for (const report of reports) {
+        if (
+            report.backgroundImage &&
+            report.backgroundImage.startsWith("http")
+        ) {
+            report.backgroundImage = await imageUrlToBase64(
+                report.backgroundImage
+            );
+        }
+
+        for (const element of report.elements) {
             if (
-                report.backgroundImage &&
-                report.backgroundImage.startsWith("http")
+                element.type === "image" &&
+                typeof element.content === "string" &&
+                element.content.startsWith("http")
             ) {
-                report.backgroundImage = await imageUrlToBase64(
-                    report.backgroundImage
+                setProgress(prev => ({ ...prev, message: "Đang xử lý hình ảnh" }));
+
+                const url = resolveImageUrl(
+                    element.content,
+                    invoicePdf,
+                    element.fieldName
                 );
-            }
-
-            for (const element of report.elements) {
-                if (
-                    element.type === "image" &&
-                    typeof element.content === "string" &&
-                    element.content.startsWith("http")
-                ) {
-                    setProgress(prev => ({ ...prev, message: "Đang xử lý hình ảnh" }));
-
-                    const url = resolveImageUrl(
-                        element.content,
-                        invoicePdf,
-                        element.fieldName
-                    );
-                    element.fieldName = "";
-                    element.content = await imageUrlToBase64(url);
-                }
+                element.fieldName = "";
+                element.content = await imageUrlToBase64(url);
             }
         }
-        const path = await generatePdf(reports, [invoicePdf]) as string;
+        const path = await generatePdf([report], [invoicePdf]) as string;
         const url = convertFileSrc(path);
 
         setUrl({ url, path });
-    }, [reports, invoicePdf]);
+    }, [invoicePdf]);
 
     const [progress, setProgress] = useState<IPdfProgress>({
         message: "Đang thực hiện...",
@@ -280,15 +276,15 @@ export function InvoiceDataViewer({
                 <button
                     type="button"
                     onClick={handleCopy}
-                    disabled={!hasContent || activeTab !== "view"}
-                    className={clsx("flex items-center cursor-pointer gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50", activeTab === "view" && "opacity-0")}
+                    disabled={!hasContent}
+                    className={clsx("flex items-center cursor-pointer gap-1.5 rounded-md border border-gray-200 px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50")}
                 >
                     {copied ? (
                         <Check size={14} className="text-green-600" />
                     ) : (
                         <Copy size={14} />
                     )}
-                    {copied ? "Đã copy" : "Sao chép"}
+                    {copied ? "Đã copy" : "Sao chép dữ liệu"}
                 </button>
             </div>
         </div>

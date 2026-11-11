@@ -115,6 +115,9 @@ export interface ISyncConfig {
 }
 
 export const syncInvoiceService = {
+    getReportTemplate: (): Promise<any> =>
+        invoke<any>("get_report_template"),
+
     getInvoiceStats: (taxCode: string) =>
         invoke<IInvoiceStats>("get_invoice_stats", { taxCode }),
 

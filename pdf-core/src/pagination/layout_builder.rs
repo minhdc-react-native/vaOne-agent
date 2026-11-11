@@ -73,6 +73,13 @@ impl LayoutBuilder {
 
                     current_offset += layout.height - element.height;
 
+                    // if element.name.as_deref() == Some("text_71j4") {
+                    //     println!(
+                    //         "buyer.taxCode={:#?} layout={:#?} element.content={}",
+                    //         context, layout.lines, element.content
+                    //     );
+                    // }
+
                     items.push(PageItem::Text { element, layout });
                 }
 

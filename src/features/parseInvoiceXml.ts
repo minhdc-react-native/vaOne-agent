@@ -1,11 +1,35 @@
 import { XMLParser } from "fast-xml-parser";
 import type { IInvoice, IInvoiceItem, ITaxItem } from "./InvoicePreview";
 
+const ARRAY_XML_PATHS = [
+    "HDon.DLHDon.NDHDon.DSHHDVu.HHDVu",
+    "HDon.DLHDon.TTChung.TTKhac.TTin",
+    "HDon.DLHDon.NDHDon.TToan.THTTLTSuat.LTSuat",
+];
+
 const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: "@_",
+    parseTagValue: true,
+    parseAttributeValue: true,
     trimValues: true,
+    isArray: (_name, jpath) =>
+        typeof jpath === "string" &&
+        ARRAY_XML_PATHS.includes(jpath),
 });
+
+export function parseXmlToJson(
+    xml: string | null
+): any {
+    if (!xml?.trim()) {
+        return {};
+    }
+    try {
+        return parser.parse(xml);
+    } catch (error) {
+        return {}
+    }
+}
 
 export function parseInvoiceXml(
     xml: string

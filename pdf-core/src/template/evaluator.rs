@@ -32,7 +32,7 @@ impl Evaluator {
         // Ok(resolve_value(data, expr))
         Ok(resolve_value(data, expr)
             .map(|v| value_to_string(&v))
-            .unwrap_or_else(|| format!("{{{}}}", expr)))
+            .unwrap_or_default())
     }
 
     fn eval_function(expr: &str, data: &Value, ctx: FormatterContext) -> Result<String> {

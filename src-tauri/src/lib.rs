@@ -230,6 +230,7 @@ pub fn run() {
             commands::system::captcha_predict,
             commands::system::open_modal_window,
             commands::system::sync_current_progress,
+            commands::system::get_report_template,
             commands::tax_accounts::get_tax_accounts,
             commands::tax_accounts::create_tax_account,
             commands::tax_accounts::update_tax_account,

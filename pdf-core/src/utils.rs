@@ -84,7 +84,7 @@ pub fn resolve_value(data: &Value, path: &str) -> Option<Value> {
     }
 
     match current {
-        Value::Null => Some(Value::String(String::new())),
+        Value::Null => None,
         _ => Some(current.clone()),
     }
 }
@@ -102,10 +102,11 @@ pub fn bind_content(template: &str, data: &Value) -> String {
             })
             .unwrap_or_default();
     }
+
     let re = Regex::new(r"\{([^{}]+)\}").unwrap();
 
     re.replace_all(template, |caps: &regex::Captures| {
-        let value = resolve_value(data, &caps[1])
+        resolve_value(data, &caps[1])
             .map(|v| match v {
                 Value::String(s) => s,
                 Value::Number(n) => n.to_string(),
@@ -113,8 +114,7 @@ pub fn bind_content(template: &str, data: &Value) -> String {
                 Value::Null => String::new(),
                 other => other.to_string(),
             })
-            .unwrap_or_else(|| format!("{{{}}}", &caps[1]));
-        return value;
+            .unwrap_or_default()
     })
     .into_owned()
 }

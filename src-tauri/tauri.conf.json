@@ -59,7 +59,8 @@
       "signingIdentity": "Developer ID Application: Duy Thanh Vũ (YTH6G323A9)"
     },
     "resources": [
-      "resources/pdfium/pdfium.dll"
+      "resources/pdfium/pdfium.dll",
+      "resources/report-template.json"
     ]
   },
   "plugins": {

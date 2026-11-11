@@ -32,6 +32,7 @@ export async function imageUrlToBase64(url: string): Promise<string> {
         });
     } catch (error) {
         console.error("imageUrlToBase64 error:", url, error);
-        throw error;
+        // throw error;
+        return "";
     }
 }

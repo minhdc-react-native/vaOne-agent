@@ -1,14 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { parseInvoiceXml } from "./parseInvoiceXml";
-import { QRCodeSVG } from "qrcode.react";
-import clsx from "clsx";
-import { imageUrlToBase64 } from "../api/services/image.service";
-import { generatePdf } from "../api/pdf";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { IPdfProgress } from "../pages/PreviewReport";
-import { listen } from "@tauri-apps/api/event";
 import Progress from "../components/Progress";
-import reportTemplate from "./invoice-config/report-template.json";
 export interface IInvoice {
     general: {
         version?: string;

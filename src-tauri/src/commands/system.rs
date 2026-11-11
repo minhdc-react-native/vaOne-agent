@@ -231,3 +231,16 @@ fn get_path(db_name: &str) -> Result<std::path::PathBuf, String> {
 
     Ok(path)
 }
+
+#[tauri::command]
+pub fn get_report_template(app: AppHandle) -> Result<serde_json::Value, String> {
+    let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
+
+    let path = resource_dir.join("resources/report-template.json");
+
+    println!("Resource directory: {:?}", resource_dir);
+
+    let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+
+    serde_json::from_str(&content).map_err(|e| e.to_string())
+}

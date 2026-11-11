@@ -166,9 +166,9 @@ impl TextLayout {
         let max_width = item.width - 4.0;
 
         let tokens = Tokenizer::tokenize(&item.content);
-        // if item.name.as_deref() == Some("text_wcjj") {
-        //     println!("element={:#?} tokens={:#?}", item, tokens);
-        // }
+        if item.name.as_deref() == Some("text_71j4") {
+            println!("element={:#?} tokens={:#?}  data={:#?}", item, tokens, data);
+        }
         let runs = Parser::parse(&tokens, data, ctx);
 
         let words = Self::split_runs(runs);
@@ -320,19 +320,14 @@ impl TextLayout {
     pub fn build_context(data: &Value, source: &str, target: &str, watch: &[String]) -> Value {
         let mut map = Map::new();
 
-        if let Some(value) = resolve_value(data, source) {
-            Self::insert_nested(&mut map, source, value.clone());
-            Self::insert_nested(&mut map, target, value);
-        }
+        let value = resolve_value(data, source).unwrap_or(Value::Null);
+
+        Self::insert_nested(&mut map, source, value.clone());
+        Self::insert_nested(&mut map, target, value);
 
         for field in watch {
-            println!(
-                "watch field={} data={:#?},data field={}",
-                field, data, data[field]
-            );
-            if let Some(value) = resolve_value(data, field) {
-                Self::insert_nested(&mut map, field, value);
-            }
+            let value = resolve_value(data, field).unwrap_or(Value::Null);
+            Self::insert_nested(&mut map, field, value);
         }
 
         Value::Object(map)
