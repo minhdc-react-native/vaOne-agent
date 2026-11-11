@@ -68,7 +68,11 @@ export function InvoiceDataViewer({
 
     const handleCopy = async () => {
         try {
-            await navigator.clipboard.writeText(activeTab !== "view" ? content : JSON.stringify(invoicePdf));
+            const invoicePdfPreview = {
+                ...invoicePdf,
+                items: invoicePdf?.items?.slice(0, 3) ?? [],
+            };
+            await navigator.clipboard.writeText(activeTab !== "view" ? content : JSON.stringify(invoicePdfPreview));
             setCopied(true);
             window.setTimeout(() => setCopied(false), 1500);
         } catch (error) {
