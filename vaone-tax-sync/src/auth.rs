@@ -919,7 +919,7 @@ impl TaxAuthService {
                     .clone()
                     .unwrap_or_else(|| format!("https://{}.vaonline.vn", access_code));
                 // 1. Đăng nhập ứng dụng.
-                let logout_url = format!("{base_url}/api/User/Logout");
+                let logout_url = format!("{base_url}/api/Account/Logout");
 
                 let access_token =
                     format!("{};{};{};{}", app_token, org_unit, get_current_year(), "vi");
