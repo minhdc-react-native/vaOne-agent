@@ -70,7 +70,7 @@ export function InvoiceDataViewer({
         try {
             const invoicePdfPreview = {
                 ...invoicePdf,
-                items: invoicePdf?.items?.slice(0, 3) ?? [],
+                items: invoicePdf?.items?.slice(0, 1) ?? [],
             };
             await navigator.clipboard.writeText(activeTab !== "view" ? content : JSON.stringify(invoicePdfPreview));
             setCopied(true);
