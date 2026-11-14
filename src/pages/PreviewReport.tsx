@@ -1,7 +1,7 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { generatePdf, printPdf } from "../api/pdf";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import AppWindow from "../components/AppWindow";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import AppWindow, { IWindowConfig } from "../components/AppWindow";
 import { useLocation } from "react-router-dom";
 import { imageUrlToBase64 } from "../api/services/image.service";
 import { listen } from "@tauri-apps/api/event";
@@ -20,7 +20,6 @@ export const PreviewReport = () => {
     const { reports, datas } = location.state || {};
     const [url, setUrl] = useState({ url: "", path: "" });
     const handleGenerate = async () => {
-        await invoke("page_ready", { name: 'report' });
         for (const report of reports) {
             if (report.backgroundImage && report.backgroundImage.startsWith("http")) {
                 report.backgroundImage = await imageUrlToBase64(report.backgroundImage);
@@ -70,10 +69,15 @@ export const PreviewReport = () => {
         await printPdf(url.path);
     }
     useEffect(() => {
-        console.log('progress>>', JSON.stringify(progress));
+        // console.log('progress>>', JSON.stringify(progress));
     }, [progress])
+
+    const config = useMemo<IWindowConfig>(() => {
+        return { name: "report" }
+    }, []);
+
     return (
-        <AppWindow title={"Preview Report"} icon="Printer"
+        <AppWindow title={"Preview Report"} icon="Printer" config={config}
         // content={
         //     (
         //         <div className="flex gap-1 py-2 pr-2 mr-2 border-r border-gray-300 w-50">

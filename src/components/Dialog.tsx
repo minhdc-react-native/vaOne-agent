@@ -7,8 +7,31 @@ import {
     Info,
     HelpCircle,
 } from "lucide-react";
+import clsx from "clsx";
 
 type DialogType = "question" | "info" | "success" | "error" | "warning";
+export type DialogSize =
+    | "xs"
+    | "sm"
+    | "md"
+    | "lg"
+    | "xl"
+    | "2xl"
+    | "3xl"
+    | "4xl"
+    | "5xl";
+
+const DIALOG_SIZE_CLASSES: Record<DialogSize, string> = {
+    xs: "w-full max-w-xs",          // 320px
+    sm: "w-full max-w-sm",          // 384px
+    md: "w-full max-w-md",          // 448px
+    lg: "w-full max-w-lg",          // 512px
+    xl: "w-full max-w-xl",          // 576px
+    "2xl": "w-full max-w-2xl",      // 672px
+    "3xl": "w-full max-w-3xl",      // 768px
+    "4xl": "w-full max-w-4xl",      // 896px
+    "5xl": "w-full max-w-5xl",      // 1024px
+};
 
 interface DialogProps {
     open: boolean;
@@ -16,10 +39,12 @@ interface DialogProps {
     title?: string;
     message?: string;
     icon?: ReactNode;
+    content?: ReactNode;
     confirmText?: string;
     cancelText?: string;
     onConfirm?: () => void;
     onCancel?: () => void;
+    size?: DialogSize;
 }
 
 const typeConfig = {
@@ -53,12 +78,14 @@ const typeConfig = {
 export default function Dialog({
     open,
     type = "info",
+    size = "md",
     title,
     message,
     confirmText = "OK",
     cancelText = "Cancel",
     onConfirm,
     onCancel,
+    content
 }: DialogProps) {
     if (!open) return null;
 
@@ -67,7 +94,7 @@ export default function Dialog({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="w-95 rounded-xl bg-white p-5 shadow-lg">
+            <div className={clsx("rounded-xl bg-white p-5 shadow-lg", DIALOG_SIZE_CLASSES[size])}>
                 {/* Header */}
                 <div className="flex items-center gap-3">
                     <div className={cn("rounded-full p-2", config.bg)}>
@@ -85,7 +112,7 @@ export default function Dialog({
                         {message}
                     </div>
                 )}
-
+                {content}
                 {/* Actions */}
                 <div className="mt-5 flex justify-end gap-2">
                     {type === "question" && (

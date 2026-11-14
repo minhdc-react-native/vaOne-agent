@@ -11,11 +11,14 @@ import { cn } from "../lib/utils";
 
 export interface InputProps
     extends InputHTMLAttributes<HTMLInputElement> {
-    label?: string;
+    label?: ReactNode;
     labelPosition?: "top" | "left" | "right";
+    labelWidth?: number;
     error?: string;
     icon?: ReactNode;
     password?: boolean;
+    sizeInput?: 'sm' | 'xs';
+    classInput?: string;
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -23,12 +26,16 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {
             label,
             labelPosition = "top",
+            labelWidth,
             error,
             icon,
             password = false,
             className,
             type,
             disabled,
+            sizeInput = 'sm',
+            classInput,
+            required,
             ...props
         },
         ref
@@ -48,24 +55,28 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
         const labelClass =
             labelPosition === "top"
-                ? "text-sm font-medium"
-                : "text-sm font-medium whitespace-nowrap";
+                ? "flex gap-1 items-center font-medium"
+                : "flex gap-1 items-center font-medium whitespace-nowrap";
 
         return (
-            <div className={cn("w-full", wrapperClass)}>
+            <div className={cn("w-full", wrapperClass,
+                sizeInput === "sm" ? "text-sm" : "text-xs"
+            )}>
                 {label && (
-                    <label className={labelClass}>
-                        {label}
+                    <label className={labelClass} style={{ width: labelWidth }}>
+                        {label} {required && <span className="text-red-500">*</span>}
                     </label>
                 )}
 
                 <div
                     className={cn(
-                        "flex h-9 w-full min-w-0 items-center rounded-lg border bg-white px-3",
+                        "flex w-full h-6 min-w-0 items-center border bg-white px-3",
                         "transition-colors",
                         "focus-within:border-(--primary)",
                         error ? "border-red-500" : "border-(--border)",
-                        disabled && "opacity-60"
+                        disabled && "opacity-60",
+                        sizeInput === "sm" ? "rounded-sm h-7" : "rounded-sm h-7",
+                        classInput
                     )}
                 >
                     {icon && (
@@ -79,7 +90,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                         type={inputType}
                         disabled={disabled}
                         className={cn(
-                            "flex-1 min-w-0 bg-transparent text-sm outline-none",
+                            "flex-1 min-w-0 bg-transparent outline-none",
                             "appearance-none",
                             "placeholder:text-gray-400",
                             className
@@ -90,6 +101,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                     {password && (
                         <button
                             type="button"
+                            tabIndex={-1}
                             onClick={() =>
                                 setShowPassword((v) => !v)
                             }

@@ -12,8 +12,9 @@ pub async fn http_get(
     token: Option<String>,
     delay: Option<u64>,
     headers: Option<HashMap<String, String>>,
+    params: Option<HashMap<String, serde_json::Value>>,
 ) -> ApiResult<Value> {
-    http::get(&url, token.as_deref(), delay, headers).await
+    http::get(&url, token.as_deref(), delay, headers, params).await
 }
 
 #[tauri::command]
