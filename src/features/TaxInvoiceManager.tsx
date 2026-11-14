@@ -1,5 +1,5 @@
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
     useGetInvoiceStats,
     useGetSyncDays,
@@ -110,6 +110,7 @@ const initialSync: ISyncConfig = {
     toDate: dateMonth.toDate,
     taxSync: true,
     appSync: false,
+    deleteData: false,
 };
 
 function StatCard({
@@ -247,13 +248,45 @@ export function TaxInvoiceManager() {
             });
             return;
         };
-        if (!syncConfig.taxSync && (!account?.auto_sync || !syncConfig.appSync)) {
+        if (!syncConfig.taxSync && (!account?.auto_sync || (!syncConfig.appSync && !syncConfig.deleteData))) {
             showNotification({
                 type: "warning",
                 message: "Bạn phải chọn ít nhất 1 chức năng!"
             });
             return;
         };
+        const actions = [
+            {
+                enabled: syncConfig.taxSync,
+                text: (
+                    <>
+                        Quét lại dữ liệu từ{" "}
+                        <span className="font-bold text-red-700">cơ quan thuế</span>
+                        {" "}để lấy bổ sung dữ liệu còn thiếu và cập nhật thông tin hóa đơn.
+                    </>
+                ),
+            },
+            {
+                enabled: account?.auto_sync && syncConfig.appSync,
+                text: (
+                    <>
+                        Đồng bộ lại toàn bộ hóa đơn trong khoảng thời gian này sang ứng dụng{" "}
+                        <span className="font-bold text-red-700">{account?.type_app}</span>.
+                    </>
+                ),
+            },
+            {
+                enabled: syncConfig.deleteData,
+                text: (
+                    <>
+                        <span className="font-bold text-red-700">Xóa dữ liệu</span> hóa đơn đã tải về trong khoảng thời gian này nhằm giảm dung lượng lưu trữ.
+                    </>
+                ),
+            },
+        ];
+
+        const enabledActions = actions.filter(item => item.enabled);
+
         const confirmed = await dialog.question(
             `Mã số thuế: ${taxCodeSelect} muốn trong khoảng thời gian này thực hiện?`,
             `Từ ngày: ${formatDate(filters.from_date)} đến ngày ${formatDate(filters.to_date)}`,
@@ -261,14 +294,13 @@ export function TaxInvoiceManager() {
                 confirmText: "Xác nhận"
             },
             <div className="mt-2 rounded-sm border border-gray-300 px-2.5 py-2 text-xs">
-                <div className="italic leading-relaxed">
-                    {syncConfig.taxSync && <i className="block">
-                        1. Quét lại dữ liệu từ <span className="font-bold text-red-700">cơ quan thuế</span> những dữ liệu còn thiếu và cập nhật thông tin mới nhất.
-                    </i>}
-
-                    {account?.auto_sync && syncConfig.appSync && <i className="block">
-                        {syncConfig.taxSync ? '2.' : '1.'} Đồng bộ lại sang ứng <span className="font-bold text-red-700">{account?.type_app}</span> tất cả hóa đơn trong khoảng thời gian này.
-                    </i>}
+                <div className="space-y-1 italic leading-relaxed">
+                    {enabledActions.map((item, index) => (
+                        <div key={index}>
+                            <span>{index + 1}. </span>
+                            {item.text}
+                        </div>
+                    ))}
                 </div>
             </div>
 
@@ -277,7 +309,7 @@ export function TaxInvoiceManager() {
         resetSyncStatus({
             ...syncConfig,
             fromDate: filters.from_date,
-            toDate: filters.to_date
+            toDate: filters.to_date,
         },
             {
                 onSuccess: () => {
@@ -334,6 +366,59 @@ export function TaxInvoiceManager() {
     const config = useMemo<IWindowConfig>(() => {
         return { name: "historyInvoice", show: true, fullScreen }
     }, [fullScreen]);
+
+    const contentHelp = useMemo((): Record<'taxSync' | 'appSync' | 'deleteData', ReactNode> => {
+        return {
+            taxSync: (
+                <div className="space-y-2 p-1">
+                    <div className="font-bold">
+                        Lấy lại dữ liệu thiếu từ cơ quan thuế
+                    </div>
+                    <div className="rounded-sm border border-yellow-700/50 bg-yellow-950/40 px-2.5 py-2 text-xs text-yellow-100">
+                        <div className="italic leading-relaxed text-yellow-100/90">
+                            Hệ thống sẽ kết nối đến cơ quan thuế để lấy bổ sung các dữ liệu hóa đơn còn thiếu, bao gồm thông tin chi tiết và dữ liệu XML (nếu chưa có). Sau khi hoàn thiện dữ liệu, hệ thống sẽ tự động cập nhật lại hóa đơn sang ứng dụng {account?.type_app}.
+
+                            <br /><br />
+
+                            Quá trình này có thể mất nhiều thời gian tùy thuộc vào số lượng hóa đơn và tốc độ phản hồi từ cơ quan thuế.
+                        </div>
+                    </div>
+                </div>
+            ),
+            appSync: (
+                <div className="space-y-2 p-1">
+                    <div className="font-bold">
+                        Đồng bộ lại dữ liệu sang ứng dụng
+                    </div>
+                    <div className="rounded-sm border border-yellow-700/50 bg-yellow-950/40 px-2.5 py-2 text-xs text-yellow-100">
+                        <div className="italic leading-relaxed text-yellow-100/90">
+                            Hệ thống sẽ sử dụng dữ liệu hóa đơn hiện có trong kho lưu trữ để cập nhật lại sang ứng dụng {account?.type_app}.
+
+                            <br /><br />
+
+                            Chức năng này không lấy lại dữ liệu từ cơ quan thuế. Nếu hóa đơn đang thiếu thông tin chi tiết hoặc dữ liệu XML, quá trình cập nhật có thể tiếp tục thất bại.
+                        </div>
+                    </div>
+                </div>
+            ),
+            deleteData: (
+                <div className="space-y-2 p-1">
+                    <div className="font-bold">
+                        Xóa dữ liệu hóa đơn lưu trữ
+                    </div>
+                    <div className="rounded-sm border border-red-700/50 bg-red-950/40 px-2.5 py-2 text-xs text-red-100">
+                        <div className="italic leading-relaxed text-red-100/90">
+                            Hệ thống sẽ xóa dữ liệu hóa đơn đang lưu trữ trên máy tính nhằm giải phóng dung lượng ổ cứng.
+
+                            <br /><br />
+
+                            <strong>Lưu ý:</strong> Dữ liệu đã xóa sẽ không được tự động lấy lại từ cơ quan thuế hoặc cập nhật lại sang ứng dụng {account?.type_app}. Vui lòng kiểm tra kỹ trước khi thực hiện.
+                        </div>
+                    </div>
+                </div>
+            )
+        };
+    }, [account?.type_app])
 
     return (
         <AppWindow
@@ -626,21 +711,29 @@ export function TaxInvoiceManager() {
                                                 <div className="flex-1" />
                                             </div>
                                             <div className="flex gap-4 items-center">
-                                                <div className="flex flex-col gap-2">
+                                                <div className="flex flex-col gap-1">
                                                     <Switch
-                                                        label="Lấy lại từ cơ quan thuế"
-                                                        // description="Cho phép worker xử lý tài khoản này"
+                                                        label="Lấy lại dữ liệu thiếu từ cơ quan thuế"
+                                                        contentHelp={contentHelp.taxSync}
                                                         checked={syncConfig.taxSync}
                                                         onChange={(value) =>
                                                             updateSyncConfig("taxSync", value)
                                                         }
                                                     />
                                                     {account?.auto_sync && <Switch
-                                                        label="Đồng bộ lại sang ứng dụng"
-                                                        // description="Cho phép worker xử lý tài khoản này"
+                                                        label="Đồng bộ lại dữ liệu sang ứng dụng"
+                                                        contentHelp={contentHelp.appSync}
                                                         checked={syncConfig.appSync}
                                                         onChange={(value) =>
                                                             updateSyncConfig("appSync", value)
+                                                        }
+                                                    />}
+                                                    {account?.auto_sync && <Switch
+                                                        label="Xóa dữ liệu hóa đơn lưu trữ"
+                                                        contentHelp={contentHelp.deleteData}
+                                                        checked={syncConfig.deleteData}
+                                                        onChange={(value) =>
+                                                            updateSyncConfig("deleteData", value)
                                                         }
                                                     />}
                                                 </div>

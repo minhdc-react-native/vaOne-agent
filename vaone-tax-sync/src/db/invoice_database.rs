@@ -1362,9 +1362,10 @@ impl InvoiceDatabase {
         to_date: &str,
         tax_sync: bool,
         app_sync: bool,
+        delete_data: bool,
     ) -> Result<()> {
         self.check_tax_code(tax_code)?;
-        if !tax_sync && !app_sync {
+        if !tax_sync && !app_sync && !delete_data {
             return Ok(());
         }
         validate_date(from_date)?;
@@ -1379,6 +1380,7 @@ impl InvoiceDatabase {
         let tx = conn.transaction().map_err(db_error)?;
 
         if tax_sync {
+            println!("tax_sync>>");
             tx.execute(
                 "UPDATE sync_days SET list_status='pending'
                  WHERE tax_code = ?1 AND sync_date >= ?2 AND sync_date <= ?3",
@@ -1387,13 +1389,37 @@ impl InvoiceDatabase {
             .map_err(db_error)?;
         }
 
-        if app_sync {
+        if app_sync && !delete_data {
+            println!("app_sync>>");
             tx.execute(
                 "UPDATE sync_invoices
-                 SET upload_status = 'pending',
-                     upload_error = NULL,
-                     updated_at = CURRENT_TIMESTAMP
-                 WHERE tax_code = ?1 AND invoice_date >= ?2 AND invoice_date <= ?3",
+                        SET upload_status = 'pending',
+                            upload_error = NULL,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE tax_code = ?1
+                            AND invoice_date >= ?2
+                            AND invoice_date <= ?3",
+                params![tax_code, from_date, to_date],
+            )
+            .map_err(db_error)?;
+        }
+
+        if delete_data {
+            println!("delete_data>>");
+            tx.execute(
+                "DELETE FROM sync_invoices
+                        WHERE tax_code = ?1
+                            AND invoice_date >= ?2
+                            AND invoice_date <= ?3",
+                params![tax_code, from_date, to_date],
+            )
+            .map_err(db_error)?;
+
+            tx.execute(
+                "DELETE FROM sync_invoices_today
+                        WHERE tax_code = ?1
+                            AND invoice_date >= ?2
+                            AND invoice_date <= ?3",
                 params![tax_code, from_date, to_date],
             )
             .map_err(db_error)?;

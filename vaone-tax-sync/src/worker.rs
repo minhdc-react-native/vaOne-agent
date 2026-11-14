@@ -279,7 +279,7 @@ impl TaxSyncWorker {
             return Ok(false);
         }
 
-        let accounts = self.db.get_enabled_tax_accounts(false)?;
+        let accounts = self.db.get_enabled_tax_accounts(false, true)?;
         let mut has_pending = false;
 
         for account in accounts {
@@ -351,8 +351,8 @@ impl TaxSyncWorker {
 
     /// Một lượt quét toàn bộ tài khoản thuế đang bật.
     pub async fn run_once(&self, cancel: CancellationToken) -> Result<()> {
-        let accounts_error = self.db.get_enabled_tax_accounts(true)?;
-        let accounts = self.db.get_enabled_tax_accounts(false)?;
+        let accounts_error = self.db.get_enabled_tax_accounts(true, false)?;
+        let accounts = self.db.get_enabled_tax_accounts(false, false)?;
 
         self.observer.on_notification(&accounts_error);
 
@@ -420,7 +420,7 @@ impl TaxSyncWorker {
             return Ok(false);
         }
 
-        let accounts = self.db.get_enabled_tax_accounts(false)?;
+        let accounts = self.db.get_enabled_tax_accounts(false, true)?;
         let mut has_pending = false;
 
         for account in accounts {

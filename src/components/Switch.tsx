@@ -1,6 +1,7 @@
-import { forwardRef } from "react";
+import React, { forwardRef } from "react";
 import { cn } from "../lib/utils";
 import clsx from "clsx";
+import { Tooltip } from "./Tooltip/Tooltip";
 
 export interface SwitchProps {
     checked: boolean;
@@ -10,6 +11,7 @@ export interface SwitchProps {
     disabled?: boolean;
     className?: string;
     labelClass?: string;
+    contentHelp?: React.ReactNode
 }
 
 const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
@@ -21,7 +23,8 @@ const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
             description,
             disabled = false,
             className,
-            labelClass
+            labelClass,
+            contentHelp
         },
         ref
     ) => {
@@ -35,8 +38,8 @@ const Switch = forwardRef<HTMLButtonElement, SwitchProps>(
                 {(label || description) && (
                     <div className="flex flex-1 flex-col">
                         {label && (
-                            <span className={clsx("text-sm font-medium", labelClass)}>
-                                {label}
+                            <span className={clsx("text-sm font-medium flex gap-2", labelClass)}>
+                                {label} {contentHelp && <Tooltip content={contentHelp}><span className="text-blue cursor-pointer font-semibold">?</span></Tooltip>}
                             </span>
                         )}
 

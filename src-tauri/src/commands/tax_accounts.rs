@@ -103,7 +103,7 @@ pub async fn update_auto_sync(
 #[tauri::command]
 pub async fn app_logout_all(db: State<'_, Database>) -> Result<(), String> {
     let accounts = db
-        .get_enabled_tax_accounts(false)
+        .get_enabled_tax_accounts(false, false)
         .map_err(|e| e.to_string())?;
 
     for account in accounts {

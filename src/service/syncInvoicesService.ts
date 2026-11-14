@@ -112,6 +112,7 @@ export interface ISyncConfig {
     toDate?: string,
     taxSync: boolean,
     appSync: boolean,
+    deleteData: boolean
 }
 
 export const syncInvoiceService = {
@@ -144,5 +145,6 @@ export const syncInvoiceService = {
             toDate: param.toDate,
             taxSync: param.taxSync,
             appSync: param.appSync,
+            deleteData: param.deleteData,
         }),
 }

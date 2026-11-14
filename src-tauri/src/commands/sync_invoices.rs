@@ -58,14 +58,27 @@ pub fn reset_sync_status(
     to_date: String,
     tax_sync: bool,
     app_sync: bool,
+    delete_data: bool,
     invoice_db_manager: tauri::State<'_, InvoiceDatabaseManager>,
+    manager: State<'_, TaxSyncWorkerManager>,
 ) -> std::result::Result<(), String> {
     let invoice_db = invoice_db_manager
         .get(&tax_code)
         .map_err(|e| e.to_string())?;
-    invoice_db
-        .reset_sync_status(&tax_code, &from_date, &to_date, tax_sync, app_sync)
-        .map_err(|e| e.to_string())
+    let result = invoice_db
+        .reset_sync_status(
+            &tax_code,
+            &from_date,
+            &to_date,
+            tax_sync,
+            app_sync,
+            delete_data,
+        )
+        .map_err(|e| e.to_string());
+    if app_sync {
+        manager.notify_upload();
+    }
+    result
 }
 
 #[tauri::command]

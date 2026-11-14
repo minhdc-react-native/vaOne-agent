@@ -964,23 +964,19 @@ impl TaxAuthService {
             return Ok(());
         };
 
-        let default_url = match account.type_app.as_str() {
-            "vaOne" => "http://10.8.0.146:30334",
-            "vaShop" => "https://web.vashop.vn",
-            _ => unreachable!(),
-        };
-
-        let base_url = account
+        let logout_url = account
             .url_api
             .as_deref()
             .filter(|url| !url.trim().is_empty())
-            .unwrap_or(default_url);
-
-        let logout_url = format!("{}/api/app/user/logout", base_url.trim_end_matches('/'));
+            .unwrap_or_else(|| match account.type_app.as_str() {
+                "vaOne" => "http://10.8.0.146:30334/api/account/logout",
+                "vaShop" => "https://web.vashop.vn/api/app/user/logout",
+                _ => unreachable!(),
+            });
 
         let response = self
             .http
-            .get(&logout_url)
+            .get(logout_url)
             .header("Accept", "application/json")
             .bearer_auth(app_token)
             .send()
