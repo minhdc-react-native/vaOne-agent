@@ -8,12 +8,15 @@ use tauri_plugin_dialog::MessageDialogButtons;
 use crate::state::APP_HANDLE;
 
 pub fn check_update_on_startup(app: AppHandle, silent: Option<bool>) {
+    println!("[UPDATE] Function called");
     let silent = silent.unwrap_or(false);
     tauri::async_runtime::spawn(async move {
+        println!("[UPDATE] Task started");
         let Ok(updater) = app.updater() else {
+            println!("[UPDATE] Cannot create updater");
             return;
         };
-
+        println!("[UPDATE] Checking...");
         match updater.check().await {
             Ok(Some(update)) => {
                 let current_version = app.package_info().version.to_string();
@@ -70,6 +73,7 @@ pub fn check_update_on_startup(app: AppHandle, silent: Option<bool>) {
                 }
             }
         }
+        println!("[UPDATE] Check completed");
     });
 }
 

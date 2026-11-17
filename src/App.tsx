@@ -1,9 +1,8 @@
 import { Routes, Route, useNavigate } from "react-router-dom";
 import SettingsPage from "./pages/Settings";
 import { useEffect } from "react";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { GetInvoices } from "./pages/GetInvoices";
-import { SplashScreen } from "./pages/Splash";
 import LoginPage from "./pages/LoginPage";
 import { BlankPage } from "./pages/BlankPage";
 import { PreviewReport } from "./pages/PreviewReport";
@@ -23,6 +22,11 @@ function App() {
   const navigate = useNavigate();
   const setOpenOverlay = useAppStore(store => store.setOpenOverlay);
   const setSyncProgress = useAppStore(store => store.setSyncProgress);
+
+  useEffect(() => {
+    console.log("[REACT] App mounted");
+    emit("main-ready").catch(console.error);
+  }, []);
 
   useEffect(() => {
     let unlisteners: (() => void)[] = [];
@@ -93,7 +97,6 @@ function App() {
   }, [login]);
   return (
     <Routes>
-      <Route path="/" element={<SplashScreen />} />
       <Route path="/blank" element={<BlankPage />} />
       <Route path="/report" element={<PreviewReport />} />
       <Route path="/settings" element={<SettingsPage />} />

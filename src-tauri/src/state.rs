@@ -5,6 +5,8 @@ use tauri::{menu::MenuItem, AppHandle, Wry};
 
 pub static CURRENT_ROUTE: OnceLock<Mutex<String>> = OnceLock::new();
 
+pub static MAIN_READY: AtomicBool = AtomicBool::new(false);
+
 // ==========================
 // APP HANDLE (Tauri)
 // ==========================

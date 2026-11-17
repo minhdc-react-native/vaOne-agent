@@ -12,16 +12,17 @@ use crate::services::progress_store::ProgressStore;
 use crate::services::tct::tax_sync_adapter::{ConsoleSyncObserver, LocalCaptchaSolver};
 use crate::services::update::check_update_on_startup;
 use crate::services::worker_manage::TaxSyncWorkerManager;
-use crate::state::{APP_STATE, SYNC_MENU};
+use crate::state::{APP_STATE, MAIN_READY, SYNC_MENU};
 use crate::state::{CURRENT_ROUTE, ONLINE_MENU};
 use crate::utils::public::navigate_to_route;
 use serde_json::Value;
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
-    App, Manager,
+    App, Listener, Manager,
 };
 use tauri_plugin_notification::NotificationExt;
 use vaone_tax_sync::database::Database;
@@ -119,18 +120,30 @@ pub fn run() {
 
             crate::state::init_ws_state();
 
+            let start = std::time::Instant::now();
+
+            println!("[STARTUP] Before local server spawn");
+
             tauri::async_runtime::spawn(async {
-                services::local_server::start().await;
+                println!("[SERVER] Task started");
+
+                if let Err(e) = services::local_server::start().await {
+                    eprintln!("[SERVER] Error: {e}");
+                }
+
+                println!("[SERVER] Task stopped");
             });
 
-            let app_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                wait(Some(3000)).await;
-                if let Some(splash) = app_handle.get_webview_window("splash_screen") {
-                    let _ = splash.close();
-                    check_update_on_startup(app_handle, Some(true));
-                }
-            });
+            println!("[STARTUP] After local server spawn: {:?}", start.elapsed());
+
+            // let app_handle = app.handle().clone();
+            // tauri::async_runtime::spawn(async move {
+            //     wait(Some(3000)).await;
+            //     if let Some(splash) = app_handle.get_webview_window("splash") {
+            //         let _ = splash.close();
+            //         check_update_on_startup(app_handle, Some(true));
+            //     }
+            // });
 
             app.notification().on_action(|event| {
                 // Chỉ xử lý khi người dùng nhấn vào notification.
@@ -149,6 +162,7 @@ pub fn run() {
                     _ => {}
                 }
             })?;
+            println!("[STARTUP] Before database connect");
             // khởi tạo dữ liệu SQLite
             let app_data_dir = app.path().app_data_dir()?;
 
@@ -163,10 +177,12 @@ pub fn run() {
             app.manage(db.clone());
             app.manage(invoice_db_manager);
 
+            println!("[STARTUP] After database connect: {:?}", start.elapsed());
+
             let captcha_solver = Arc::new(LocalCaptchaSolver);
 
             let sync_observer = Arc::new(ConsoleSyncObserver);
-
+            println!("[STARTUP] Before workder create");
             let worker = Arc::new(TaxSyncWorker::new(
                 db,
                 app_data_dir.join("invoices"),
@@ -177,12 +193,37 @@ pub fn run() {
 
             let worker_manager = TaxSyncWorkerManager::new(worker);
 
-            // Tự chạy khi ứng dụng khởi động
-            worker_manager.start().map_err(std::io::Error::other)?;
+            // // Tự chạy khi ứng dụng khởi động
+            // worker_manager.start().map_err(std::io::Error::other)?;
 
             app.manage(worker_manager);
 
             app.manage(ProgressStore::default());
+            println!("[STARTUP] After worker create: {:?}", start.elapsed());
+            let app_handle = app.handle().clone();
+            let event_app_handle = app_handle.clone();
+
+            app_handle.once("main-ready", move |_| {
+                println!("MAIN WEBVIEW READY");
+
+                MAIN_READY.store(true, Ordering::SeqCst);
+
+                // Đóng splash
+                if let Some(splash) = event_app_handle.get_webview_window("splash") {
+                    let _ = splash.close();
+                }
+
+                // Kiểm tra cập nhật
+                let update_handle = event_app_handle.clone();
+                // check_update_on_startup(update_handle, Some(true));
+
+                // 3. Khởi chạy worker
+                if let Some(manager) = event_app_handle.try_state::<TaxSyncWorkerManager>() {
+                    if let Err(e) = manager.start() {
+                        eprintln!("Failed to start worker: {e}");
+                    }
+                }
+            });
 
             Ok(())
         })
