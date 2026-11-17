@@ -3,8 +3,6 @@ import LoginTctPage from "./LoginTctPage";
 import LoginMInvoicePage from "./LoginMInvoicePage";
 import LoginSaveInvoicePage from "./LoginSaveInvoicePage";
 import { useAppStore } from "../stores/app.store";
-import { useEffect } from "react";
-import { hideWindow } from "../components/AppWindow";
 import LoginEmpty from "./LoginEmpty";
 
 export default function LoginPage() {

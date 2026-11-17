@@ -363,9 +363,7 @@ export function TaxInvoiceManager() {
     const beforeClose = async () => {
         // await emit('modal_closed');
     }
-    const config = useMemo<IWindowConfig>(() => {
-        return { name: "historyInvoice", show: true, fullScreen }
-    }, [fullScreen]);
+    const config: IWindowConfig = { name: "historyInvoice", show: true, fullScreen }
 
     const contentHelp = useMemo((): Record<'taxSync' | 'appSync' | 'deleteData', ReactNode> => {
         return {

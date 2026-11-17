@@ -98,6 +98,9 @@ export default function LoginMInvoicePage({ params }: IProgs) {
             }
         });
     };
+    const config: IWindowConfig = {
+        name: "loginMInvoice"
+    };
 
     if (
         login &&
@@ -105,9 +108,6 @@ export default function LoginMInvoicePage({ params }: IProgs) {
     ) {
         return null;
     }
-    const config = useMemo<IWindowConfig>(() => {
-        return { name: "loginSaveInvoice" }
-    }, []);
 
     return (
         <AppWindow title="Đăng nhập" icon="User" config={config}>

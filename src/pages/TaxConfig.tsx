@@ -45,9 +45,7 @@ export const TaxConfig = () => {
         return confirmed;
     }
 
-    const config = useMemo<IWindowConfig>(() => {
-        return { name: "taxConfig" }
-    }, []);
+    const config: IWindowConfig = { name: "taxConfig" };
 
     return (
         <AppWindow title={"Quản lý kết nối, đồng bộ dữ liệu với tổng cục thuế"} icon="Unplug" config={config}

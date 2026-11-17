@@ -97,9 +97,7 @@ export default function SettingsPage() {
         await hideWindow();
     };
 
-    const config = useMemo<IWindowConfig>(() => {
-        return { name: "settings" }
-    }, []);
+    const config: IWindowConfig = { name: "settings" };
 
     if (!info) {
         return (
