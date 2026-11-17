@@ -101,7 +101,18 @@ export default function AppWindow({
     }, [config]);
 
     return (
-        <div className={clsx("flex h-screen flex-col bg-white")}>
+        <div
+            className="
+                flex
+                h-screen
+                flex-col
+                overflow-hidden
+                rounded-xl
+                border
+                border-gray-200
+                bg-white
+            "
+        >
             {/* Title Bar */}
             <header
                 className="

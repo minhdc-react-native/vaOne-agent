@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "splash",
-        "title": "VAOne Agent",
+        "title": "vaOne Plugin",
         "url": "splash.html",
         "width": 250,
         "height": 150,
@@ -28,6 +28,20 @@
       {
         "label": "main",
         "title": "vaOne Plugin",
+        "decorations": false,
+        "transparent": true,
+        "skipTaskbar": true,
+        "width": 400,
+        "height": 300,
+        "visible": false,
+        "center": true
+      },
+      {
+        "label": "modal_screen",
+        "title": "vaOne Plugin",
+        "decorations": false,
+        "transparent": true,
+        "skipTaskbar": true,
         "width": 400,
         "height": 300,
         "visible": false,
