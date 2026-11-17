@@ -136,14 +136,14 @@ pub fn run() {
 
             println!("[STARTUP] After local server spawn: {:?}", start.elapsed());
 
-            // let app_handle = app.handle().clone();
-            // tauri::async_runtime::spawn(async move {
-            //     wait(Some(3000)).await;
-            //     if let Some(splash) = app_handle.get_webview_window("splash") {
-            //         let _ = splash.close();
-            //         check_update_on_startup(app_handle, Some(true));
-            //     }
-            // });
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                wait(Some(3000)).await;
+                if let Some(splash) = app_handle.get_webview_window("splash") {
+                    let _ = splash.close();
+                    check_update_on_startup(app_handle, Some(true));
+                }
+            });
 
             app.notification().on_action(|event| {
                 // Chỉ xử lý khi người dùng nhấn vào notification.
@@ -193,8 +193,8 @@ pub fn run() {
 
             let worker_manager = TaxSyncWorkerManager::new(worker);
 
-            // // Tự chạy khi ứng dụng khởi động
-            // worker_manager.start().map_err(std::io::Error::other)?;
+            // Tự chạy khi ứng dụng khởi động
+            worker_manager.start().map_err(std::io::Error::other)?;
 
             app.manage(worker_manager);
 
@@ -208,21 +208,21 @@ pub fn run() {
 
                 MAIN_READY.store(true, Ordering::SeqCst);
 
-                // Đóng splash
-                if let Some(splash) = event_app_handle.get_webview_window("splash") {
-                    let _ = splash.close();
-                }
+                // // Đóng splash
+                // if let Some(splash) = event_app_handle.get_webview_window("splash") {
+                //     let _ = splash.close();
+                // }
 
-                // Kiểm tra cập nhật
-                let update_handle = event_app_handle.clone();
-                check_update_on_startup(update_handle, Some(true));
+                // // Kiểm tra cập nhật
+                // let update_handle = event_app_handle.clone();
+                // check_update_on_startup(update_handle, Some(true));
 
-                // 3. Khởi chạy worker
-                if let Some(manager) = event_app_handle.try_state::<TaxSyncWorkerManager>() {
-                    if let Err(e) = manager.start() {
-                        eprintln!("Failed to start worker: {e}");
-                    }
-                }
+                // // 3. Khởi chạy worker
+                // if let Some(manager) = event_app_handle.try_state::<TaxSyncWorkerManager>() {
+                //     if let Err(e) = manager.start() {
+                //         eprintln!("Failed to start worker: {e}");
+                //     }
+                // }
             });
 
             Ok(())
