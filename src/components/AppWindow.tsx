@@ -106,10 +106,6 @@ export default function AppWindow({
                 flex
                 h-screen
                 flex-col
-                overflow-hidden
-                rounded-xl
-                border
-                border-gray-200
                 bg-white
             "
         >

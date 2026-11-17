@@ -193,7 +193,7 @@ pub async fn open_modal_window(app: AppHandle, route: String, name: String) -> R
         .inner_size(width, height)
         .resizable(false)
         .decorations(false)
-        .transparent(true)
+        .transparent(false)
         .always_on_top(true)
         .center()
         .visible(false)

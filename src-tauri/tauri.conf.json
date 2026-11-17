@@ -20,7 +20,7 @@
         "center": true,
         "resizable": false,
         "decorations": false,
-        "transparent": true,
+        "transparent": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "visible": true
@@ -29,7 +29,7 @@
         "label": "main",
         "title": "vaOne Plugin",
         "decorations": false,
-        "transparent": true,
+        "transparent": false,
         "skipTaskbar": true,
         "width": 400,
         "height": 300,
