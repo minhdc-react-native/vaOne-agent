@@ -134,7 +134,8 @@ export default function LoginTctPage({ params }: IProgs) {
         });
         // await getInvoiceTCT(res.token);
     };
-    const config: IWindowConfig = { name: "loginTct" }
+
+    const config: IWindowConfig = useMemo(() => { return { name: "loginTct" } }, [])
     if (
         login &&
         login.username === params.username && !reConnect.current

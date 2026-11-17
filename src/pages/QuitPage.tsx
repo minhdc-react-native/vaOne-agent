@@ -8,7 +8,7 @@ export default function QuitPage() {
         await invoke("quit_app");
     };
 
-    const config: IWindowConfig = { name: "quit" };
+    const config: IWindowConfig = useMemo(() => { return { name: "quit" } }, [])
 
     return (
         <AppWindow title="Thoát ứng dụng" icon="LogOut" config={config}>

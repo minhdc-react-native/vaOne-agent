@@ -130,7 +130,7 @@ export default function ProgressTask({
         await emit('modal_closed');
     }
 
-    const config: IWindowConfig = { name: "progressTask" };
+    const config: IWindowConfig = useMemo(() => { return { name: "progressTask" } }, [])
 
     return (
         <AppWindow title={"Theo dõi tiến trình đồng bộ dữ liệu"} icon="Loader" callBack={{ beforeClose }} config={config}>

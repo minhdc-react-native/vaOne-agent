@@ -21,8 +21,7 @@ export const GetInvoices = () => {
         [login?.info.invoiceType]
     );
 
-    const config: IWindowConfig = { name: "getInvoiceTct" }
-
+    const config: IWindowConfig = useMemo(() => { return { name: "getInvoiceTct" } }, [])
     return (
         <AppWindow title="Tải hóa đơn..." icon="Download" config={config}>
             <div className="space-y-2 p-6 w-100">

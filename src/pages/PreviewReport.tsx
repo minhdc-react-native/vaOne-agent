@@ -72,7 +72,7 @@ export const PreviewReport = () => {
         // console.log('progress>>', JSON.stringify(progress));
     }, [progress])
 
-    const config: IWindowConfig = { name: "report" }
+    const config: IWindowConfig = useMemo(() => { return { name: "report" } }, [])
 
     return (
         <AppWindow title={"Preview Report"} icon="Printer" config={config}

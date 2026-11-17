@@ -41,7 +41,7 @@ export const UpdatePage = () => {
         };
     }, []);
 
-    const config: IWindowConfig = { name: "update" };
+    const config: IWindowConfig = useMemo(() => { return { name: "update" } }, [])
 
     return (
         <AppWindow title="Cập nhật" icon="Download" disableClose={true} config={config}>

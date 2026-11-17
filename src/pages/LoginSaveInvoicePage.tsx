@@ -99,9 +99,8 @@ export default function LoginSaveInvoicePage({ params }: IProgs) {
         });
     };
 
-    const config: IWindowConfig = {
-        name: "loginSaveInvoice"
-    };
+
+    const config: IWindowConfig = useMemo(() => { return { name: "loginSaveInvoice" } }, [])
 
     if (
         login &&

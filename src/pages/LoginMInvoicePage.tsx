@@ -98,9 +98,8 @@ export default function LoginMInvoicePage({ params }: IProgs) {
             }
         });
     };
-    const config: IWindowConfig = {
-        name: "loginMInvoice"
-    };
+
+    const config: IWindowConfig = useMemo(() => { return { name: "loginMInvoice" } }, [])
 
     if (
         login &&
