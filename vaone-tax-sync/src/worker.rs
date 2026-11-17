@@ -420,7 +420,7 @@ impl TaxSyncWorker {
             return Ok(false);
         }
 
-        let accounts = self.db.get_enabled_tax_accounts(false, true)?;
+        let accounts = self.db.get_enabled_tax_accounts(false, false)?;
         let mut has_pending = false;
 
         for account in accounts {
