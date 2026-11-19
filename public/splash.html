@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VAOne Agent</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            width: 250px;
+            height: 150px;
+            overflow: hidden;
+            background: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #222;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            padding: 10px 20px;
+            text-align: center;
+            background: #ffffff;
+            overflow: hidden;
+        }
+
+        .logo {
+            width: 110px;
+            height: 50px;
+            object-fit: contain;
+        }
+
+        h2 {
+            margin: 8px 0 5px;
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        p {
+            margin: 0;
+            color: #888;
+            font-size: 11px;
+        }
+
+        .progress {
+            margin-top: 22px;
+            height: 3px;
+            background: #eeeeee;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress::after {
+            content: "";
+            display: block;
+            width: 35%;
+            height: 100%;
+            background: #e11c2a;
+            border-radius: 10px;
+            animation: loading 1.2s ease-in-out infinite alternate;
+        }
+
+        @keyframes loading {
+            from {
+                transform: translateX(0);
+            }
+
+            to {
+                transform: translateX(185%);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <img class="logo" src="/logo-vacom.png" alt="vaOne" />
+        <h2>vaOne Plugin</h2>
+        <p>Đang khởi tạo ứng dụng...</p>
+        <div class="progress"></div>
+    </div>
+</body>
+
+</html>

@@ -43,3 +43,6 @@ yarn tauri icon src-tauri/icons/1024x1024.png
 
 rm -rf src-tauri/target
 yarn tauri build
+
+
+open "$HOME/Library/Application Support/com.congtyvacom.vaone-plugin"

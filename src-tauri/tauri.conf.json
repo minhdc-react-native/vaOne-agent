@@ -12,12 +12,29 @@
   "app": {
     "windows": [
       {
-        "label": "main",
-        "title": "vaOne plugin",
-        "width": 10,
-        "height": 10,
+        "label": "splash",
+        "title": "vaOne Plugin",
+        "url": "splash.html",
+        "width": 250,
+        "height": 150,
+        "center": true,
         "resizable": false,
-        "decorations": false
+        "decorations": false,
+        "transparent": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": true
+      },
+      {
+        "label": "main",
+        "title": "vaOne Plugin",
+        "decorations": false,
+        "transparent": false,
+        "skipTaskbar": true,
+        "width": 400,
+        "height": 300,
+        "visible": false,
+        "center": true
       }
     ],
     "security": {
@@ -45,7 +62,11 @@
     "macOS": {
       "infoPlist": "Info.plist",
       "signingIdentity": "Developer ID Application: Duy Thanh Vũ (YTH6G323A9)"
-    }
+    },
+    "resources": [
+      "resources/pdfium/pdfium.dll",
+      "resources/report-template.json"
+    ]
   },
   "plugins": {
     "updater": {
