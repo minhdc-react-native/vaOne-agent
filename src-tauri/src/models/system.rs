@@ -124,3 +124,11 @@ pub struct Login {
 
     pub info: serde_json::Value,
 }
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAvailablePayload {
+    pub current_version: String,
+    pub new_version: String,
+    pub notes: String,
+}

@@ -42,6 +42,23 @@ interface ProgressTaskProps {
 export default function ProgressTask({
     className = "",
 }: ProgressTaskProps) {
+
+    const beforeClose = async () => {
+        await emit('modal_closed');
+    }
+
+    const config: IWindowConfig = useMemo(() => { return { name: "progressTask" } }, [])
+
+    return (
+        <AppWindow title={"Theo dõi tiến trình đồng bộ dữ liệu"} icon="Loader" callBack={{ beforeClose }} config={config}>
+            <ProgressTaskView className={className} />
+        </AppWindow>
+    );
+}
+
+export function ProgressTaskView({
+    className = "",
+}: ProgressTaskProps) {
     const [tasks, setTasks] = useState<TaskProgress[]>([]);
 
     useEffect(() => {
@@ -126,19 +143,11 @@ export default function ProgressTask({
         };
     }, []);
 
-    const beforeClose = async () => {
-        await emit('modal_closed');
-    }
-
-    const config: IWindowConfig = useMemo(() => { return { name: "progressTask" } }, [])
-
     return (
-        <AppWindow title={"Theo dõi tiến trình đồng bộ dữ liệu"} icon="Loader" callBack={{ beforeClose }} config={config}>
-            <div className={`space-y-3 w-92 m-4 ${className}`}>
-                {tasks.length === 0 && <NoTask />}
-                {tasks.map((task) => <ProgressTaskItem key={`${task.tax_code}:${task.task}`} task={task} />)}
-            </div>
-        </AppWindow>
+        <div className={`space-y-3 m-2 ${className}`}>
+            {tasks.length === 0 && <NoTask />}
+            {tasks.map((task) => <ProgressTaskItem key={`${task.tax_code}:${task.task}`} task={task} />)}
+        </div>
     );
 }
 

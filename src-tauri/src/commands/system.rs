@@ -1,6 +1,8 @@
 use crate::models::system::AgentInfo;
 use crate::models::system::Login;
 use crate::services::progress_store::ProgressStore;
+use crate::services::update::check_update_on_startup;
+use crate::services::update::update_and_restart;
 use crate::state::APP_HANDLE;
 use crate::state::APP_STATE;
 use crate::state::CURRENT_ROUTE;
@@ -244,4 +246,18 @@ pub fn get_report_template(app: AppHandle) -> Result<serde_json::Value, String> 
     let content = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
 
     serde_json::from_str(&content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> Result<(), String> {
+    let current_version = app.package_info().version.to_string();
+
+    update_and_restart(app, current_version)
+        .await
+        .map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn check_update(app: AppHandle, silent: Option<bool>) {
+    check_update_on_startup(app, silent);
 }

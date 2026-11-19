@@ -6,10 +6,13 @@ import {
     AlertTriangle,
     Info,
     HelpCircle,
+    X,
 } from "lucide-react";
 import clsx from "clsx";
+import { Tooltip } from "./Tooltip/Tooltip";
+import Button from "./Button";
 
-type DialogType = "question" | "info" | "success" | "error" | "warning";
+export type DialogType = "question" | "info" | "success" | "error" | "warning";
 export type DialogSize =
     | "xs"
     | "sm"
@@ -45,6 +48,7 @@ interface DialogProps {
     onConfirm?: () => void;
     onCancel?: () => void;
     size?: DialogSize;
+    closeIcon?: boolean;
 }
 
 const typeConfig = {
@@ -85,7 +89,8 @@ export default function Dialog({
     cancelText = "Cancel",
     onConfirm,
     onCancel,
-    content
+    content,
+    closeIcon = false
 }: DialogProps) {
     if (!open) return null;
 
@@ -94,16 +99,20 @@ export default function Dialog({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className={clsx("rounded-xl bg-white p-5 shadow-lg", DIALOG_SIZE_CLASSES[size])}>
+            <div className={clsx("rounded-xl bg-white p-2 shadow-lg", DIALOG_SIZE_CLASSES[size])}>
                 {/* Header */}
-                <div className="flex items-center gap-3">
-                    <div className={cn("rounded-full p-2", config.bg)}>
+                <div className="flex items-center gap-2">
+                    <div className={cn("rounded-full p-1", config.bg)}>
                         <Icon className={cn("h-5 w-5", config.color)} />
                     </div>
 
-                    <div className="text-base font-semibold">
+                    <div className="text-base font-semibold flex-1">
                         {title || type.toUpperCase()}
                     </div>
+                    {closeIcon && <Tooltip title="Thoát"><Button
+                        onClick={onConfirm} variant="ghost"
+                        iconOnly icon={<X size={15} />}
+                    /></Tooltip>}
                 </div>
 
                 {/* Message */}
@@ -114,7 +123,7 @@ export default function Dialog({
                 )}
                 {content}
                 {/* Actions */}
-                <div className="mt-5 flex justify-end gap-2">
+                {!closeIcon && <div className="mt-5 flex justify-end gap-2">
                     {type === "question" && (
                         <button
                             onClick={onCancel}
@@ -139,7 +148,7 @@ export default function Dialog({
                     >
                         {confirmText}
                     </button>
-                </div>
+                </div>}
             </div>
         </div>
     );

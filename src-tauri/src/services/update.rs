@@ -5,7 +5,7 @@ use tauri_plugin_updater::UpdaterExt;
 
 use tauri_plugin_dialog::MessageDialogButtons;
 
-use crate::state::APP_HANDLE;
+use crate::{models::system::UpdateAvailablePayload, state::APP_HANDLE};
 
 pub fn check_update_on_startup(app: AppHandle, silent: Option<bool>) {
     println!("[UPDATE] Function called");
@@ -77,6 +77,52 @@ pub fn check_update_on_startup(app: AppHandle, silent: Option<bool>) {
     });
 }
 
+// pub fn check_update_on_startup(app: AppHandle, silent: Option<bool>) {
+//     let silent = silent.unwrap_or(false);
+
+//     tauri::async_runtime::spawn(async move {
+//         println!("[UPDATE] Checking...");
+
+//         let Ok(updater) = app.updater() else {
+//             eprintln!("[UPDATE] Cannot create updater");
+//             return;
+//         };
+
+//         match updater.check().await {
+//             Ok(Some(update)) => {
+//                 let payload = UpdateAvailablePayload {
+//                     current_version: app.package_info().version.to_string(),
+//                     new_version: update.version.to_string(),
+//                     notes: update
+//                         .body
+//                         .clone()
+//                         .unwrap_or_else(|| "Không có ghi chú cập nhật.".to_string()),
+//                 };
+
+//                 if let Err(err) = app.emit("update-available", payload) {
+//                     eprintln!("[UPDATE] Emit failed: {err}");
+//                 }
+//             }
+
+//             Ok(None) => {
+//                 if !silent {
+//                     let version = app.package_info().version.to_string();
+
+//                     let _ = app.emit("update-not-available", version);
+//                 }
+//             }
+
+//             Err(err) => {
+//                 eprintln!("[UPDATE] Check failed: {err}");
+
+//                 if !silent {
+//                     let _ = app.emit("update-check-failed", err.to_string());
+//                 }
+//             }
+//         }
+//     });
+// }
+
 fn emit_progress(progress: serde_json::Value) {
     if let Some(app) = APP_HANDLE.get() {
         let _ = app.emit("update-progress", progress);
@@ -84,7 +130,7 @@ fn emit_progress(progress: serde_json::Value) {
     }
 }
 
-async fn update_and_restart(app: AppHandle, current_version: String) -> anyhow::Result<()> {
+pub async fn update_and_restart(app: AppHandle, current_version: String) -> anyhow::Result<()> {
     let Some(update) = app.updater()?.check().await? else {
         println!("Already latest.");
         return Ok(());

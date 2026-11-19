@@ -1,6 +1,6 @@
 import { Routes, Route, useNavigate } from "react-router-dom";
 import SettingsPage from "./pages/Settings";
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
 import { GetInvoices } from "./pages/GetInvoices";
 import LoginPage from "./pages/LoginPage";
@@ -22,6 +22,7 @@ function App() {
   const navigate = useNavigate();
   const setOpenOverlay = useAppStore(store => store.setOpenOverlay);
   const setSyncProgress = useAppStore(store => store.setSyncProgress);
+
 
   useEffect(() => {
     console.log("[REACT] App mounted");
@@ -96,19 +97,33 @@ function App() {
     });
   }, [login]);
   return (
-    <Routes>
-      <Route path="/blank" element={<BlankPage />} />
-      <Route path="/report" element={<PreviewReport />} />
-      <Route path="/settings" element={<SettingsPage />} />
-      <Route path="/tax-config/:taxCode?" element={<TaxConfig />} />
-      <Route path="/history-invoice/:taxCode" element={<TaxInvoiceManager />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/get-invoices" element={<GetInvoices />} />
-      <Route path="/progress-task" element={<ProgressTask />} />
-      <Route path="/update" element={<UpdatePage />} />
-      <Route path="/quit" element={<QuitPage />} />
-    </Routes>
+    <>
+      <StartupRedirect />
+
+      <Routes>
+        <Route path="/blank" element={<BlankPage />} />
+        <Route path="/report" element={<PreviewReport />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/tax-config/:taxCode?" element={<TaxConfig />} />
+        <Route path="/history-invoice/:taxCode" element={<TaxInvoiceManager />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/get-invoices" element={<GetInvoices />} />
+        <Route path="/progress-task" element={<ProgressTask />} />
+        <Route path="/update" element={<UpdatePage />} />
+        <Route path="/quit" element={<QuitPage />} />
+      </Routes>
+    </>
   );
 }
 
 export default App;
+
+function StartupRedirect() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    navigate("/blank", { replace: true });
+  }, []);
+
+  return null;
+}

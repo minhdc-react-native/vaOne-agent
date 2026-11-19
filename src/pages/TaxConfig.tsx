@@ -10,6 +10,7 @@ import { dialog } from "../service/dialog.service";
 import ModalOverlay from "../features/ModalOverlay";
 import { useAppStore } from "../stores/app.store";
 import { Loading } from "../components/Loading";
+import { ProgressTaskView } from "./ProgressTask";
 export const KEY_TAX_ACCOUNT_SCROLL_TOP = 'tax-account-scroll-top'
 export const TaxConfig = () => {
     const { loading,
@@ -22,12 +23,18 @@ export const TaxConfig = () => {
             sessionStorage.removeItem(KEY_TAX_ACCOUNT_SCROLL_TOP);
         }
     }, []);
-    const openOverlay = useAppStore(appStore => appStore.openOverlay);
-    const setOpenOverlay = useAppStore(appStore => appStore.setOpenOverlay);
+    // const openOverlay = useAppStore(appStore => appStore.openOverlay);
+    // const setOpenOverlay = useAppStore(appStore => appStore.setOpenOverlay);
     const onProgressTask = async () => {
         try {
-            setOpenOverlay(true);
-            await invoke("open_modal_window", { route: "/progress-task", name: "taxConfig" });
+            await dialog.open({
+                type: "info",
+                title: 'Theo dõi tiến trình đồng bộ dữ liệu',
+                closeIcon: true,
+                content: <ProgressTaskView />
+            });
+            // setOpenOverlay(true);
+            // await invoke("open_modal_window", { route: "/progress-task", name: "taxConfig" });
         } catch (error) {
             console.error("Không thể mở tiến trình đồng bộ:", error);
         }
@@ -71,7 +78,7 @@ export const TaxConfig = () => {
             }
             callBack={!isRunning ? { onConfirm } : undefined}
         >
-            <ModalOverlay open={openOverlay} />
+            {/* <ModalOverlay open={openOverlay} /> */}
             <TaxAccountManager isRunning={isRunning} />
         </AppWindow>
     )

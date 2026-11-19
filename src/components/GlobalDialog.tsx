@@ -1,11 +1,11 @@
 import { ReactNode, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-import Dialog, { DialogSize } from "./Dialog";
+import Dialog, { DialogSize, DialogType } from "./Dialog";
 import { contents, dialog, listeners } from "../service/dialog.service";
 
 export type DialogPayload = {
     id: string;
-    type: any;
+    type: DialogType;
     title?: string;
     message?: string;
     text?: {
@@ -13,6 +13,7 @@ export type DialogPayload = {
         cancelText?: string;
     },
     content?: ReactNode,
+    closeIcon?: boolean,
     size?: DialogSize
 };
 
@@ -65,6 +66,7 @@ export function GlobalDialog() {
             }}
             content={content}
             size={current.size}
+            closeIcon={current.closeIcon}
         />
     );
 }

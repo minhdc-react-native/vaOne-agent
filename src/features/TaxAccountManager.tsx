@@ -566,11 +566,11 @@ export default function TaxAccountManager({ isRunning }: ITaxAccountManager) {
 
                     <div className="italic leading-relaxed text-yellow-100/90">
                         {error1 && <i className="block">
-                            1. {error1}
+                            {error2 ? '1.' : ''} {error1}
                         </i>}
 
                         {error2 && <i className="block">
-                            2.{error2}
+                            {error1 ? '2.' : ''} {error2}
                         </i>}
                     </div>
                 </div>

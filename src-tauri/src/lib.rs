@@ -213,7 +213,7 @@ pub fn run() {
                 //     let _ = splash.close();
                 // }
 
-                // // Kiểm tra cập nhật
+                // Kiểm tra cập nhật
                 // let update_handle = event_app_handle.clone();
                 // check_update_on_startup(update_handle, Some(true));
 
@@ -272,6 +272,8 @@ pub fn run() {
             commands::system::open_modal_window,
             commands::system::sync_current_progress,
             commands::system::get_report_template,
+            commands::system::install_update,
+            commands::system::check_update,
             commands::tax_accounts::get_tax_accounts,
             commands::tax_accounts::create_tax_account,
             commands::tax_accounts::update_tax_account,

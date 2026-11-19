@@ -6,6 +6,7 @@ import { HashRouter } from "react-router-dom";
 import { GlobalDialog } from "./components/GlobalDialog";
 import { GlobalLoading } from "./components/GlobalLoading";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { AppUpdateManager } from "./features/AppUpdateManager";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -25,6 +26,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <QueryClientProvider client={queryClient}>
         <GlobalLoading />
         <GlobalDialog />
+        {/* <AppUpdateManager /> */}
         <App />
       </QueryClientProvider>
     </HashRouter>
